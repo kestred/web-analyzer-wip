@@ -1,5 +1,5 @@
 use crate::syntax_kind::*;
-use javascript_grammar::scan::{
+use crate::scan::{
     scan_multibyte_symbol,
     scan_number,
     scan_template_literal,
@@ -16,13 +16,13 @@ use web_grammars_utils::scan::{
     scan_string,
 };
 
-pub struct TypescriptLexer {
+pub struct JavascriptLexer {
     prev_tokens: [Option<SyntaxKind>; 3]
 }
 
-impl TypescriptLexer {
-    pub fn new() -> TypescriptLexer {
-        TypescriptLexer { prev_tokens: [None, None, None] }
+impl JavascriptLexer {
+    pub fn new() -> JavascriptLexer {
+        JavascriptLexer { prev_tokens: [None, None, None] }
     }
 
     fn scan_next(&self, c: char, s: &mut Scanner) -> SyntaxKind {
@@ -50,9 +50,6 @@ impl TypescriptLexer {
             if let Some(kind) = to_javascript_keyword(s.current_text()) {
                 return kind;
             }
-            if let Some(kind) = to_typescript_keyword(s.current_text()) {
-                return kind;
-            }
             return IDENT;
         }
 
@@ -77,7 +74,7 @@ impl TypescriptLexer {
                 return STRING_LIT;
             }
             '`' => {
-                return scan_template_literal(s, TypescriptLexer::new());
+                return scan_template_literal(s, JavascriptLexer::new());
             }
             _ => (),
         }
@@ -86,7 +83,7 @@ impl TypescriptLexer {
     }
 }
 
-impl Lexer for TypescriptLexer {
+impl Lexer for JavascriptLexer {
     fn scan(&mut self, c: char, s: &mut Scanner) -> SyntaxKind {
         let kind = self.scan_next(c, s);
         self.prev_tokens = [Some(kind), self.prev_tokens[0], self.prev_tokens[1]];
@@ -94,7 +91,7 @@ impl Lexer for TypescriptLexer {
     }
 }
 
-impl ResetableLexer for TypescriptLexer {
+impl ResetableLexer for JavascriptLexer {
     fn reset(&mut self) {
         self.prev_tokens = [None, None, None];
     }

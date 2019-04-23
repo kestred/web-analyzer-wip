@@ -8,13 +8,13 @@ pub fn is_decimal(c: char) -> bool {
     '0' <= c && c <= '9'
 }
 
-pub fn is_ident_prefix_ascii(c: char) -> bool {
+pub fn is_ascii_ident_prefix(c: char) -> bool {
     (c >= 'a' && c <= 'z')
         || (c >= 'A' && c <= 'Z')
         || c == '_'
 }
 
-pub fn is_ident_suffix_ascii(c: char) -> bool {
+pub fn is_ascii_ident_suffix(c: char) -> bool {
     (c >= 'a' && c <= 'z')
         || (c >= 'A' && c <= 'Z')
         || (c >= '0' && c <= '9')

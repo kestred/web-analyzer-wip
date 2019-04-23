@@ -34,15 +34,16 @@ pub const IN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(123);
 pub const INSTANCEOF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(124);
 pub const NEW_KW: SyntaxKind = JAVASCRIPT.syntax_kind(125);
 pub const NULL_KW: SyntaxKind = JAVASCRIPT.syntax_kind(126);
-pub const RETURN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(131);
-pub const SUPER_KW: SyntaxKind = JAVASCRIPT.syntax_kind(132);
-pub const SWITCH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(133);
-pub const THIS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(134);
-pub const THROW_KW: SyntaxKind = JAVASCRIPT.syntax_kind(135);
-pub const TRUE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(136);
-pub const TRY_KW: SyntaxKind = JAVASCRIPT.syntax_kind(137);
-pub const TYPEOF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(138);
-pub const VAR_KW: SyntaxKind = JAVASCRIPT.syntax_kind(139);
+pub const RETURN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(130);
+pub const SUPER_KW: SyntaxKind = JAVASCRIPT.syntax_kind(131);
+pub const SWITCH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(132);
+pub const THIS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(133);
+pub const THROW_KW: SyntaxKind = JAVASCRIPT.syntax_kind(134);
+pub const TRUE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(135);
+pub const TRY_KW: SyntaxKind = JAVASCRIPT.syntax_kind(136);
+pub const TYPEOF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(137);
+pub const VAR_KW: SyntaxKind = JAVASCRIPT.syntax_kind(138);
+pub const VOID_KW: SyntaxKind = JAVASCRIPT.syntax_kind(139);
 pub const WHILE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(140);
 pub const WITH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(141);
 pub const YIELD_KW: SyntaxKind = JAVASCRIPT.syntax_kind(142);
@@ -87,6 +88,59 @@ pub const STRING_LIT: SyntaxKind = JAVASCRIPT.syntax_kind(202);
 pub const REGEXP_LIT: SyntaxKind = JAVASCRIPT.syntax_kind(203);
 pub const TEMPLATE_LIT: SyntaxKind = JAVASCRIPT.syntax_kind(204);
 
+pub fn is_javascript_punct(k: SyntaxKind) -> bool {
+    match k {
+        _ if k == DOT => true,
+        _ if k == SEMI => true,
+        _ if k == COMMA => true,
+        _ if k == COLON => true,
+        _ if k == QUESTION => true,
+        _ if k == L_PAREN => true,
+        _ if k == R_PAREN => true, // N.B. amibiguous when distinguishing regexp
+        _ if k == L_CURLY => true,
+        _ if k == R_CURLY => true, // N.B. amibiguous when distinguishing regexp
+        _ if k == L_BRACK => true,
+        _ if k == R_BRACK => true, // N.B. ignore when distinguishing regexp
+        _ if k == L_ANGLE => true,
+        _ if k == R_ANGLE => true,
+        _ if k == LTEQ => true,
+        _ if k == GTEQ => true,
+        _ if k == EQEQ => true,
+        _ if k == EQEQEQ => true,
+        _ if k == BANG => true,
+        _ if k == BANGEQ => true,
+        _ if k == BANGEQEQ => true,
+        _ if k == PLUS => true,
+        _ if k == PLUS_EQ => true,
+        _ if k == MINUS => true,
+        _ if k == MINUS_EQ => true,
+        _ if k == STAR => true,
+        _ if k == STAR_EQ => true,
+        _ if k == SLASH => true,
+        _ if k == SLASH_EQ => true,
+        _ if k == PERCENT => true,
+        _ if k == PERCENT_EQ => true,
+        _ if k == INCREMENT => true,
+        _ if k == DECREMENT => true,
+        _ if k == SHL => true,
+        _ if k == SHL_EQ => true,
+        _ if k == SHR => true,
+        _ if k == SHR_EQ => true,
+        _ if k == SHU => true,
+        _ if k == SHU_EQ => true,
+        _ if k == CARET => true,
+        _ if k == CARET_EQ => true,
+        _ if k == AMPERSAND => true,
+        _ if k == AMPERSAND_EQ => true,
+        _ if k == PIPE => true,
+        _ if k == PIPE_EQ => true,
+        _ if k == AND => true,
+        _ if k == OR => true,
+        _ if k == TILDA => true,
+        _ => false,
+    }
+}
+
 pub fn to_javascript_symbol(c: char) -> Option<SyntaxKind> {
     match c {
         '(' => Some(L_PAREN),
@@ -102,7 +156,6 @@ pub fn to_javascript_symbol(c: char) -> Option<SyntaxKind> {
         _ => None
     }
 }
-
 
 pub fn to_javascript_keyword(s: &str) -> Option<SyntaxKind> {
     match s {
