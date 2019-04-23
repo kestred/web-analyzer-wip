@@ -1,7 +1,7 @@
 use crate::syntax_kind::*;
 use web_grammars_utils::{Scanner, SyntaxKind};
 use web_grammars_utils::lexer::ResetableLexer;
-use web_grammars_utils::scan::is_decimal;
+use web_grammars_utils::scan::{is_decimal, scan_string};
 
 /// Assumes preceding back tick
 pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) -> SyntaxKind {
@@ -47,13 +47,22 @@ pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) ->
 }
 
 /// Assumes preceding `/`
-pub fn scan_regexp_literal(s: &mut Scanner, prev_tokens: [Option<SyntaxKind>; 3]) -> Option<SyntaxKind> {
+pub fn scan_regexp_literal(s: &mut Scanner, prev_tokens: [Option<SyntaxKind>; 3]) -> bool {
     let next_chars = [Some('/'), s.current(), s.nth(1)];
     if !is_regexp_start(next_chars, prev_tokens) {
-        return None;
+        return false;
     }
 
-    None
+    scan_string('/', s);
+    s.bump_while(is_regexp_flag);
+    true
+}
+
+fn is_regexp_flag(c: char) -> bool {
+    match c {
+        'g' | 'i' | 'm' | 's' | 'u' | 'y' => true,
+        _ => false,
+    }
 }
 
 fn is_regexp_start(next: [Option<char>; 3], prev: [Option<SyntaxKind>; 3]) -> bool {
@@ -63,42 +72,43 @@ fn is_regexp_start(next: [Option<char>; 3], prev: [Option<SyntaxKind>; 3]) -> bo
     };
 
     if is_javascript_punct(_1st) {
-        if let Some(_2nd) = prev[1] {
-            if is_javascript_punct(_2nd) {
-                if _1st == INCREMENT || _1st == DECREMENT {
-                    let next_chars = [None, next[0], next[1]];
-                    let prev_tokens = [Some(_2nd), prev[2], None];
-                    return is_regexp_start(next_chars, prev_tokens);
-                } else if _1st == R_CURLY {
-                    // N.B. assume regexp follows curly, because the alternative never
-                    //      makes sense semantically even if it is valid syntactically.
-                    return true;
-                } else if _1st == R_PAREN {
-                    // FIXME: This part certainly can parse valid code incorrectly.
-
-                    // HACK: Use some heuristics to best guess whether its a regexp
-                    return match (next[0], next[1], next[2]) {
-                        // Looks like a pattern
-                        (Some('/'), Some('^'), _) => true,
-                        (Some('/'), Some('['), _) => true,
-                        (Some('/'), Some('\\'), _) => true,
-
-                        // Looks like division
-                        (Some('/'), Some('('), _) => false,
-                        (Some('/'), Some(' '), _) => false,
-                        (Some('/'), Some(k), _) if is_decimal(k) => false,
-
-                        // Fallback to assuming regexp after a parenthesis
-                        _ => true,
-                    };
-                } else if _1st == R_BRACK {
-                    // N.B. a regular expression can never follow a `]`
-                    return false;
-                } else {
-                    // We are confident that this is actually a regular expression!
-                    return true;
-                }
+        if _1st == INCREMENT || _1st == DECREMENT {
+            if let Some(_2nd) = prev[1] {
+                let next_chars = [None, next[0], next[1]];
+                let prev_tokens = [Some(_2nd), prev[2], None];
+                return is_regexp_start(next_chars, prev_tokens);
             }
+            return true;
+        } else if _1st == R_CURLY {
+            // N.B. assume regexp follows curly, because the alternative never
+            //      makes sense semantically even if it is valid syntactically.
+            return true;
+        } else if _1st == R_PAREN {
+            // FIXME: This part certainly can parse valid code incorrectly.
+            // TODO: Maybe conservatively, always return `false` in this case
+            //       and handle the weird symbol sequences during parsing?
+            // HACK: Use some heuristics to best guess whether its a regexp
+            return match (next[0], next[1], next[2]) {
+                // Looks like a pattern
+                (Some('/'), Some('^'), _) => true,
+                (Some('/'), Some('['), _) => true,
+                (Some('/'), Some('\\'), _) => true,
+
+                // Looks like division
+                (Some('/'), Some('\n'), _) => false,
+                (Some('/'), Some('('), _) => false,
+                (Some('/'), Some(' '), _) => false,
+                (Some('/'), Some(k), _) if is_decimal(k) => false,
+
+                // Fallback to assuming regexp after a parenthesis
+                _ => true,
+            };
+        } else if _1st == R_BRACK {
+            // N.B. a regular expression can never follow a `]`
+            return false;
+        } else {
+            // We are confident that this is actually a regular expression!
+            return true;
         }
     }
     match _1st {

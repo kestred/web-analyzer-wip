@@ -2,6 +2,7 @@ use crate::syntax_kind::*;
 use crate::scan::{
     scan_multibyte_symbol,
     scan_number,
+    scan_regexp_literal,
     scan_template_literal,
 };
 use web_grammars_utils::{Lexer, Scanner, SyntaxKind};
@@ -40,6 +41,9 @@ impl JavascriptLexer {
             '/' => {
                 if scan_c_comment(s, false) {
                     return COMMENT;
+                }
+                if scan_regexp_literal(s, self.prev_tokens) {
+                    return REGEXP_LIT;
                 }
             }
             _ => (),
@@ -86,7 +90,9 @@ impl JavascriptLexer {
 impl Lexer for JavascriptLexer {
     fn scan(&mut self, c: char, s: &mut Scanner) -> SyntaxKind {
         let kind = self.scan_next(c, s);
-        self.prev_tokens = [Some(kind), self.prev_tokens[0], self.prev_tokens[1]];
+        if kind != WHITESPACE && kind != COMMENT && kind != ERROR {
+            self.prev_tokens = [Some(kind), self.prev_tokens[0], self.prev_tokens[1]];
+        }
         return kind;
     }
 }
@@ -102,7 +108,35 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_lex_template() {
+    fn test_scan_regexp() {
+        let example = r#"
+let foo = /abc/.test(3);
+let bar = 12 / 3.5;
+if (/^[A-Za-z_]+$/g.test(x)) return true;
+"#;
+
+        let tokens = JavascriptLexer::new()
+            .tokenize(example)
+            .into_iter()
+            .map(|t| t.kind)
+            .filter(|k| *k != WHITESPACE)
+            .collect::<Vec<_>>();
+
+        let expect = vec![
+            // let foo = /abc/.test(3);
+            LET_KW, IDENT, EQ, REGEXP_LIT, DOT, IDENT, L_PAREN, NUMBER_LIT, R_PAREN, SEMI,
+
+            // let bar = 12 / 3.5;
+            LET_KW, IDENT, EQ, NUMBER_LIT, SLASH, NUMBER_LIT, SEMI,
+
+            // if (/^[A-Za-z_]+\/$/g.test(x)) return true;
+            IF_KW, L_PAREN, REGEXP_LIT, DOT, IDENT, L_PAREN, IDENT, R_PAREN, R_PAREN, RETURN_KW, TRUE_KW, SEMI
+        ];
+        assert_eq!(tokens, expect);
+    }
+
+    #[test]
+    fn test_scan_template() {
         let example = r#"
 let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '2';
 "#;
@@ -119,7 +153,7 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
     }
 
     #[test]
-    fn test_lex_sample1() {
+    fn test_scan_sample1() {
         let example = r#"
 var rows = prompt("How many rows for your multiplication table?");
 var cols = prompt("How many columns for your multiplication table?");

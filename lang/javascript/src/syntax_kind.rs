@@ -105,6 +105,7 @@ pub fn is_javascript_punct(k: SyntaxKind) -> bool {
         _ if k == R_ANGLE => true,
         _ if k == LTEQ => true,
         _ if k == GTEQ => true,
+        _ if k == EQ => true,
         _ if k == EQEQ => true,
         _ if k == EQEQEQ => true,
         _ if k == BANG => true,

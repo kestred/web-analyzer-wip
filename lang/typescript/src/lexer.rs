@@ -2,6 +2,7 @@ use crate::syntax_kind::*;
 use javascript_grammar::scan::{
     scan_multibyte_symbol,
     scan_number,
+    scan_regexp_literal,
     scan_template_literal,
 };
 use web_grammars_utils::{Lexer, Scanner, SyntaxKind};
@@ -40,6 +41,9 @@ impl TypescriptLexer {
             '/' => {
                 if scan_c_comment(s, false) {
                     return COMMENT;
+                }
+                if scan_regexp_literal(s, self.prev_tokens) {
+                    return REGEXP_LIT;
                 }
             }
             _ => (),
@@ -89,7 +93,9 @@ impl TypescriptLexer {
 impl Lexer for TypescriptLexer {
     fn scan(&mut self, c: char, s: &mut Scanner) -> SyntaxKind {
         let kind = self.scan_next(c, s);
-        self.prev_tokens = [Some(kind), self.prev_tokens[0], self.prev_tokens[1]];
+        if kind != WHITESPACE && kind != COMMENT && kind != ERROR {
+            self.prev_tokens = [Some(kind), self.prev_tokens[0], self.prev_tokens[1]];
+        }
         return kind;
     }
 }
