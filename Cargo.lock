@@ -51,6 +51,14 @@ version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "estree-grammar"
+version = "0.1.0"
+dependencies = [
+ "combine 3.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "web-grammars-utils 0.1.0",
+]
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -228,7 +236,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "colosseum 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "smol_str 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smol_str 0.1.10 (git+https://github.com/kestred/smol_str.git?branch=kstenerson/from_iterator)",
  "text_unit 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -266,7 +274,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "smol_str"
 version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/kestred/smol_str.git?branch=kstenerson/from_iterator#3826349e3c32c0f991a2eded01e340c0c8f049ed"
 
 [[package]]
 name = "stable_deref_trait"
@@ -311,7 +319,6 @@ dependencies = [
 name = "web-grammars-utils"
 version = "0.1.0"
 dependencies = [
- "combine 3.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rowan 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -367,7 +374,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)" = "c4488ae950c49d403731982257768f48fada354a5203fe81f9bb6f43ca9002be"
-"checksum smol_str 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "d077b3367211e9c6e2e012fb804c444e0d80ab5a51ae4137739b58e6446dcaef"
+"checksum smol_str 0.1.10 (git+https://github.com/kestred/smol_str.git?branch=kstenerson/from_iterator)" = "<none>"
 "checksum stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 "checksum text_unit 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "158bb1c22b638b1da3c95a8ad9f061ea40d4d39fd0301be3a520f92efeeb189e"
 "checksum unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"

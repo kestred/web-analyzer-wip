@@ -1,8 +1,9 @@
 [package]
-name = "web-grammars-utils"
+name = "estree-grammar"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
 [dependencies]
-rowan = "0.5.0"
+combine = "3.8.1"
+web-grammars-utils = { path = "../../utils" }
