@@ -56,6 +56,20 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "html-grammar"
+version = "0.1.0"
+dependencies = [
+ "web-grammars-utils 0.1.0",
+]
+
+[[package]]
+name = "javascript-grammar"
+version = "0.1.0"
+dependencies = [
+ "web-grammars-utils 0.1.0",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -268,6 +282,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "typescript-grammar"
 version = "0.1.0"
 dependencies = [
+ "javascript-grammar 0.1.0",
  "web-grammars-utils 0.1.0",
 ]
 
@@ -288,6 +303,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "vue-grammar"
 version = "0.1.0"
 dependencies = [
+ "html-grammar 0.1.0",
  "web-grammars-utils 0.1.0",
 ]
 

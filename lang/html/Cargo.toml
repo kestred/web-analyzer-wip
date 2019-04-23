@@ -1,9 +1,8 @@
 [package]
-name = "vue-grammar"
+name = "html-grammar"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
 [dependencies]
 web-grammars-utils = { path = "../../utils" }
-html-grammar = { path = "../html" }
