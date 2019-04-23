@@ -1,5 +1,5 @@
 use crate::syntax_kind::*;
-use web_grammars_utils::{Lexer, Scanner, SyntaxKind};
+use web_grammars_utils::{Scanner, SyntaxKind};
 use web_grammars_utils::lexer::ResetableLexer;
 use web_grammars_utils::scan::is_decimal;
 

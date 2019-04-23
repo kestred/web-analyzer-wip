@@ -96,3 +96,71 @@ impl ResetableLexer for JavascriptLexer {
         self.prev_tokens = [None, None, None];
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_lex_sample1() {
+        let example = r#"
+var rows = prompt("How many rows for your multiplication table?");
+var cols = prompt("How many columns for your multiplication table?");
+if(rows == "" || rows == null) rows = 10;
+if(cols== "" || cols== null) cols = 10;
+createTable(rows, cols);
+function createTable(rows, cols) {
+    var j=1;
+    var output = "<table border='1' width='500' cellspacing='0'cellpadding='5'>";
+    for(i=1;i<=rows;i++) {
+        output = output + "<tr>";
+        while(j<=cols) {
+            output = output + "<td>" + i*j + "</td>";
+            j = j+1;
+        }
+        output = output + "</tr>";
+        j = 1;
+    }
+    output = output + "</table>";
+    document.write(output);
+}
+"#;
+        let tokens = JavascriptLexer::new()
+            .tokenize(example)
+            .into_iter()
+            .map(|t| t.kind)
+            .collect::<Vec<_>>();
+        let expect = &[
+            WHITESPACE, VAR_KW, WHITESPACE, IDENT, WHITESPACE, EQ, // var rows =
+            WHITESPACE, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI, // prompt("How many rows for your multiplication table?");
+        ];
+        assert_eq!(&tokens[..expect.len()], expect);
+
+        let tokens = tokens
+            .into_iter()
+            .filter(|k| *k != WHITESPACE)
+            .collect::<Vec<_>>();
+        let expect = vec![
+            // var rows = prompt("How many rows for your multiplication table?");
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI,
+
+            // var cols = prompt("How many columns for your multiplication table?");
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI,
+
+            // if(rows == "" || rows == null) rows = 10;
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LIT, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LIT, SEMI,
+
+            // if(cols== "" || cols== null) cols = 10;
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LIT, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LIT, SEMI,
+
+            // createTable(rows, cols);
+            IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, SEMI,
+
+            // function createTable(rows, cols) {
+            FUNCTION_KW, IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, L_CURLY
+        ];
+        assert_eq!(&tokens[..expect.len()], expect.as_slice());
+
+
+    }
+}

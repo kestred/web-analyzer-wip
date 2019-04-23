@@ -11,7 +11,7 @@ impl LanguageKind {
 
     pub const fn syntax_kind(self, suffix: u16) -> SyntaxKind {
         let prefix = (self.0 as u16) << LanguageKind::SYNTAX_BITS;
-        SyntaxKind(prefix & suffix)
+        SyntaxKind(prefix | suffix)
     }
 }
 
@@ -29,7 +29,7 @@ mod tests {
     fn test_language_kind() {
         let l = LanguageKind(2);
         let k = l.syntax_kind(1234);
-        assert_eq!(k.0, 2048 + 1234);
+        assert_eq!(k.0, 4096 + 1234);
         let o =  LanguageKind::from(k);
         assert_eq!(o, l);
     }
