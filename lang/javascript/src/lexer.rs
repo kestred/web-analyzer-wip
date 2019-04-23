@@ -102,6 +102,23 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_lex_template() {
+        let example = r#"
+let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '2';
+"#;
+
+        let tokens = JavascriptLexer::new()
+            .tokenize(example)
+            .into_iter()
+            .map(|t| t.kind)
+            .filter(|k| *k != WHITESPACE)
+            .collect::<Vec<_>>();
+
+        let expect = vec![LET_KW, IDENT, EQ, TEMPLATE_LIT, PLUS, TEMPLATE_LIT, PLUS, STRING_LIT, SEMI];
+        assert_eq!(tokens, expect);
+    }
+
+    #[test]
     fn test_lex_sample1() {
         let example = r#"
 var rows = prompt("How many rows for your multiplication table?");
@@ -160,7 +177,5 @@ function createTable(rows, cols) {
             FUNCTION_KW, IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, L_CURLY
         ];
         assert_eq!(&tokens[..expect.len()], expect.as_slice());
-
-
     }
 }

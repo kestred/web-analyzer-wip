@@ -92,6 +92,21 @@ impl<'s> Scanner<'s> {
         let len: u32 = self.len.into();
         self.text[len as usize..].chars()
     }
+
+    // TODO: Replace `advance` and `remaining_text` with a safer "child" scanner method
+
+    #[doc(hidden)]
+    /// Advances the scanner a given length.
+    pub fn advance(&mut self, len: TextUnit) {
+        self.len += len;
+    }
+
+    #[doc(hidden)]
+    /// Returns the remaining text.
+    pub fn remaining_text(&self) -> &str {
+        let len: u32 = self.len.into();
+        &self.text[len as usize..]
+    }
 }
 
 #[cfg(test)]

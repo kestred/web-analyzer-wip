@@ -4,7 +4,7 @@ use web_grammars_utils::lexer::ResetableLexer;
 use web_grammars_utils::scan::is_decimal;
 
 /// Assumes preceding back tick
-pub fn scan_template_literal(s: &mut Scanner, mut l: impl ResetableLexer) -> SyntaxKind {
+pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) -> SyntaxKind {
     while let Some(c) = s.current() {
         match c {
             '\\' => {
@@ -19,14 +19,18 @@ pub fn scan_template_literal(s: &mut Scanner, mut l: impl ResetableLexer) -> Syn
                     s.bump();
 
                     // Scan using lexer until we find a matching R_BRACE
-                    while let Some(c) = s.current() {
-                        match l.scan(c, s) { // TODO: Test this to make sure it works
+                    while s.current().is_some() {
+                        let mut child = Scanner::new(s.remaining_text());
+                        let c = child.bump().unwrap();
+                        match lexer.scan(c, &mut child) {
                             k if k == EOF => break,
                             k if k == R_CURLY => break,
                             k if k == TOMBSTONE => return TOMBSTONE,
                             k if k == ERROR => return ERROR,
-                            _ => l.reset(),
+                            _ => (),
                         }
+                        s.advance(child.into_len());
+                        lexer.reset()
                     }
                 }
             }
