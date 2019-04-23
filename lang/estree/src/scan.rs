@@ -10,37 +10,37 @@ pub fn is_markdown_lang_char(c: char) -> bool {
 
 /// Extracts code blocks from a markdown file
 pub fn extract_code_blocks(text: &str) -> Vec<&str> {
-  let mut text = text;
-  let mut results = Vec::new();
-  while !text.is_empty() {
-    let mut s = Scanner::new(text);
-    let c = s.bump().unwrap();
-    let found = scan_part(c, &mut s);
-    let length: u32 = s.into_len().into();
-    if found {
-      results.push(&text[..length as usize]);
+    let mut text = text;
+    let mut results = Vec::new();
+    while !text.is_empty() {
+        let mut s = Scanner::new(text);
+        let c = s.bump().unwrap();
+        let found = scan_part(c, &mut s);
+        let length: u32 = s.into_len().into();
+        if found {
+            results.push(&text[..length as usize]);
+        }
+        text = &text[length as usize..];
     }
-    text = &text[length as usize..];
-  }
-  results
+    results
 }
 
 fn scan_part(c: char, s: &mut Scanner) -> bool {
-  match c {
-    '`' => {
-      return scan_code_block(s);
+    match c {
+        '`' => {
+            return scan_code_block(s);
+        }
+        _ => {
+            s.bump_while(|c| c != '`');
+            return false;
+        }
     }
-    _ => {
-      s.bump_while(|c| c != '`');
-      return false;
-    }
-  }
 }
 
 /// Assumes preceding backtick
 fn scan_code_block(s: &mut Scanner) -> bool {
     if !s.at_str("``") {
-      return false;
+        return false;
     }
     s.bump();
     s.bump();
@@ -50,13 +50,13 @@ fn scan_code_block(s: &mut Scanner) -> bool {
             '`' => {
                 s.bump();
                 if s.at_str("``") {
-                  s.bump();
-                  s.bump();
-                  return true;
+                    s.bump();
+                    s.bump();
+                    return true;
                 }
             }
             _ => {
-              s.bump();
+                s.bump();
             }
         }
     }
@@ -66,11 +66,11 @@ fn scan_code_block(s: &mut Scanner) -> bool {
 
 #[cfg(test)]
 mod test {
-  use super::*;
+    use super::*;
 
-  #[test]
-  fn test_extract_sample() {
-      let example = r#"
+    #[test]
+    fn test_extract_sample() {
+        let example = r#"
 This document specifies the extensions to the core ESTree AST types to support the ES2018 grammar.
 
 # Statements
@@ -94,12 +94,12 @@ extend interface ObjectExpression {
 Spread properties, e.g., `{a: 1, ...obj, b: 2}`.
 "#;
 
-      let blocks = extract_code_blocks(example);
-      assert_eq!(blocks.len(), 2);
-      assert_eq!(blocks[0], r#"```js
+        let blocks = extract_code_blocks(example);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0], r#"```js
 extend interface ForOfStatement {
   await: boolean;
 }
 ```"#);
-  }
+    }
 }

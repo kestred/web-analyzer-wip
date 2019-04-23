@@ -41,7 +41,7 @@ where
             name,
             parents,
             fields,
-            extend: extend_kw.is_some(),
+            is_extension: extend_kw.is_some(),
         }
     })
 }
