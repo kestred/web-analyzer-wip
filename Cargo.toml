@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "lang/typescript",
+  "lang/vue",
+  "utils"
+]
