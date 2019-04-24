@@ -27,7 +27,7 @@ impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
         self.errors.push((error, self.text_pos.into()))
     }
 
-    pub fn token<F>(&mut self, kind: SyntaxKind, num_tokens: usize, skip: F)
+    pub fn span<F>(&mut self, kind: SyntaxKind, num_tokens: usize, skip: F)
     where
         F: Fn(SyntaxKind) -> bool
     {

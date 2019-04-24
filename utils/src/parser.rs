@@ -17,7 +17,7 @@ mod token_source;
 mod tree_sink;
 
 use crate::Token;
-use crate::syntax_kind::{COMMENT, EOF};
+use crate::syntax_kind::{COMMENT, TOMBSTONE};
 use rowan::{SyntaxKind, SyntaxNode, TreeArc};
 use std::fmt::Debug;
 
@@ -42,6 +42,7 @@ where
 }
 
 pub struct Parser<'a, E: 'static + Debug + Send + Sync> {
+    stack: Vec<Event<E>>,
     source_pos: usize,
     source: TextTokenSource<'a>,
     sink: TextTreeSink<'a, E>,
@@ -50,19 +51,51 @@ pub struct Parser<'a, E: 'static + Debug + Send + Sync> {
 impl<'a, E: 'static + Debug + Send + Sync> Parser<'a, E> {
     pub fn new(text: &'a str, tokens: &'a [Token]) -> Parser<'a, E> {
         Parser {
+            stack: Vec::new(),
             source_pos: 0,
-            source: TextTokenSource::extract(text, tokens, |k| k == COMMENT),
+            source: TextTokenSource::extract(text, tokens, skip_predicate),
             sink: TextTreeSink::new(text, tokens),
         }
     }
 
-    pub fn parse<G: Grammar<E>>(mut self, grammar: G) -> TreeArc<SyntaxNode> {
-        let start = self.source_pos;
-        let kind = grammar.parse(&mut self);
-        let len = self.source_pos - start;
-        assert!(self.source_pos > start);
-        self.sink.token(kind, len, |k| k == COMMENT);
+    pub fn parse<G: Grammar<E>>(mut self, grammar: &G) -> TreeArc<SyntaxNode> {
+        self.eval(grammar);
+        self.finish()
+    }
+
+    pub fn eval<G: Grammar<E>>(&mut self, grammar: &G) {
+        let start = self.start_marker();
+        let kind = grammar.parse(self);
+        self.complete_marker(start, kind);
+    }
+
+    fn finish(mut self) -> TreeArc<SyntaxNode> {
+        for op in self.stack {
+            match op {
+                Event::Start { kind } if kind == TOMBSTONE => {}
+                Event::Start { kind } => self.sink.start_node(kind, skip_predicate),
+                Event::Finish => self.sink.finish_node(),
+                Event::Error { error } => self.sink.error(error),
+                Event::Span { kind, len } => self.sink.span(kind, len, skip_predicate),
+            }
+        }
         self.sink.finish()
+    }
+
+    fn start_marker(&mut self) -> Marker {
+        let start = Marker::new(self.stack.len());
+        self.stack.push(Event::Start { kind: TOMBSTONE });
+        start
+    }
+
+    fn complete_marker(&mut self, marker: Marker, kind: SyntaxKind) {
+        match self.stack[marker.pos] {
+            Event::Start { kind: ref mut slot, .. } => {
+                *slot = kind;
+            }
+            _ => unreachable!(),
+        }
+        self.stack.push(Event::Finish { });
     }
 
     // fn nth(&self, n: usize) -> SyntaxKind {
@@ -80,4 +113,26 @@ impl<'a, E: 'static + Debug + Send + Sync> Parser<'a, E> {
     // fn advance(&mut self, n: usize) {
     //     self.source_pos += n;
     // }
+}
+
+struct Marker {
+    // Pos is an offset into the stack of operations
+    pos: usize
+}
+
+impl Marker {
+    fn new(pos: usize) -> Marker {
+        Marker { pos }
+    }
+}
+
+enum Event<E> {
+    Start { kind: SyntaxKind },
+    Finish,
+    Error { error: E },
+    Span { kind: SyntaxKind, len: usize },
+}
+
+fn skip_predicate(k: SyntaxKind) -> bool {
+    k == COMMENT
 }
