@@ -1,5 +1,6 @@
 use web_grammars_utils::{LanguageKind, SyntaxKind};
 
+pub use crate::generated::syntax_kind::*;
 pub use web_grammars_utils::syntax_kind::*;
 
 pub const JAVASCRIPT: LanguageKind = LanguageKind(2);
@@ -87,9 +88,6 @@ pub const NUMBER_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(201);
 pub const STRING_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(202);
 pub const REGEXP_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(203);
 pub const TEMPLATE_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(204);
-
-// Re-export automatically generated syntax kinds
-pub use crate::generated::syntax_kind::*;
 
 pub fn is_javascript_punct(k: SyntaxKind) -> bool {
     match k {
