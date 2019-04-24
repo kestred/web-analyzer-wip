@@ -7,8 +7,8 @@ macro_rules! ast_node {
         unsafe impl $crate::TransparentNewType for $node {
             type Repr = $crate::SyntaxNode;
         }
-        impl $node {
-            pub fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+        impl $crate::AstNode for $node {
+            fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
                 use $crate::TransparentNewType;
 
                 if syntax.kind() == $kind {
@@ -18,7 +18,7 @@ macro_rules! ast_node {
                 }
             }
 
-            pub fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
+            fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
         }
         impl ToOwned for $node {
             type Owned = $crate::TreeArc<Self>;
@@ -36,9 +36,10 @@ macro_rules! ast_node {
         unsafe impl $crate::TransparentNewType for $node {
             type Repr = $crate::SyntaxNode;
         }
-
         impl $node {
             pub fn kind(&self) -> $enum {
+                use $crate::AstNode;
+
                 match self.syntax.kind() {
                     // Match quickly on the syntax kind if possible
                     $($(k if k == $kind => $enum::$variant($variant::cast(&self.syntax).unwrap()),)*)*
@@ -50,17 +51,19 @@ macro_rules! ast_node {
                     }
                 }
             }
-
-            pub fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
-                use $crate::TransparentNewType;
+        }
+        impl $crate::AstNode for $node {
+            fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+                use $crate::{AstNode, TransparentNewType};
 
                 match syntax.kind() {
                     $(_k if ast_node!(@try_cast _k $($kind)*) => ast_node!(@cast syntax $node $variant $($kind)*),)*
                     _ => None,
                 }
             }
-        }
 
+            fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
+        }
         impl ToOwned for $node {
             type Owned = $crate::TreeArc<Self>;
             fn to_owned(&self) -> $crate::TreeArc<Self> {
@@ -74,7 +77,7 @@ macro_rules! ast_node {
         )*}
         $(impl<'a> From<&'a $variant> for &'a $node {
             fn from(node: &'a $variant) -> &'a $node {
-                $node::cast(&node.syntax).unwrap()
+                <$node as $crate::AstNode>::cast(&node.syntax).unwrap()
             }
         })*
     };
