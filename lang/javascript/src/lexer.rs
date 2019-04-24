@@ -154,28 +154,7 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
 
     #[test]
     fn test_scan_sample1() {
-        let example = r#"
-var rows = prompt("How many rows for your multiplication table?");
-var cols = prompt("How many columns for your multiplication table?");
-if(rows == "" || rows == null) rows = 10;
-if(cols== "" || cols== null) cols = 10;
-createTable(rows, cols);
-function createTable(rows, cols) {
-    var j=1;
-    var output = "<table border='1' width='500' cellspacing='0'cellpadding='5'>";
-    for(i=1;i<=rows;i++) {
-        output = output + "<tr>";
-        while(j<=cols) {
-            output = output + "<td>" + i*j + "</td>";
-            j = j+1;
-        }
-        output = output + "</tr>";
-        j = 1;
-    }
-    output = output + "</table>";
-    document.write(output);
-}
-"#;
+        let example = crate::samples::SAMPLE_1;
         let tokens = JavascriptLexer::new()
             .tokenize(example)
             .into_iter()
@@ -211,5 +190,14 @@ function createTable(rows, cols) {
             FUNCTION_KW, IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, L_CURLY
         ];
         assert_eq!(&tokens[..expect.len()], expect.as_slice());
+    }
+
+    #[test]
+    fn test_scan_sample2() {
+        let example = crate::samples::SAMPLE_2;
+        let tokens = JavascriptLexer::new().tokenize(example);
+        let errors = tokens.iter().enumerate().filter(|(_, t)| t.kind == ERROR).collect::<Vec<_>>();
+        eprintln!("{:#?}", tokens.iter().map(|t| format!("{:?}", as_debug_repr(t.kind))).collect::<Vec<_>>());
+        assert!(errors.is_empty(), "Found errors: {:?}", errors);
     }
 }

@@ -1,93 +1,116 @@
-use web_grammars_utils::{LanguageKind, SyntaxKind};
+use web_grammars_utils::{syntax_kinds, LanguageKind, SyntaxKind};
 
 pub use crate::generated::syntax_kind::*;
 pub use web_grammars_utils::syntax_kind::*;
 
 pub const JAVASCRIPT: LanguageKind = LanguageKind(2);
 
-// Unusual javascript symbols
-pub const SHU: SyntaxKind = JAVASCRIPT.syntax_kind(50); // '>>>'
-pub const SHU_EQ: SyntaxKind = JAVASCRIPT.syntax_kind(51); // '>>>='
-pub const EQEQEQ: SyntaxKind = JAVASCRIPT.syntax_kind(52); // '==='
-pub const BANGEQEQ: SyntaxKind = JAVASCRIPT.syntax_kind(53); // '!=='
+pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
+    self::default::as_str(k)
+        .or(self::symbols::as_str(k))
+        .or(self::keywords::as_str(k))
+        .or(self::literals::as_str(k))
+}
 
-// Keywords defined in ES2015
-pub const BREAK_KW: SyntaxKind = JAVASCRIPT.syntax_kind(101);
-pub const CASE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(102);
-pub const CATCH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(103);
-pub const CLASS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(104);
-pub const CONST_KW: SyntaxKind = JAVASCRIPT.syntax_kind(105);
-pub const CONTINUE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(106);
-pub const DEBUGGER_KW: SyntaxKind = JAVASCRIPT.syntax_kind(107);
-pub const DEFAULT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(108);
-pub const DELETE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(109);
-pub const DO_KW: SyntaxKind = JAVASCRIPT.syntax_kind(110);
-pub const ELSE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(111);
-pub const EXPORT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(113);
-pub const EXTENDS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(114);
-pub const FALSE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(115);
-pub const FINALLY_KW: SyntaxKind = JAVASCRIPT.syntax_kind(118);
-pub const FOR_KW: SyntaxKind = JAVASCRIPT.syntax_kind(119);
-pub const FUNCTION_KW: SyntaxKind = JAVASCRIPT.syntax_kind(120);
-pub const IF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(121);
-pub const IMPORT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(122);
-pub const IN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(123);
-pub const INSTANCEOF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(124);
-pub const NEW_KW: SyntaxKind = JAVASCRIPT.syntax_kind(125);
-pub const NULL_KW: SyntaxKind = JAVASCRIPT.syntax_kind(126);
-pub const RETURN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(130);
-pub const SUPER_KW: SyntaxKind = JAVASCRIPT.syntax_kind(131);
-pub const SWITCH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(132);
-pub const THIS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(133);
-pub const THROW_KW: SyntaxKind = JAVASCRIPT.syntax_kind(134);
-pub const TRUE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(135);
-pub const TRY_KW: SyntaxKind = JAVASCRIPT.syntax_kind(136);
-pub const TYPEOF_KW: SyntaxKind = JAVASCRIPT.syntax_kind(137);
-pub const VAR_KW: SyntaxKind = JAVASCRIPT.syntax_kind(138);
-pub const VOID_KW: SyntaxKind = JAVASCRIPT.syntax_kind(139);
-pub const WHILE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(140);
-pub const WITH_KW: SyntaxKind = JAVASCRIPT.syntax_kind(141);
-pub const YIELD_KW: SyntaxKind = JAVASCRIPT.syntax_kind(142);
+pub fn as_debug_repr(k: SyntaxKind) -> Option<SyntaxKindMeta> {
+    self::default::as_debug_repr(k)
+        .or(self::symbols::as_debug_repr(k))
+        .or(self::keywords::as_debug_repr(k))
+        .or(self::literals::as_debug_repr(k))
+}
 
-// In ES2015, these are always reserved
-pub const ENUM_KW: SyntaxKind = JAVASCRIPT.syntax_kind(143);
+syntax_kinds! {
+    language JAVASCRIPT;
 
-// In ES2015, the following are only reserved when they are found in strict mode code:
-pub const IMPLEMENTS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(144);
-pub const INTERFACE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(145);
-pub const LET_KW: SyntaxKind = JAVASCRIPT.syntax_kind(146);
-pub const PACKAGE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(147);
-pub const PRIVATE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(148);
-pub const PROTECTED_KW: SyntaxKind = JAVASCRIPT.syntax_kind(149);
-pub const PUBLIC_KW: SyntaxKind = JAVASCRIPT.syntax_kind(150);
-pub const STATIC_KW: SyntaxKind = JAVASCRIPT.syntax_kind(151);
+    symbols {
+        // Unusual javascript symbols
+        SHU 50 (">>>")
+        SHU_EQ 51 (">>>=")
+        EQEQEQ 52 ("===")
+        BANGEQEQ 53 ("!==")
+    }
 
-// In ES2015, the following are only reserved when they are found in module code:
-pub const AWAIT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(152);
+    keywords {
+        // Keywords defined in ES2015
+        BREAK_KW 101
+        CASE_KW 102
+        CATCH_KW 103
+        CLASS_KW 104
+        CONST_KW 105
+        CONTINUE_KW 106
+        DEBUGGER_KW 107
+        DEFAULT_KW 108
+        DELETE_KW 109
+        DO_KW 110
+        ELSE_KW 111
+        EXPORT_KW 113
+        EXTENDS_KW 114
+        FALSE_KW 115
+        FINALLY_KW 118
+        FOR_KW 119
+        FUNCTION_KW 120
+        IF_KW 121
+        IMPORT_KW 122
+        IN_KW 123
+        INSTANCEOF_KW 124
+        NEW_KW 125
+        NULL_KW 126
+        RETURN_KW 130
+        SUPER_KW 131
+        SWITCH_KW 132
+        THIS_KW 133
+        THROW_KW 134
+        TRUE_KW 135
+        TRY_KW 136
+        TYPEOF_KW 137
+        VAR_KW 138
+        VOID_KW 139
+        WHILE_KW 140
+        WITH_KW 141
+        YIELD_KW 142
 
-// The following are reserved as future keywords by older ECMAScript specifications (ECMAScript 1 till 3).
-pub const ABSTRACT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(153);
-pub const BOOLEAN_KW: SyntaxKind = JAVASCRIPT.syntax_kind(154);
-pub const BYTE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(155);
-pub const CHAR_KW: SyntaxKind = JAVASCRIPT.syntax_kind(156);
-pub const DOUBLE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(157);
-pub const FINAL_KW: SyntaxKind = JAVASCRIPT.syntax_kind(158);
-pub const FLOAT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(159);
-pub const GOTO_KW: SyntaxKind = JAVASCRIPT.syntax_kind(160);
-pub const INT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(161);
-pub const LONG_KW: SyntaxKind = JAVASCRIPT.syntax_kind(162);
-pub const NATIVE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(163);
-pub const SHORT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(164);
-pub const SYNCHRONIZED_KW: SyntaxKind = JAVASCRIPT.syntax_kind(165);
-pub const THROWS_KW: SyntaxKind = JAVASCRIPT.syntax_kind(166);
-pub const TRANSIENT_KW: SyntaxKind = JAVASCRIPT.syntax_kind(167);
-pub const VOLATILE_KW: SyntaxKind = JAVASCRIPT.syntax_kind(168);
+        // In ES2015, these are always reserved
+        ENUM_KW 143
 
-// Literals
-pub const NUMBER_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(201);
-pub const STRING_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(202);
-pub const REGEXP_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(203);
-pub const TEMPLATE_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(204);
+        // In ES2015, the following are only reserved when they are found in strict mode code:
+        IMPLEMENTS_KW 144
+        INTERFACE_KW 145
+        LET_KW 146
+        PACKAGE_KW 147
+        PRIVATE_KW 148
+        PROTECTED_KW 149
+        PUBLIC_KW 150
+        STATIC_KW 151
+
+        // In ES2015, the following are only reserved when they are found in module code:
+        AWAIT_KW 152
+
+        // The following are reserved as future keywords by older ECMAScript specifications (ECMAScript 1 till 3).
+        ABSTRACT_KW 153
+        BOOLEAN_KW 154
+        BYTE_KW 155
+        CHAR_KW 156
+        DOUBLE_KW 157
+        FINAL_KW 158
+        FLOAT_KW 159
+        GOTO_KW 160
+        INT_KW 161
+        LONG_KW 162
+        NATIVE_KW 163
+        SHORT_KW 164
+        SYNCHRONIZED_KW 165
+        THROWS_KW 166
+        TRANSIENT_KW 167
+        VOLATILE_KW 168
+    }
+
+    literals {
+        NUMBER_TOKEN 201
+        STRING_TOKEN 202
+        REGEXP_TOKEN 203
+        TEMPLATE_TOKEN 204
+    }
+}
 
 pub fn is_javascript_punct(k: SyntaxKind) -> bool {
     match k {
