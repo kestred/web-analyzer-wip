@@ -91,7 +91,6 @@ pub const TEMPLATE_TOKEN: SyntaxKind = JAVASCRIPT.syntax_kind(204);
 // Re-export automatically generated syntax kinds
 pub use crate::generated::syntax_kind::*;
 
-
 pub fn is_javascript_punct(k: SyntaxKind) -> bool {
     match k {
         _ if k == DOT => true,
