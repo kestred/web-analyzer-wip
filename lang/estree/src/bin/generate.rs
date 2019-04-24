@@ -37,6 +37,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     let mut out = String::new();
+    out.push_str("#![allow(dead_code)]\n\n");
 
     // Generate ast nodes
     out.push_str("pub mod ast {\n");
@@ -80,15 +81,13 @@ fn main() -> Result<(), std::io::Error> {
         out.push_str(");\n");
         let type_ = node.fields.iter().find(|f| f.name == "type").map(|f| &f.type_);
         if let Some(ast::Type::StringLiteral(literal)) = type_ {
-            out.push_str("    impl ");
-            out.push_str(&node.name);
-            out.push_str(" {\n");
-            out.push_str("        fn type_() -> &'static str {\n");
-            out.push_str("            ");
-            out.push_str(&literal);
-            out.push('\n');
-            out.push_str("        }\n");
-            out.push_str("    }\n");
+            out.push_str(&format!(r#"
+    impl {0} {{
+        pub fn type_(&self) -> &'static str {{
+            {1}
+        }}
+    }}
+"#, &node.name, &literal)[1..]);
         }
     }
     out.push_str("}\n\n");
@@ -144,13 +143,16 @@ fn has_leaf_nodes(spec: &Tree, node: &ast::Interface) -> bool {
 
 fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
     if let Some(children) = spec.children.get(&node.name) {
+        let children = children
+            .into_iter()
+            .flat_map(|c| spec.find_node(c))
+            .collect::<Vec<_>>();
         out.push_str("    ast_node!(");
         out.push_str(&node.name);
         out.push_str(", enum ");
         out.push_str(&node.name);
         out.push_str("Kind {\n");
-        for child in children {
-            let child = spec.find_node(child).unwrap();
+        for child in &children {
             if has_leaf_nodes(spec, child) {
                 out.push_str("        ");
                 out.push_str(&child.name);
@@ -163,6 +165,24 @@ fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
             }
         }
         out.push_str("    });\n");
+        out.push_str("    impl ");
+        out.push_str(&node.name);
+        out.push_str(" {\n");
+        out.push_str("        pub fn type_(&self) -> &'static str {\n");
+        out.push_str("            match self.kind()");
+        out.push_str(" {\n");
+        for child in &children {
+            if has_leaf_nodes(spec, child) {
+                out.push_str("                ");
+                out.push_str(&node.name);
+                out.push_str("Kind::");
+                out.push_str(&child.name);
+                out.push_str("(node) => node.type_(),\n");
+            }
+        }
+        out.push_str("            }\n");
+        out.push_str("        }\n");
+        out.push_str("    }\n");
         true
     } else {
         false
