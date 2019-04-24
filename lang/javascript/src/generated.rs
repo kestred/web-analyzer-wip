@@ -3,16 +3,19 @@ pub mod ast {
     use web_grammars_utils::ast_node;
 
     ast_node!(Node, enum NodeKind {
+        Program = PROGRAM,
         Function,
         Statement,
         Directive = DIRECTIVE,
         SwitchCase = SWITCH_CASE,
+        CatchClause = CATCH_CLAUSE,
         VariableDeclarator = VARIABLE_DECLARATOR,
         Expression,
-        Property,
+        Property = PROPERTY,
         Pattern,
         Super = SUPER,
         SpreadElement = SPREAD_ELEMENT,
+        TemplateElement = TEMPLATE_ELEMENT,
         Class,
         ClassBody = CLASS_BODY,
         MethodDefinition = METHOD_DEFINITION,
@@ -49,12 +52,18 @@ pub mod ast {
         Identifier = IDENTIFIER,
         Literal = LITERAL,
         ThisExpression = THIS_EXPRESSION,
+        ArrayExpression = ARRAY_EXPRESSION,
+        ObjectExpression = OBJECT_EXPRESSION,
         FunctionExpression = FUNCTION_EXPRESSION,
         UnaryExpression = UNARY_EXPRESSION,
         UpdateExpression = UPDATE_EXPRESSION,
         BinaryExpression = BINARY_EXPRESSION,
+        AssignmentExpression = ASSIGNMENT_EXPRESSION,
         LogicalExpression = LOGICAL_EXPRESSION,
+        MemberExpression = MEMBER_EXPRESSION,
         ConditionalExpression = CONDITIONAL_EXPRESSION,
+        CallExpression = CALL_EXPRESSION,
+        NewExpression = NEW_EXPRESSION,
         SequenceExpression = SEQUENCE_EXPRESSION,
         ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
         YieldExpression = YIELD_EXPRESSION,
@@ -69,6 +78,8 @@ pub mod ast {
     });
     ast_node!(Pattern, enum PatternKind {
         Identifier = IDENTIFIER,
+        MemberExpression = MEMBER_EXPRESSION,
+        ObjectPattern = OBJECT_PATTERN,
         ArrayPattern = ARRAY_PATTERN,
         RestElement = REST_ELEMENT,
         AssignmentPattern = ASSIGNMENT_PATTERN,
@@ -92,18 +103,23 @@ pub mod ast {
     });
     ast_node!(Declaration, enum DeclarationKind {
         FunctionDeclaration = FUNCTION_DECLARATION,
+        VariableDeclaration = VARIABLE_DECLARATION,
         ClassDeclaration = CLASS_DECLARATION,
     });
     ast_node!(AnonymousDefaultExportedClassDeclaration, ANONYMOUS_DEFAULT_EXPORTED_CLASS_DECLARATION);
     ast_node!(AnonymousDefaultExportedFunctionDeclaration, ANONYMOUS_DEFAULT_EXPORTED_FUNCTION_DECLARATION);
+    ast_node!(ArrayExpression, ARRAY_EXPRESSION);
     ast_node!(ArrayPattern, ARRAY_PATTERN);
     ast_node!(ArrowFunctionExpression, ARROW_FUNCTION_EXPRESSION);
+    ast_node!(AssignmentExpression, ASSIGNMENT_EXPRESSION);
     ast_node!(AssignmentPattern, ASSIGNMENT_PATTERN);
     ast_node!(AssignmentProperty, ASSIGNMENT_PROPERTY);
     ast_node!(AwaitExpression, AWAIT_EXPRESSION);
     ast_node!(BinaryExpression, BINARY_EXPRESSION);
     ast_node!(BlockStatement, BLOCK_STATEMENT);
     ast_node!(BreakStatement, BREAK_STATEMENT);
+    ast_node!(CallExpression, CALL_EXPRESSION);
+    ast_node!(CatchClause, CATCH_CLAUSE);
     ast_node!(ClassBody, CLASS_BODY);
     ast_node!(ClassDeclaration, CLASS_DECLARATION);
     ast_node!(ClassExpression, CLASS_EXPRESSION);
@@ -119,6 +135,7 @@ pub mod ast {
     ast_node!(ExportSpecifier, EXPORT_SPECIFIER);
     ast_node!(ExpressionStatement, EXPRESSION_STATEMENT);
     ast_node!(ForInStatement, FOR_IN_STATEMENT);
+    ast_node!(ForOfStatement, FOR_OF_STATEMENT);
     ast_node!(ForStatement, FOR_STATEMENT);
     ast_node!(FunctionDeclaration, FUNCTION_DECLARATION);
     ast_node!(FunctionExpression, FUNCTION_EXPRESSION);
@@ -131,8 +148,13 @@ pub mod ast {
     ast_node!(LabeledStatement, LABELED_STATEMENT);
     ast_node!(Literal, LITERAL);
     ast_node!(LogicalExpression, LOGICAL_EXPRESSION);
+    ast_node!(MemberExpression, MEMBER_EXPRESSION);
     ast_node!(MetaProperty, META_PROPERTY);
     ast_node!(MethodDefinition, METHOD_DEFINITION);
+    ast_node!(NewExpression, NEW_EXPRESSION);
+    ast_node!(ObjectExpression, OBJECT_EXPRESSION);
+    ast_node!(ObjectPattern, OBJECT_PATTERN);
+    ast_node!(Program, PROGRAM);
     ast_node!(RestElement, REST_ELEMENT);
     ast_node!(ReturnStatement, RETURN_STATEMENT);
     ast_node!(SequenceExpression, SEQUENCE_EXPRESSION);
@@ -141,12 +163,14 @@ pub mod ast {
     ast_node!(SwitchCase, SWITCH_CASE);
     ast_node!(SwitchStatement, SWITCH_STATEMENT);
     ast_node!(TaggedTemplateExpression, TAGGED_TEMPLATE_EXPRESSION);
+    ast_node!(TemplateElement, TEMPLATE_ELEMENT);
     ast_node!(TemplateLiteral, TEMPLATE_LITERAL);
     ast_node!(ThisExpression, THIS_EXPRESSION);
     ast_node!(ThrowStatement, THROW_STATEMENT);
     ast_node!(TryStatement, TRY_STATEMENT);
     ast_node!(UnaryExpression, UNARY_EXPRESSION);
     ast_node!(UpdateExpression, UPDATE_EXPRESSION);
+    ast_node!(VariableDeclaration, VARIABLE_DECLARATION);
     ast_node!(VariableDeclarator, VARIABLE_DECLARATOR);
     ast_node!(WhileStatement, WHILE_STATEMENT);
     ast_node!(WithStatement, WITH_STATEMENT);
@@ -159,59 +183,71 @@ pub mod syntax_kind {
 
     pub const ANONYMOUS_DEFAULT_EXPORTED_CLASS_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(205);
     pub const ANONYMOUS_DEFAULT_EXPORTED_FUNCTION_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(206);
-    pub const ARRAY_PATTERN: SyntaxKind = JAVASCRIPT.syntax_kind(207);
-    pub const ARROW_FUNCTION_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(208);
-    pub const ASSIGNMENT_PATTERN: SyntaxKind = JAVASCRIPT.syntax_kind(209);
-    pub const ASSIGNMENT_PROPERTY: SyntaxKind = JAVASCRIPT.syntax_kind(210);
-    pub const AWAIT_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(211);
-    pub const BINARY_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(212);
-    pub const BLOCK_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(213);
-    pub const BREAK_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(214);
-    pub const CLASS_BODY: SyntaxKind = JAVASCRIPT.syntax_kind(215);
-    pub const CLASS_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(216);
-    pub const CLASS_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(217);
-    pub const CONDITIONAL_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(218);
-    pub const CONTINUE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(219);
-    pub const DEBUGGER_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(220);
-    pub const DIRECTIVE: SyntaxKind = JAVASCRIPT.syntax_kind(221);
-    pub const DO_WHILE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(222);
-    pub const EMPTY_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(223);
-    pub const EXPORT_ALL_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(224);
-    pub const EXPORT_DEFAULT_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(225);
-    pub const EXPORT_NAMED_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(226);
-    pub const EXPORT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(227);
-    pub const EXPRESSION_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(228);
-    pub const FOR_IN_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(229);
-    pub const FOR_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(230);
-    pub const FUNCTION_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(231);
-    pub const FUNCTION_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(232);
-    pub const IDENTIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(233);
-    pub const IF_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(234);
-    pub const IMPORT_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(235);
-    pub const IMPORT_DEFAULT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(236);
-    pub const IMPORT_NAMESPACE_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(237);
-    pub const IMPORT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(238);
-    pub const LABELED_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(239);
-    pub const LITERAL: SyntaxKind = JAVASCRIPT.syntax_kind(240);
-    pub const LOGICAL_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(241);
-    pub const META_PROPERTY: SyntaxKind = JAVASCRIPT.syntax_kind(242);
-    pub const METHOD_DEFINITION: SyntaxKind = JAVASCRIPT.syntax_kind(243);
-    pub const REST_ELEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(244);
-    pub const RETURN_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(245);
-    pub const SEQUENCE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(246);
-    pub const SPREAD_ELEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(247);
-    pub const SUPER: SyntaxKind = JAVASCRIPT.syntax_kind(248);
-    pub const SWITCH_CASE: SyntaxKind = JAVASCRIPT.syntax_kind(249);
-    pub const SWITCH_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(250);
-    pub const TAGGED_TEMPLATE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(251);
-    pub const TEMPLATE_LITERAL: SyntaxKind = JAVASCRIPT.syntax_kind(252);
-    pub const THIS_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(253);
-    pub const THROW_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(254);
-    pub const TRY_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(255);
-    pub const UNARY_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(256);
-    pub const UPDATE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(257);
-    pub const VARIABLE_DECLARATOR: SyntaxKind = JAVASCRIPT.syntax_kind(258);
-    pub const WHILE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(259);
-    pub const WITH_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(260);
-    pub const YIELD_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(261);
+    pub const ARRAY_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(207);
+    pub const ARRAY_PATTERN: SyntaxKind = JAVASCRIPT.syntax_kind(208);
+    pub const ARROW_FUNCTION_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(209);
+    pub const ASSIGNMENT_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(210);
+    pub const ASSIGNMENT_PATTERN: SyntaxKind = JAVASCRIPT.syntax_kind(211);
+    pub const ASSIGNMENT_PROPERTY: SyntaxKind = JAVASCRIPT.syntax_kind(212);
+    pub const AWAIT_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(213);
+    pub const BINARY_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(214);
+    pub const BLOCK_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(215);
+    pub const BREAK_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(216);
+    pub const CALL_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(217);
+    pub const CATCH_CLAUSE: SyntaxKind = JAVASCRIPT.syntax_kind(218);
+    pub const CLASS_BODY: SyntaxKind = JAVASCRIPT.syntax_kind(219);
+    pub const CLASS_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(220);
+    pub const CLASS_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(221);
+    pub const CONDITIONAL_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(222);
+    pub const CONTINUE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(223);
+    pub const DEBUGGER_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(224);
+    pub const DIRECTIVE: SyntaxKind = JAVASCRIPT.syntax_kind(225);
+    pub const DO_WHILE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(226);
+    pub const EMPTY_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(227);
+    pub const EXPORT_ALL_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(228);
+    pub const EXPORT_DEFAULT_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(229);
+    pub const EXPORT_NAMED_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(230);
+    pub const EXPORT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(231);
+    pub const EXPRESSION_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(232);
+    pub const FOR_IN_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(233);
+    pub const FOR_OF_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(234);
+    pub const FOR_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(235);
+    pub const FUNCTION_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(236);
+    pub const FUNCTION_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(237);
+    pub const IDENTIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(238);
+    pub const IF_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(239);
+    pub const IMPORT_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(240);
+    pub const IMPORT_DEFAULT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(241);
+    pub const IMPORT_NAMESPACE_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(242);
+    pub const IMPORT_SPECIFIER: SyntaxKind = JAVASCRIPT.syntax_kind(243);
+    pub const LABELED_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(244);
+    pub const LITERAL: SyntaxKind = JAVASCRIPT.syntax_kind(245);
+    pub const LOGICAL_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(246);
+    pub const MEMBER_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(247);
+    pub const META_PROPERTY: SyntaxKind = JAVASCRIPT.syntax_kind(248);
+    pub const METHOD_DEFINITION: SyntaxKind = JAVASCRIPT.syntax_kind(249);
+    pub const NEW_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(250);
+    pub const OBJECT_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(251);
+    pub const OBJECT_PATTERN: SyntaxKind = JAVASCRIPT.syntax_kind(252);
+    pub const PROGRAM: SyntaxKind = JAVASCRIPT.syntax_kind(253);
+    pub const REST_ELEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(254);
+    pub const RETURN_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(255);
+    pub const SEQUENCE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(256);
+    pub const SPREAD_ELEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(257);
+    pub const SUPER: SyntaxKind = JAVASCRIPT.syntax_kind(258);
+    pub const SWITCH_CASE: SyntaxKind = JAVASCRIPT.syntax_kind(259);
+    pub const SWITCH_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(260);
+    pub const TAGGED_TEMPLATE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(261);
+    pub const TEMPLATE_ELEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(262);
+    pub const TEMPLATE_LITERAL: SyntaxKind = JAVASCRIPT.syntax_kind(263);
+    pub const THIS_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(264);
+    pub const THROW_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(265);
+    pub const TRY_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(266);
+    pub const UNARY_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(267);
+    pub const UPDATE_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(268);
+    pub const VARIABLE_DECLARATION: SyntaxKind = JAVASCRIPT.syntax_kind(269);
+    pub const VARIABLE_DECLARATOR: SyntaxKind = JAVASCRIPT.syntax_kind(270);
+    pub const WHILE_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(271);
+    pub const WITH_STATEMENT: SyntaxKind = JAVASCRIPT.syntax_kind(272);
+    pub const YIELD_EXPRESSION: SyntaxKind = JAVASCRIPT.syntax_kind(273);
 }

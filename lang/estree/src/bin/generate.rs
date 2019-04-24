@@ -44,9 +44,11 @@ fn main() -> Result<(), std::io::Error> {
     out.push_str("    use web_grammars_utils::ast_node;\n\n");
     let mut leaf_nodes = Vec::new();
     let mut emitted_nodes = HashSet::new();
-    let root = spec.find_node("Node").expect("expected estree to contain `Node` interface");
-    try_emit_enum(&mut out, &spec, root);
-    emitted_nodes.insert(&root.name);
+    {
+        let root = spec.find_node("Node").expect("expected estree to contain `Node` interface");
+        try_emit_enum(&mut out, &spec, root);
+        emitted_nodes.insert(&root.name);
+    }
     for node in spec.children.get("Node")
         .expect("expected estree to contain `Node` interface")
         .iter()
@@ -190,7 +192,7 @@ impl EstreeBuilder {
                         let name = field.name.clone();
                         curr.fields = curr.fields
                             .drain(0..)
-                            .filter(|x| x.name == name)
+                            .filter(|x| x.name != name)
                             .chain(std::iter::once(field))
                             .collect::<Vec<_>>();
                     }
