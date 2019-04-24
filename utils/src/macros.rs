@@ -8,8 +8,7 @@ macro_rules! ast_node {
             type Repr = $crate::SyntaxNode;
         }
         impl $node {
-            #[allow(unused)]
-            fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+            pub fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
                 use $crate::TransparentNewType;
 
                 if syntax.kind() == $kind {
@@ -18,6 +17,8 @@ macro_rules! ast_node {
                     None
                 }
             }
+
+            pub fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
         }
         impl ToOwned for $node {
             type Owned = $crate::TreeArc<Self>;
@@ -50,7 +51,7 @@ macro_rules! ast_node {
                 }
             }
 
-            fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+            pub fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
                 use $crate::TransparentNewType;
 
                 match syntax.kind() {

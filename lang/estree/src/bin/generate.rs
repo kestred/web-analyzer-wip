@@ -16,7 +16,7 @@ fn main() -> Result<(), std::io::Error> {
         "lang/estree/spec/es2018.md",
         "lang/estree/spec/es2019.md",
     ];
-    let mut spec = EstreeBuilder::default();
+    let mut spec = Tree::default();
     for filepath in filepaths {
         let fulltext = fs::read_to_string(filepath)?;
         let blocks = scan::extract_code_blocks(&fulltext);
@@ -54,7 +54,7 @@ fn main() -> Result<(), std::io::Error> {
         .iter()
         .flat_map(|n| spec.find_node(&n))
     {
-        if try_emit_enum(&mut out, &spec, node) {
+        if !is_leaf_node(&spec, node) && try_emit_enum(&mut out, &spec, node) {
             emitted_nodes.insert(&node.name);
         }
     }
@@ -64,7 +64,7 @@ fn main() -> Result<(), std::io::Error> {
         }
 
         if is_ast_node(&spec, node) {
-            if is_leaf_node(node) {
+            if is_leaf_node(&spec, node) {
                 leaf_nodes.push(node);
             } else if try_emit_enum(&mut out, &spec, node) {
                 emitted_nodes.insert(&node.name);
@@ -78,6 +78,18 @@ fn main() -> Result<(), std::io::Error> {
         out.push_str(", ");
         out.push_str(&node.name.to_shouty_snake_case());
         out.push_str(");\n");
+        let type_ = node.fields.iter().find(|f| f.name == "type").map(|f| &f.type_);
+        if let Some(ast::Type::StringLiteral(literal)) = type_ {
+            out.push_str("    impl ");
+            out.push_str(&node.name);
+            out.push_str(" {\n");
+            out.push_str("        fn type_() -> &'static str {\n");
+            out.push_str("            ");
+            out.push_str(&literal);
+            out.push('\n');
+            out.push_str("        }\n");
+            out.push_str("    }\n");
+        }
     }
     out.push_str("}\n\n");
 
@@ -101,16 +113,22 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn is_ast_node(spec: &EstreeBuilder, node: &ast::Interface) -> bool {
-    spec.find_roots(&node.name).any(|n| n.name == "Node")
+fn is_ast_node(spec: &Tree, node: &ast::Interface) -> bool {
+    spec.find_ancestors(&node.name).any(|n| n.name == "Node")
 }
 
-fn is_leaf_node(node: &ast::Interface) -> bool {
-   node.fields.iter().any(|f| f.name == "type")
+fn is_leaf_node(spec: &Tree, node: &ast::Interface) -> bool {
+    let _ = spec;
+    node.fields.iter().any(|f| {
+        match &f.type_ {
+            ast::Type::StringLiteral(lit) if f.name == "type" => &lit[1..lit.len()-1] == &node.name,
+            _ => false
+        }
+    })
 }
 
-fn has_leaf_nodes(spec: &EstreeBuilder, node: &ast::Interface) -> bool {
-    if is_leaf_node(node) {
+fn has_leaf_nodes(spec: &Tree, node: &ast::Interface) -> bool {
+    if is_leaf_node(&spec, node) {
         return true;
     }
 
@@ -124,7 +142,7 @@ fn has_leaf_nodes(spec: &EstreeBuilder, node: &ast::Interface) -> bool {
     }
 }
 
-fn try_emit_enum(out: &mut String, spec: &EstreeBuilder, node: &ast::Interface) -> bool {
+fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
     if let Some(children) = spec.children.get(&node.name) {
         out.push_str("    ast_node!(");
         out.push_str(&node.name);
@@ -137,7 +155,7 @@ fn try_emit_enum(out: &mut String, spec: &EstreeBuilder, node: &ast::Interface) 
                 out.push_str("        ");
                 out.push_str(&child.name);
 
-                if is_leaf_node(child) {
+                if is_leaf_node(spec, child) {
                     out.push_str(" = ");
                     out.push_str(&child.name.to_shouty_snake_case());
                 }
@@ -152,29 +170,45 @@ fn try_emit_enum(out: &mut String, spec: &EstreeBuilder, node: &ast::Interface) 
 }
 
 #[derive(Default)]
-pub struct EstreeBuilder {
+pub struct Tree {
     pub nodes: Vec<ast::Interface>,
     pub children: HashMap<String, Vec<String>>,
     pub dictionary: HashMap<String, usize>,
 }
 
-impl EstreeBuilder {
+impl Tree {
     pub fn find_node(&self, name: &str) -> Option<&ast::Interface> {
         self.dictionary.get(name).and_then(|&i| self.nodes.get(i))
     }
 
-    pub fn find_roots(&self, name: &String) -> impl Iterator<Item=&ast::Interface> {
-        let mut roots = HashSet::new();
+    pub fn find_ancestors(&self, name: &str) -> impl Iterator<Item=&ast::Interface> {
+        let mut results = HashSet::new();
         let mut queries = vec![name];
         while let Some(node) = queries.pop().and_then(|q| self.find_node(q)) {
-            if node.parents.is_empty() && &node.name != name {
-                roots.insert(&node.name);
+            if &node.name != name {
+                results.insert(&node.name);
             }
             for parent in &node.parents {
-                queries.push(parent);
+                queries.push(&parent);
             }
         }
-        roots.into_iter().flat_map(move |r| self.find_node(r))
+        results.into_iter().flat_map(move |r| self.find_node(r))
+    }
+
+    pub fn find_descendents(&self, name: &str) -> impl Iterator<Item=&ast::Interface> {
+        let mut results = HashSet::new();
+        let mut queries = vec![name];
+        while let Some(node) = queries.pop().and_then(|q| self.find_node(q)) {
+            if &node.name != name {
+                results.insert(&node.name);
+            }
+            if let Some(children) = self.children.get(&node.name) {
+                for child in children {
+                    queries.push(&child);
+                }
+            }
+        }
+        results.into_iter().flat_map(move |r| self.find_node(r))
     }
 
     pub fn extend(&mut self, node: ast::Definition) {
