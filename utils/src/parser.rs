@@ -42,35 +42,49 @@ where
 }
 
 pub struct Parser<'a, E: 'static + Debug + Send + Sync> {
-    stack: Vec<Event<E>>,
+    events: Vec<Event<E>>,
     source_pos: usize,
     source: TextTokenSource<'a>,
     sink: TextTreeSink<'a, E>,
 }
 
-impl<'a, E: 'static + Debug + Send + Sync> Parser<'a, E> {
+impl<'a, E> Parser<'a, E>
+where
+    E: 'static + Debug + Send + Sync
+{
     pub fn new(text: &'a str, tokens: &'a [Token]) -> Parser<'a, E> {
         Parser {
-            stack: Vec::new(),
+            events: Vec::new(),
             source_pos: 0,
             source: TextTokenSource::extract(text, tokens, skip_predicate),
             sink: TextTreeSink::new(text, tokens),
         }
     }
 
+    /// Parse the grammar completely and return the result root syntax node.
     pub fn parse<G: Grammar<E>>(mut self, grammar: &G) -> TreeArc<SyntaxNode> {
         self.eval(grammar);
         self.finish()
     }
 
+    /// Evaluate a single grammar rule.
+    ///
+    /// This is intended to be called within a `Grammar` parsing function
+    /// to begin parsing a sub-grammar.
     pub fn eval<G: Grammar<E>>(&mut self, grammar: &G) {
         let start = self.start_marker();
         let kind = grammar.parse(self);
         self.complete_marker(start, kind);
     }
 
+    /// Emit error for the current node in the parse tree
+    pub fn error(&mut self, error: E) {
+        self.events.push(Event::Error { error });
+    }
+
+    /// Consume the parser and apply it's events to create the syntax tree.
     fn finish(mut self) -> TreeArc<SyntaxNode> {
-        for op in self.stack {
+        for op in self.events {
             match op {
                 Event::Start { kind } if kind == TOMBSTONE => {}
                 Event::Start { kind } => self.sink.start_node(kind, skip_predicate),
@@ -82,20 +96,24 @@ impl<'a, E: 'static + Debug + Send + Sync> Parser<'a, E> {
         self.sink.finish()
     }
 
+    /// Starts a new node in the syntax tree. All nodes and tokens
+    /// consumed between the `start` and the corresponding `Parser::complete_marker`
+    /// belong to the same node.
     fn start_marker(&mut self) -> Marker {
-        let start = Marker::new(self.stack.len());
-        self.stack.push(Event::Start { kind: TOMBSTONE });
+        let start = Marker::new(self.events.len());
+        self.events.push(Event::Start { kind: TOMBSTONE });
         start
     }
 
+    /// Finishes the syntax tree node and assigns `kind` to it.
     fn complete_marker(&mut self, marker: Marker, kind: SyntaxKind) {
-        match self.stack[marker.pos] {
+        match self.events[marker.pos] {
             Event::Start { kind: ref mut slot, .. } => {
                 *slot = kind;
             }
             _ => unreachable!(),
         }
-        self.stack.push(Event::Finish { });
+        self.events.push(Event::Finish { });
     }
 
     // fn nth(&self, n: usize) -> SyntaxKind {
@@ -115,8 +133,20 @@ impl<'a, E: 'static + Debug + Send + Sync> Parser<'a, E> {
     // }
 }
 
+impl<'a, E> Parser<'a, E>
+where
+    E: 'static + Debug + Send + Sync + From<String>
+{
+    /// Emit an error message for the current node in the parse tree.
+    pub fn errmsg<T: Into<String>>(&mut self, message: T) {
+        let error = E::from(message.into());
+        self.events.push(Event::Error { error })
+    }
+}
+
+/// See `Parser::start_marker`.
 struct Marker {
-    // Pos is an offset into the stack of operations
+    // Pos is an offset into the parser's events of events
     pos: usize
 }
 
@@ -126,6 +156,10 @@ impl Marker {
     }
 }
 
+/// The `Parser` builds up a list of `Event`s which are
+/// then converted to a tree structure at the end of parsing.
+///
+/// This allows for more fine-grained control of parsing in the middle.
 enum Event<E> {
     Start { kind: SyntaxKind },
     Finish,
