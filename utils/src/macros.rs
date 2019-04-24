@@ -39,8 +39,14 @@ macro_rules! ast_node {
         impl $node {
             pub fn kind(&self) -> $enum {
                 match self.syntax.kind() {
+                    // Match quickly on the syntax kind if possible
                     $($(k if k == $kind => $enum::$variant($variant::cast(&self.syntax).unwrap()),)*)*
-                    _ => unreachable!(),
+
+                    // Otherwise test all nested enums
+                    _ => {
+                        $(ast_node!(@try_kind self $enum $variant $($kind)*);)*
+                        unreachable!()
+                    }
                 }
             }
 
@@ -48,7 +54,7 @@ macro_rules! ast_node {
                 use $crate::TransparentNewType;
 
                 match syntax.kind() {
-                    $(_k if ast_node!(@cast_predicate _k $($kind)*) => ast_node!(@cast syntax $node $variant $($kind)*),)*
+                    $(_k if ast_node!(@try_cast _k $($kind)*) => ast_node!(@cast syntax $node $variant $($kind)*),)*
                     _ => None,
                 }
             }
@@ -72,10 +78,16 @@ macro_rules! ast_node {
         })*
     };
 
-    (@cast_predicate $binding:ident $kind:expr) => {
+    (@try_kind $self:ident $enum:ident $variant:ident $kind:expr) => {};
+    (@try_kind $self:ident $enum:ident $variant:ident) => {
+        if let Some(value) = $variant::cast(&$self.syntax) {
+            return $enum::$variant(value);
+        }
+    };
+    (@try_cast $binding:ident $kind:expr) => {
         $binding == $kind
     };
-    (@cast_predicate $binding:ident) => {
+    (@try_cast $binding:ident) => {
         true
     };
     (@cast $syntax:ident $node:ident $variant:ident $kind:expr) => {
