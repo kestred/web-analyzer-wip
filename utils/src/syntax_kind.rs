@@ -1,5 +1,10 @@
-use crate::language_kind::LanguageKind;
+mod language_kind;
+mod meta;
+
 use rowan::SyntaxKind;
+
+pub use self::language_kind::LanguageKind;
+pub use self::meta::SyntaxKindMeta;
 
 const DEFAULT: LanguageKind = LanguageKind(0);
 

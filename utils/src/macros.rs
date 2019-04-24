@@ -101,3 +101,56 @@ macro_rules! ast_node {
         $variant::cast($syntax).map(|_| $node::from_repr($syntax))
     };
 }
+
+#[macro_export]
+macro_rules! syntax_kinds {
+    {
+        language: $lang:expr;
+
+        $(
+            $label:ident : $(
+                kind:ident $num:tt $($raw:tt)?
+            )*
+        )*
+    } => {
+        $(
+            pub mod $label {
+                $(#[doc(hidden)] pub(crate) const $kind: $crate::SyntaxKind = $lang.syntax_kind($num);)*
+
+                /// Get the canonical string representation of the token, if one exists
+                pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
+                    match k {
+                        $($(_ if k == $kind => Some($raw)),*)*
+                        _ => None,
+                    }
+                }
+
+                /// Convert the syntax kind into a value with extra debug information
+                /// that can be used with `std::fmt::Debug` format strings.
+                pub fn as_debug_repr(k: SyntaxKind) -> Option<impl std::fmt::Debug> {
+                    match k {
+                        $(
+                            _ if k == $kind => {
+                                $crate::syntax_kind::SyntaxKindMeta {
+                                    name: stringify!($kind),
+                                    kind: $kind,
+                                    canonical: None $(.or($raw))*
+                                }
+                            }
+                        )*,
+                        _ => None,
+                    }
+                }
+            }
+            pub use self::$label::{
+                $($kind)*
+            };
+        )*
+
+        pub fn to_debug()
+SHU: SyntaxKind = JAVASCRIPT.syntax_kind(50); // '>>>'
+pub const SHU_EQ: SyntaxKind = JAVASCRIPT.syntax_kind(51); // '>>>='
+pub const EQEQEQ: SyntaxKind = JAVASCRIPT.syntax_kind(52); // '==='
+pub const BANGEQEQ: SyntaxKind = JAVASCRIPT.syntax_kind(53); // '!=='
+    }
+}
