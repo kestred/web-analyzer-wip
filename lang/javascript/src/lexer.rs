@@ -43,7 +43,7 @@ impl JavascriptLexer {
                     return COMMENT;
                 }
                 if scan_regexp_literal(s, self.prev_tokens) {
-                    return REGEXP_LIT;
+                    return REGEXP_TOKEN;
                 }
             }
             _ => (),
@@ -59,7 +59,7 @@ impl JavascriptLexer {
 
         if is_decimal(c) {
             scan_number(c, s);
-            return NUMBER_LIT;
+            return NUMBER_TOKEN;
         }
 
         // One-byte symbols/operations/punctuation.
@@ -75,7 +75,7 @@ impl JavascriptLexer {
         match c {
             '\'' | '"' => {
                 scan_string(c, s);
-                return STRING_LIT;
+                return STRING_TOKEN;
             }
             '`' => {
                 return scan_template_literal(s, JavascriptLexer::new());
@@ -124,13 +124,13 @@ if (/^[A-Za-z_]+$/g.test(x)) return true;
 
         let expect = vec![
             // let foo = /abc/.test(3);
-            LET_KW, IDENT, EQ, REGEXP_LIT, DOT, IDENT, L_PAREN, NUMBER_LIT, R_PAREN, SEMI,
+            LET_KW, IDENT, EQ, REGEXP_TOKEN, DOT, IDENT, L_PAREN, NUMBER_TOKEN, R_PAREN, SEMI,
 
             // let bar = 12 / 3.5;
-            LET_KW, IDENT, EQ, NUMBER_LIT, SLASH, NUMBER_LIT, SEMI,
+            LET_KW, IDENT, EQ, NUMBER_TOKEN, SLASH, NUMBER_TOKEN, SEMI,
 
             // if (/^[A-Za-z_]+\/$/g.test(x)) return true;
-            IF_KW, L_PAREN, REGEXP_LIT, DOT, IDENT, L_PAREN, IDENT, R_PAREN, R_PAREN, RETURN_KW, TRUE_KW, SEMI
+            IF_KW, L_PAREN, REGEXP_TOKEN, DOT, IDENT, L_PAREN, IDENT, R_PAREN, R_PAREN, RETURN_KW, TRUE_KW, SEMI
         ];
         assert_eq!(tokens, expect);
     }
@@ -148,7 +148,7 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
             .filter(|k| *k != WHITESPACE)
             .collect::<Vec<_>>();
 
-        let expect = vec![LET_KW, IDENT, EQ, TEMPLATE_LIT, PLUS, TEMPLATE_LIT, PLUS, STRING_LIT, SEMI];
+        let expect = vec![LET_KW, IDENT, EQ, TEMPLATE_TOKEN, PLUS, TEMPLATE_TOKEN, PLUS, STRING_TOKEN, SEMI];
         assert_eq!(tokens, expect);
     }
 
@@ -183,7 +183,7 @@ function createTable(rows, cols) {
             .collect::<Vec<_>>();
         let expect = &[
             WHITESPACE, VAR_KW, WHITESPACE, IDENT, WHITESPACE, EQ, // var rows =
-            WHITESPACE, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI, // prompt("How many rows for your multiplication table?");
+            WHITESPACE, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI, // prompt("How many rows for your multiplication table?");
         ];
         assert_eq!(&tokens[..expect.len()], expect);
 
@@ -193,16 +193,16 @@ function createTable(rows, cols) {
             .collect::<Vec<_>>();
         let expect = vec![
             // var rows = prompt("How many rows for your multiplication table?");
-            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI,
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI,
 
             // var cols = prompt("How many columns for your multiplication table?");
-            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LIT, R_PAREN, SEMI,
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI,
 
             // if(rows == "" || rows == null) rows = 10;
-            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LIT, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LIT, SEMI,
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_TOKEN, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_TOKEN, SEMI,
 
             // if(cols== "" || cols== null) cols = 10;
-            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LIT, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LIT, SEMI,
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_TOKEN, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_TOKEN, SEMI,
 
             // createTable(rows, cols);
             IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, SEMI,

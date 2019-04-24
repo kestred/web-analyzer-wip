@@ -1,17 +1,19 @@
 #[macro_export]
 macro_rules! ast_node {
     ($ast:ident, $kind:expr) => {
-        #[derive(Eq, PartialEq, Hash)]
+        #[derive(Debug, Eq, PartialEq, Hash)]
         #[repr(transparent)]
-        struct $ast { pub syntax: $crate::SyntaxNode }
+        pub struct $ast { pub syntax: $crate::SyntaxNode }
         unsafe impl $crate::TransparentNewType for $ast {
             type Repr = $crate::SyntaxNode;
         }
         impl $ast {
             #[allow(unused)]
             fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+                use $crate::TransparentNewType;
+
                 if syntax.kind() == $kind {
-                    Some(Self::from_repr(syntax.into_repr()))
+                    Some(Self::from_repr(syntax))
                 } else {
                     None
                 }
@@ -24,31 +26,33 @@ macro_rules! ast_node {
             }
         }
     };
-    ($ast:ident as enum $enum:ident $(<$lifetime:tt>)? {
-        $($varname:ident($vartype:ty) = $kind:expr),*
+    ($ast:ident, enum $enum:ident {
+        $($varname:ident $(= $kind:expr)? ),* $(,)?
     }) => {
         #[derive(Debug, Eq, PartialEq, Hash)]
         #[repr(transparent)]
-        struct $ast { pub syntax: $crate::SyntaxNode }
+        pub struct $ast { pub syntax: $crate::SyntaxNode }
         unsafe impl $crate::TransparentNewType for $ast {
             type Repr = $crate::SyntaxNode;
         }
 
-        impl Expr {
+        impl $ast {
             pub fn kind(&self) -> $enum {
                 match self.syntax.kind() {
-                    $(k if k == $kind => $enum::$varname($vartype::cast(&self.syntax).unwrap()),)*
+                    $($(k if k == $kind => $enum::$varname($varname::cast(&self.syntax).unwrap()),)*)*
                     _ => unreachable!(),
                 }
             }
 
             fn cast(syntax: &$crate::SyntaxNode) -> Option<&Self> {
+                use $crate::TransparentNewType;
+
                 let is_match = match syntax.kind() {
-                    $(k if k == $kind => true,)*
+                    $($(k if k == $kind => true,)*)*
                     _ => false,
                 };
                 if is_match {
-                    Some($ast::from_repr(syntax.into_repr()))
+                    Some($ast::from_repr(syntax))
                 } else {
                     None
                 }
@@ -62,14 +66,24 @@ macro_rules! ast_node {
             }
         }
 
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        pub enum $enum $(<$lifetime>)* {$(
-            $varname($(&$lifetime)* $vartype),
+        #[derive(Debug, Eq, PartialEq)]
+        pub enum $enum<'a> {$(
+            $varname(&'a $varname),
         )*}
-        $(impl$(<$lifetime>)* From<$(&$lifetime)* $vartype> for $(&$lifetime)* $ast {
-            fn from(node: $(&$lifetime)* $vartype) -> $(&$lifetime)* $ast {
-                Expr::cast(&node.syntax).unwrap()
+        $(impl<'a> From<&'a $varname> for &'a $ast {
+            fn from(node: &'a $varname) -> &'a $ast {
+                $ast::cast(&node.syntax).unwrap()
             }
         })*
+
+        // #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        // pub enum $enum $(<$lifetime>)* {$(
+        //     $varname($(&$lifetime)* $varname),
+        // )*}
+        // $(impl$(<$lifetime>)* From<$(&$lifetime)* $varname> for $(&$lifetime)* $ast {
+        //     fn from(node: $(&$lifetime)* $varname) -> $(&$lifetime)* $ast {
+        //         $ast::cast(&node.syntax).unwrap()
+        //     }
+        // })*
     };
 }

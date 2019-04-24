@@ -43,7 +43,7 @@ pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) ->
             }
         }
     }
-    TEMPLATE_LIT
+    TEMPLATE_TOKEN
 }
 
 /// Assumes preceding `/`

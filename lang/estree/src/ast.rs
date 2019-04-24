@@ -3,6 +3,7 @@ pub enum Type {
     Named(String),
     Array(Box<Type>),
     Union(Vec<Type>),
+    Object(Vec<Field>),
     StringLiteral(String),
 }
 
@@ -18,4 +19,17 @@ pub struct Interface {
     pub parents: Vec<String>,
     pub fields: Vec<Field>,
     pub is_extension: bool,
+}
+
+#[derive(Debug)]
+pub struct Enum {
+    pub name: String,
+    pub literals: Vec<String>,
+    pub is_extension: bool,
+}
+
+#[derive(Debug)]
+pub enum Definition {
+  Enum(Enum),
+  Interface(Interface),
 }

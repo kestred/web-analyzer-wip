@@ -1,13 +1,12 @@
 use crate::ast::*;
-use combine::{ParseError, Parser, RangeStream};
+use combine::{parser, ParseError, ParseResult, Parser, RangeStream};
 use combine::parser::char::{alpha_num, space, string};
 use combine::parser::choice::{choice, optional};
 use combine::parser::combinator::recognize;
 use combine::parser::item::{satisfy, token};
-use combine::parser::repeat::{escaped, many, sep_by1, skip_many, skip_many1};
-use combine::parser::sequence::between;
+use combine::parser::repeat::{escaped, many, sep_by, sep_by1, skip_many, skip_many1};
 
-pub fn code_block<I>() -> impl Parser<Input = I, Output = Vec<Interface>>
+pub fn code_block<I>() -> impl Parser<Input = I, Output = Vec<Definition>>
 where
     I: RangeStream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
@@ -16,19 +15,74 @@ where
         string("```"),
         string("js"),
         whitespace(),
-        many(interface().skip(whitespace())),
+        many(definition().skip(whitespace())),
         string("```"),
     )
-    .map(|(_, _, _, interfaces, _)| interfaces)
+    .map(|(_, _, _, definitions, _)| definitions)
 }
 
-pub fn interface<I>() -> impl Parser<Input = I, Output = Interface>
+pub fn definition<I>() -> impl Parser<Input = I, Output = Definition>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    parser(definition_inner)
+}
+
+fn definition_inner<I>(input: &mut I) -> ParseResult<Definition, I>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    let checkpoint = input.checkpoint();
+    let is_extension = string("extend")
+        .skip(whitespace())
+        .parse_stream(input)
+        .is_ok();
+    if !is_extension {
+        input.reset(checkpoint);
+    }
+
+    choice((
+        enum_defn().map(Definition::Enum),
+        interface_defn().map(Definition::Interface),
+    ))
+    .map(|mut defn| {
+        match &mut defn {
+            Definition::Enum(node) => node.is_extension = is_extension,
+            Definition::Interface(node) => node.is_extension = is_extension,
+        }
+        defn
+    })
+    .parse_stream(input)
+}
+
+pub fn enum_defn<I>() -> impl Parser<Input = I, Output = Enum>
 where
     I: RangeStream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     (
-        optional(string("extend").skip(whitespace())),
+        string("enum").skip(whitespace()),
+        ident().skip(whitespace()),
+        token('{').skip(whitespace()),
+        sep_by(str_literal().skip(whitespace()), token('|').skip(whitespace())),
+        token('}'),
+    ).map(|(_, name, _, literals, _)| {
+        Enum {
+            name,
+            literals,
+            is_extension: false,
+        }
+    })
+}
+
+pub fn interface_defn<I>() -> impl Parser<Input = I, Output = Interface>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
         string("interface").skip(whitespace()),
         ident().skip(whitespace()),
         inherits().skip(whitespace()),
@@ -36,12 +90,12 @@ where
         many::<Vec<_>, _>(field().skip(whitespace())),
         token('}'),
     )
-    .map(|(extend_kw, _, name, parents, _, fields, _)| {
+    .map(|(_, name, parents, _, fields, _)| {
         Interface {
             name,
             parents,
             fields,
-            is_extension: extend_kw.is_some(),
+            is_extension: false,
         }
     })
 }
@@ -80,25 +134,20 @@ where
     I: RangeStream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    choice((
-        type_union(),
-        between(token('['), token(']'), type_union()).map(|x| Type::Array(Box::new(x))),
-    ))
+    parser(type_inner)
 }
 
-pub fn type_union<I>() -> impl Parser<Input = I, Output = Type>
+fn type_inner<I>(input: &mut I) -> ParseResult<Type, I>
 where
     I: RangeStream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    sep_by1(type_atom().skip(whitespace()), token('|').skip(whitespace()))
-        .map(|x: Vec<Type>| {
-            if x.len() > 1 {
-                Type::Union(x)
-            } else {
-                x.into_iter().next().unwrap()
-            }
-        })
+     choice((
+        type_union(),
+        type_array(),
+        type_object(),
+    ))
+    .parse_stream(input)
 }
 
 pub fn type_atom<I>() -> impl Parser<Input = I, Output = Type>
@@ -108,8 +157,56 @@ where
 {
     choice((
         ident().map(Type::Named),
-        str_literal().map(Type::StringLiteral),
+        str_literal().map(Type::StringLiteral)
     ))
+}
+
+pub fn type_array<I>() -> impl Parser<Input = I, Output = Type>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
+        token('[').skip(whitespace()),
+        type_expr().skip(whitespace()),
+        token(']'),
+    ).map(|(_, type_, _)| Type::Array(Box::new(type_)))
+}
+
+pub fn type_object<I>() -> impl Parser<Input = I, Output = Type>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
+        token('{').skip(whitespace()),
+        many(field().skip(whitespace())),
+        token('}'),
+    ).map(|(_, fields, _)| Type::Object(fields))
+}
+
+pub fn type_union<I>() -> impl Parser<Input = I, Output = Type>
+where
+    I: RangeStream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    sep_by1(
+        choice((
+            type_atom(),
+            type_array(),
+            type_object(),
+        )).skip(whitespace()),
+
+        // seperator
+        token('|').skip(whitespace())
+    )
+    .map(|x: Vec<Type>| {
+        if x.len() > 1 {
+            Type::Union(x)
+        } else {
+            x.into_iter().next().unwrap()
+        }
+    })
 }
 
 fn ident<I>() -> impl Parser<Input = I, Output = String>
@@ -171,7 +268,7 @@ interface AssignmentProperty <: Property, OtherInterface {
     method: false;
 }
 "#.trim();
-        let result = interface().easy_parse(State::new(example));
+        let result = interface_defn().easy_parse(State::new(example));
         assert!(result.is_ok(), "\n\n{}\n", result.unwrap_err());
         let (data, mut state) = result.unwrap();
         assert!(state.uncons().is_err());

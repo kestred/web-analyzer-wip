@@ -43,7 +43,7 @@ impl TypescriptLexer {
                     return COMMENT;
                 }
                 if scan_regexp_literal(s, self.prev_tokens) {
-                    return REGEXP_LIT;
+                    return REGEXP_TOKEN;
                 }
             }
             _ => (),
@@ -62,7 +62,7 @@ impl TypescriptLexer {
 
         if is_decimal(c) {
             scan_number(c, s);
-            return NUMBER_LIT;
+            return NUMBER_TOKEN;
         }
 
         // One-byte symbols/operations/punctuation.
@@ -78,7 +78,7 @@ impl TypescriptLexer {
         match c {
             '\'' | '"' => {
                 scan_string(c, s);
-                return STRING_LIT;
+                return STRING_TOKEN;
             }
             '`' => {
                 return scan_template_literal(s, TypescriptLexer::new());
