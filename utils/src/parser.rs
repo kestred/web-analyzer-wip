@@ -1,23 +1,26 @@
 //! An example of how to implement a parsing using the utils.
 //!
 //! ```ignore
-//! use crate::MyLexer; // implements `web_grammars_utils::Lexer`
-//! use web_grammars_utils::{TextTreeSource, TextTokenSource};
+//! use web_grammars_utils::{Lexer, Grammar, Parser, SyntaxKind};
+//!
+//! struct MyLexer { ... }
+//!
+//! impl Lexer for MyLexer { ... }
+//!
+//! fn my_grammar(p: &mut Parser) -> SyntaxKind { ... }
 //!
 //! fn parse(text: &str) -> SyntaxNode {
-//!     let tokens = MyLexer::tokenize(&text);
-//!     let token_source = TextTokenSource::new(text, &tokens);
-//!     let mut tree_sink = TextTreeSink::new(text, &tokens);
-//!     ra_parser::parse(&token_source, &mut tree_sink);
-//!     tree_sink.finish()
+//!     let tokens = MyLexer::tokenize(text);
+//!     let parser = Parser::new(text, &tokens);
+//!     parser.parse(my_grammar)
 //! }
 //! ```
 
 mod token_source;
 mod tree_sink;
 
-use crate::Token;
-use crate::syntax_kind::{COMMENT, TOMBSTONE};
+use crate::lexer::Token;
+use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE};
 use rowan::{SyntaxKind, SyntaxNode, TreeArc};
 use std::fmt::Debug;
 
@@ -77,9 +80,61 @@ where
         self.complete_marker(start, kind);
     }
 
-    /// Emit error for the current node in the parse tree
-    pub fn error(&mut self, error: E) {
+    /// [Internal API] Emit error for the current node in the parse tree
+    pub(crate) fn error(&mut self, error: E) {
         self.events.push(Event::Error { error });
+    }
+
+    /// [Internal API] Starts a new node in the syntax tree. All nodes and tokens
+    /// consumed between the `start` and the corresponding `Parser::complete_marker`
+    /// belong to the same node.
+    pub(crate) fn start_marker(&mut self) -> Marker {
+        let start = Marker::new(self.events.len());
+        self.events.push(Event::Start { kind: TOMBSTONE });
+        start
+    }
+
+    /// [Internal API] Finishes the syntax tree node and assigns `kind` to it.
+    pub(crate) fn complete_marker(&mut self, marker: Marker, kind: SyntaxKind) {
+        match self.events[marker.pos] {
+            Event::Start { kind: ref mut slot, .. } => {
+                *slot = kind;
+            }
+            _ => unreachable!(),
+        }
+        self.events.push(Event::Finish { });
+    }
+
+    /// [Internal API] Returns the kind of the current token.
+    /// If parser has already reached the end of input,
+    /// the special `EOF` kind is returned.
+    pub(crate) fn current(&self) -> SyntaxKind {
+        self.nth(0)
+    }
+
+    /// [Internal API] Checks if the current token is `kind`.
+    pub(crate) fn at(&self, kind: SyntaxKind) -> bool {
+        self.current() == kind
+    }
+
+    /// [Internal API] Lookahead returning the kind of the next nth token.
+    pub(crate) fn nth(&self, n: usize) -> SyntaxKind {
+        self.source.token_kind(self.source_pos + n)
+    }
+
+    /// [Internal API] Advances the parser by one token unconditionally.
+    pub(crate) fn bump(&mut self) {
+        let kind = self.nth(0);
+        if kind == EOF {
+            return;
+        }
+        self.advance(kind, 1);
+    }
+
+    /// Advance the parser.
+    fn advance(&mut self, kind: SyntaxKind, len: usize) {
+        self.source_pos += len;
+        self.events.push(Event::Span { kind, len });
     }
 
     /// Consume the parser and apply it's events to create the syntax tree.
@@ -95,42 +150,6 @@ where
         }
         self.sink.finish()
     }
-
-    /// Starts a new node in the syntax tree. All nodes and tokens
-    /// consumed between the `start` and the corresponding `Parser::complete_marker`
-    /// belong to the same node.
-    fn start_marker(&mut self) -> Marker {
-        let start = Marker::new(self.events.len());
-        self.events.push(Event::Start { kind: TOMBSTONE });
-        start
-    }
-
-    /// Finishes the syntax tree node and assigns `kind` to it.
-    fn complete_marker(&mut self, marker: Marker, kind: SyntaxKind) {
-        match self.events[marker.pos] {
-            Event::Start { kind: ref mut slot, .. } => {
-                *slot = kind;
-            }
-            _ => unreachable!(),
-        }
-        self.events.push(Event::Finish { });
-    }
-
-    // fn nth(&self, n: usize) -> SyntaxKind {
-    //     self.source.token_kind(self.source_pos + n)
-    // }
-
-    // fn bump(&mut self) {
-    //     let kind = self.nth(0);
-    //     if kind == EOF {
-    //         return;
-    //     }
-    //     self.advance(1);
-    // }
-
-    // fn advance(&mut self, n: usize) {
-    //     self.source_pos += n;
-    // }
 }
 
 impl<'a, E> Parser<'a, E>
@@ -145,7 +164,7 @@ where
 }
 
 /// See `Parser::start_marker`.
-struct Marker {
+pub(crate) struct Marker {
     // Pos is an offset into the parser's events of events
     pos: usize
 }
