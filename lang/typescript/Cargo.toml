@@ -1,9 +1,9 @@
 [package]
-name = "typescript-grammar"
+name = "typescript_grammar"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
 [dependencies]
-web-grammars-utils = { path = "../../utils" }
-javascript-grammar = { path = "../javascript" }
+web_grammars_utils = { path = "../../utils" }
+javascript_grammar = { path = "../javascript" }

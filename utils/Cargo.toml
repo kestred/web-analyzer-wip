@@ -1,8 +1,9 @@
 [package]
-name = "web-grammars-utils"
+name = "web_grammars_utils"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
 [dependencies]
 rowan = "0.5.0"
+smallset = "0.1.0"
