@@ -20,7 +20,9 @@ pub fn variable_initializer() -> impl PredictiveGrammar {
 }
 
 pub fn expression() -> impl PredictiveGrammar {
-    literal() // TODO: Implement full expression tree
+    ( token(IDENT)
+    | literal()
+    ) // TODO: Implement all expressions
 }
 
 pub fn literal() -> impl PredictiveGrammar {
