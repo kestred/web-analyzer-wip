@@ -10,6 +10,9 @@ pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
         .or(self::symbols::as_str(k))
         .or(self::keywords::as_str(k))
         .or(self::literals::as_str(k))
+
+        // N.B. None of the nodes have a canonical str repr
+        // .or(self::nodes::as_str(k))
 }
 
 pub fn as_debug_repr(k: SyntaxKind) -> Option<SyntaxKindMeta> {
@@ -17,6 +20,7 @@ pub fn as_debug_repr(k: SyntaxKind) -> Option<SyntaxKindMeta> {
         .or(self::symbols::as_debug_repr(k))
         .or(self::keywords::as_debug_repr(k))
         .or(self::literals::as_debug_repr(k))
+        .or(self::nodes::as_debug_repr(k))
 }
 
 syntax_kinds! {
@@ -32,76 +36,76 @@ syntax_kinds! {
 
     keywords {
         // Keywords defined in ES2015
-        BREAK_KW 101
-        CASE_KW 102
-        CATCH_KW 103
-        CLASS_KW 104
-        CONST_KW 105
-        CONTINUE_KW 106
-        DEBUGGER_KW 107
-        DEFAULT_KW 108
-        DELETE_KW 109
-        DO_KW 110
-        ELSE_KW 111
-        EXPORT_KW 113
-        EXTENDS_KW 114
-        FALSE_KW 115
-        FINALLY_KW 118
-        FOR_KW 119
-        FUNCTION_KW 120
-        IF_KW 121
-        IMPORT_KW 122
-        IN_KW 123
-        INSTANCEOF_KW 124
-        NEW_KW 125
-        NULL_KW 126
-        RETURN_KW 130
-        SUPER_KW 131
-        SWITCH_KW 132
-        THIS_KW 133
-        THROW_KW 134
-        TRUE_KW 135
-        TRY_KW 136
-        TYPEOF_KW 137
-        VAR_KW 138
-        VOID_KW 139
-        WHILE_KW 140
-        WITH_KW 141
-        YIELD_KW 142
+        BREAK_KW 101 ("break")
+        CASE_KW 102 ("case")
+        CATCH_KW 103 ("catch")
+        CLASS_KW 104 ("class")
+        CONST_KW 105 ("const")
+        CONTINUE_KW 106 ("continue")
+        DEBUGGER_KW 107 ("debugger")
+        DEFAULT_KW 108 ("default")
+        DELETE_KW 109 ("delete")
+        DO_KW 110 ("do")
+        ELSE_KW 111 ("else")
+        EXPORT_KW 113 ("export")
+        EXTENDS_KW 114 ("extends")
+        FALSE_KW 115 ("false")
+        FINALLY_KW 118 ("finally")
+        FOR_KW 119 ("for")
+        FUNCTION_KW 120 ("function")
+        IF_KW 121 ("if")
+        IMPORT_KW 122 ("import")
+        IN_KW 123 ("in")
+        INSTANCEOF_KW 124 ("instanceof")
+        NEW_KW 125 ("new")
+        NULL_KW 126 ("null")
+        RETURN_KW 130 ("return")
+        SUPER_KW 131 ("super")
+        SWITCH_KW 132 ("switch")
+        THIS_KW 133 ("this")
+        THROW_KW 134 ("throw")
+        TRUE_KW 135 ("true")
+        TRY_KW 136 ("try")
+        TYPEOF_KW 137 ("typeof")
+        VAR_KW 138 ("var")
+        VOID_KW 139 ("void")
+        WHILE_KW 140 ("while")
+        WITH_KW 141 ("with")
+        YIELD_KW 142 ("yield")
 
         // In ES2015, these are always reserved
-        ENUM_KW 143
+        ENUM_KW 143 ("enum")
 
         // In ES2015, the following are only reserved when they are found in strict mode code:
-        IMPLEMENTS_KW 144
-        INTERFACE_KW 145
-        LET_KW 146
-        PACKAGE_KW 147
-        PRIVATE_KW 148
-        PROTECTED_KW 149
-        PUBLIC_KW 150
-        STATIC_KW 151
+        IMPLEMENTS_KW 144 ("implements")
+        INTERFACE_KW 145 ("interface")
+        LET_KW 146 ("let")
+        PACKAGE_KW 147 ("package")
+        PRIVATE_KW 148 ("private")
+        PROTECTED_KW 149 ("protected")
+        PUBLIC_KW 150 ("public")
+        STATIC_KW 151 ("static")
 
         // In ES2015, the following are only reserved when they are found in module code:
-        AWAIT_KW 152
+        AWAIT_KW 152 ("await")
 
         // The following are reserved as future keywords by older ECMAScript specifications (ECMAScript 1 till 3).
-        ABSTRACT_KW 153
-        BOOLEAN_KW 154
-        BYTE_KW 155
-        CHAR_KW 156
-        DOUBLE_KW 157
-        FINAL_KW 158
-        FLOAT_KW 159
-        GOTO_KW 160
-        INT_KW 161
-        LONG_KW 162
-        NATIVE_KW 163
-        SHORT_KW 164
-        SYNCHRONIZED_KW 165
-        THROWS_KW 166
-        TRANSIENT_KW 167
-        VOLATILE_KW 168
+        ABSTRACT_KW 153 ("abstract")
+        BOOLEAN_KW 154 ("boolean")
+        BYTE_KW 155 ("byte")
+        CHAR_KW 156 ("char")
+        DOUBLE_KW 157 ("double")
+        FINAL_KW 158 ("final")
+        FLOAT_KW 159 ("float")
+        GOTO_KW 160 ("goto")
+        INT_KW 161 ("int")
+        LONG_KW 162 ("long")
+        NATIVE_KW 163 ("native")
+        SHORT_KW 164 ("short")
+        SYNCHRONIZED_KW 165 ("synchronized")
+        THROWS_KW 166 ("throws")
+        TRANSIENT_KW 167 ("transient")
+        VOLATILE_KW 168 ("volatile")
     }
 
     literals {

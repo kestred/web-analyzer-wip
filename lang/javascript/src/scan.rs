@@ -3,6 +3,20 @@ use web_grammars_utils::{Scanner, SyntaxKind};
 use web_grammars_utils::lexer::ResetableLexer;
 use web_grammars_utils::scan::{is_decimal, scan_string};
 
+pub fn is_javascript_ident_prefix(c: char) -> bool {
+    (c >= 'a' && c <= 'z')
+        || (c >= 'A' && c <= 'Z')
+        || c == '_'
+        || c == '$'
+}
+
+pub fn is_javascript_ident_suffix(c: char) -> bool {
+    (c >= 'a' && c <= 'z')
+        || (c >= 'A' && c <= 'Z')
+        || (c >= '0' && c <= '9')
+        || c == '_'
+}
+
 /// Assumes preceding back tick
 pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) -> SyntaxKind {
     while let Some(c) = s.current() {

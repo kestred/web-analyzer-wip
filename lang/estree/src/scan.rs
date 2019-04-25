@@ -15,7 +15,7 @@ pub fn extract_code_blocks(text: &str) -> Vec<&str> {
     while !text.is_empty() {
         let mut s = Scanner::new(text);
         let c = s.bump().unwrap();
-        let found = scan_part(c, &mut s);
+        let found = scan_code_block_or_skip(c, &mut s);
         let length: u32 = s.into_len().into();
         if found {
             results.push(&text[..length as usize]);
@@ -25,7 +25,9 @@ pub fn extract_code_blocks(text: &str) -> Vec<&str> {
     results
 }
 
-fn scan_part(c: char, s: &mut Scanner) -> bool {
+/// Either scans a code block or attempts to seeks to the next
+/// character that could start a could block.
+fn scan_code_block_or_skip(c: char, s: &mut Scanner) -> bool {
     match c {
         '`' => {
             return scan_code_block(s);

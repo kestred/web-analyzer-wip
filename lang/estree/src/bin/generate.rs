@@ -103,15 +103,20 @@ fn main() -> Result<(), std::io::Error> {
     let mut next_syntax_kind = BASE_SYNTAX_KIND;
     out.push_str("pub mod syntax_kind {\n");
     out.push_str("    use crate::syntax_kind::JAVASCRIPT;\n");
-    out.push_str("    use web_grammars_utils::SyntaxKind;\n\n");
+    out.push_str("    use web_grammars_utils::syntax_kinds;\n\n");
+    out.push_str("    syntax_kinds! {\n");
+    out.push_str("        language JAVASCRIPT;\n\n");
+    out.push_str("        nodes {\n");
     for node in &leaf_nodes {
-        out.push_str("    pub const ");
+        out.push_str("            ");
         out.push_str(&node.name.to_shouty_snake_case());
-        out.push_str(": SyntaxKind = JAVASCRIPT.syntax_kind(");
+        out.push(' ');
         out.push_str(&next_syntax_kind.to_string());
-        out.push_str(");\n");
+        out.push('\n');
         next_syntax_kind += 1;
     }
+    out.push_str("        }\n");
+    out.push_str("    }\n");
     out.push_str("}\n");
 
     fs::write("lang/javascript/src/generated.rs", out.as_bytes())?;

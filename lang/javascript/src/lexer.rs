@@ -1,5 +1,7 @@
 use crate::syntax_kind::*;
 use crate::scan::{
+    is_javascript_ident_prefix,
+    is_javascript_ident_suffix,
     scan_multibyte_symbol,
     scan_number,
     scan_regexp_literal,
@@ -9,8 +11,6 @@ use web_grammars_utils::{Lexer, Scanner, SyntaxKind};
 use web_grammars_utils::lexer::ResetableLexer;
 use web_grammars_utils::scan::{
     is_decimal,
-    is_ascii_ident_prefix,
-    is_ascii_ident_suffix,
     is_whitespace,
     scan_c_comment,
     scan_shebang,
@@ -49,8 +49,8 @@ impl JavascriptLexer {
             _ => (),
         }
 
-        if is_ascii_ident_prefix(c) {
-            s.bump_while(is_ascii_ident_suffix);
+        if is_javascript_ident_prefix(c) {
+            s.bump_while(is_javascript_ident_suffix);
             if let Some(kind) = to_javascript_keyword(s.current_text()) {
                 return kind;
             }
@@ -197,7 +197,9 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
         let example = crate::samples::SAMPLE_2;
         let tokens = JavascriptLexer::new().tokenize(example);
         let errors = tokens.iter().enumerate().filter(|(_, t)| t.kind == ERROR).collect::<Vec<_>>();
-        eprintln!("{:#?}", tokens.iter().map(|t| format!("{:?}", as_debug_repr(t.kind))).collect::<Vec<_>>());
+        eprintln!("{}", tokens.iter().map(|t| {
+            as_debug_repr(t.kind).map(|meta| format!("[{} | {}]", meta.name, meta.kind.0)).unwrap_or("[None".to_string())
+        }).collect::<Vec<_>>().join("\n"));
         assert!(errors.is_empty(), "Found errors: {:?}", errors);
     }
 }
