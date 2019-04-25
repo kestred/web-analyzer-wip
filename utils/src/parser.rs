@@ -20,7 +20,7 @@
 mod token_source;
 mod tree_sink;
 
-use crate::grammar::Grammar;
+use crate::grammar::GrammarNode;
 use crate::lexer::Token;
 use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE, WHITESPACE};
 use rowan::{SyntaxKind, SyntaxNode, TreeArc};
@@ -52,16 +52,16 @@ impl<'a, E: ParseError> Parser<'a, E> {
     }
 
     /// Parse the grammar completely and return the result root syntax node.
-    pub fn parse<G: Grammar<E>>(mut self, grammar: &G) -> TreeArc<SyntaxNode> {
+    pub fn parse<G: GrammarNode<E>>(mut self, grammar: &G) -> TreeArc<SyntaxNode> {
         self.eval(grammar);
         self.finish()
     }
 
     /// Evaluate a single grammar rule.
     ///
-    /// This is intended to be called within a `Grammar` parsing function
+    /// This is intended to be called within a `GrammarNode` parsing function
     /// to begin parsing a sub_grammar.
-    pub fn eval<G: Grammar<E>>(&mut self, grammar: &G) -> SyntaxKind {
+    pub fn eval<G: GrammarNode<E>>(&mut self, grammar: &G) -> SyntaxKind {
         let start = self.start_marker();
         let kind = grammar.parse(self);
         self.complete_marker(start, kind);
@@ -115,7 +115,7 @@ impl<'a, E: ParseError> Parser<'a, E> {
             .iter()
             .enumerate()
             .find(|(_key, val)| Event::is_err(val))
-            .map(|(key, _val)| key);
+            .map(|(key, _val)| key + checkpoint.event_len);
         if let Some(idx) = error_idx {
             let error = match self.events.remove(idx) {
                 Event::Error { error } => error,

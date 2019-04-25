@@ -1,19 +1,9 @@
-use crate::grammar::{Grammar, GrammarLike, Outcome};
+use crate::grammar::{GrammarNode, Grammar, Outcome};
 use crate::parser::{ParseError, Parser};
 use crate::parse_ok;
 use rowan::SyntaxKind;
 
-impl<Err, Func> Grammar<Err> for Func
-where
-    Func: Fn(&mut Parser<Err>) -> SyntaxKind,
-    Err: ParseError,
-{
-    fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind {
-        self(p)
-    }
-}
-
-impl<Err, Func, Return> GrammarLike<Err> for Func
+impl<Err, Func, Return> Grammar<Err> for Func
 where
     Err: ParseError,
     Func: Fn(&mut Parser<Err>) -> Return,
@@ -24,21 +14,31 @@ where
     }
 }
 
-impl<Err, A> GrammarLike<Err> for (A,)
+impl<Err, Func> GrammarNode<Err> for Func
+where
+    Func: Fn(&mut Parser<Err>) -> SyntaxKind,
+    Err: ParseError,
+{
+    fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind {
+        self(p)
+    }
+}
+
+impl<Err, A> Grammar<Err> for (A,)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
+    A: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         self.0.parse(p)
     }
 }
 
-impl<Err, A, B> GrammarLike<Err> for (A, B)
+impl<Err, A, B> Grammar<Err> for (A, B)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -46,12 +46,12 @@ where
     }
 }
 
-impl<Err, A, B, C> GrammarLike<Err> for (A, B, C)
+impl<Err, A, B, C> Grammar<Err> for (A, B, C)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -60,13 +60,13 @@ where
     }
 }
 
-impl<Err, A, B, C, D> GrammarLike<Err> for (A, B, C, D)
+impl<Err, A, B, C, D> Grammar<Err> for (A, B, C, D)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -76,14 +76,14 @@ where
     }
 }
 
-impl<Err, A, B, C, D, E> GrammarLike<Err> for (A, B, C, D, E)
+impl<Err, A, B, C, D, E> Grammar<Err> for (A, B, C, D, E)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -94,15 +94,15 @@ where
     }
 }
 
-impl<Err, A, B, C, D, E, F> GrammarLike<Err> for (A, B, C, D, E, F)
+impl<Err, A, B, C, D, E, F> Grammar<Err> for (A, B, C, D, E, F)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -114,16 +114,16 @@ where
     }
 }
 
-impl<Err, A, B, C, D, E, F, G> GrammarLike<Err> for (A, B, C, D, E, F, G)
+impl<Err, A, B, C, D, E, F, G> Grammar<Err> for (A, B, C, D, E, F, G)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
-    G: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
+    G: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));
@@ -136,17 +136,17 @@ where
     }
 }
 
-impl<Err, A, B, C, D, E, F, G, H> GrammarLike<Err> for (A, B, C, D, E, F, G, H)
+impl<Err, A, B, C, D, E, F, G, H> Grammar<Err> for (A, B, C, D, E, F, G, H)
 where
     Err: ParseError,
-    A: GrammarLike<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
-    G: GrammarLike<Err>,
-    H: GrammarLike<Err>,
+    A: Grammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
+    G: Grammar<Err>,
+    H: Grammar<Err>,
 {
     fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         parse_ok!(self.0.parse(p));

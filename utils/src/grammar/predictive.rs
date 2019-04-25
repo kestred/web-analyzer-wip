@@ -5,15 +5,15 @@ use crate::parser::ParseError;
 //
 // - Allows more efficient parsing of LL(1)-like than arbitrary lookahead (TODO: Benchmark).
 // - Can be used to generate a list of expected tokens
-pub trait Predictive<Err: ParseError = String>: GrammarLike<Err> {
+pub trait PredictiveGrammar<Err: ParseError = String>: Grammar<Err> {
     fn predicate(&self) -> TokenSet;
 }
 
-pub trait PredictiveNode<Err: ParseError = String>: Grammar<Err> {
+pub trait PredictiveGrammarNode<Err: ParseError = String>: GrammarNode<Err> {
     fn predicate(&self) -> TokenSet;
 }
 
-impl<Err> Predictive<Err> for Expect<Err>
+impl<Err> PredictiveGrammar<Err> for Expect<Err>
 where
     Err: ParseError,
 {
@@ -24,20 +24,20 @@ where
     }
 }
 
-impl<Err, G> Predictive<Err> for Node<Err, G>
+impl<Err, G> PredictiveGrammar<Err> for Committed<Err, G>
 where
     Err: ParseError,
-    G: PredictiveNode<Err>,
+    G: PredictiveGrammarNode<Err>,
 {
     fn predicate(&self) -> TokenSet {
       self.grammar.predicate()
     }
 }
 
-impl<Err, G> PredictiveNode<Err> for NodeLike<Err, G>
+impl<Err, G> PredictiveGrammarNode<Err> for Uncommitted<Err, G>
 where
     Err: ParseError,
-    G: Predictive<Err>,
+    G: PredictiveGrammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
       self.grammar.predicate()
@@ -45,10 +45,10 @@ where
 }
 
 
-impl<Err, O> Predictive<Err> for Many1<Err, O>
+impl<Err, O> PredictiveGrammar<Err> for Many1<Err, O>
 where
     Err: ParseError,
-    O: Predictive<Err>,
+    O: PredictiveGrammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
       self.once.predicate()
@@ -56,119 +56,119 @@ where
 }
 
 
-impl<Err, O, S> Predictive<Err> for SepBy1<Err, O, S>
+impl<Err, O, S> PredictiveGrammar<Err> for SepBy1<Err, O, S>
 where
     Err: ParseError,
-    O: Predictive<Err>,
-    S: Predictive<Err>,
+    O: PredictiveGrammar<Err>,
+    S: PredictiveGrammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
       self.once.predicate()
     }
 }
 
-impl<Err, A> Predictive<Err> for (A,)
+impl<Err, A> PredictiveGrammar<Err> for (A,)
 where
     Err: ParseError,
-    A: Predictive<Err>,
+    A: PredictiveGrammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B> Predictive<Err> for (A, B)
+impl<Err, A, B> PredictiveGrammar<Err> for (A, B)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C> Predictive<Err> for (A, B, C)
+impl<Err, A, B, C> PredictiveGrammar<Err> for (A, B, C)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C, D> Predictive<Err> for (A, B, C, D)
+impl<Err, A, B, C, D> PredictiveGrammar<Err> for (A, B, C, D)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C, D, E> Predictive<Err> for (A, B, C, D, E)
+impl<Err, A, B, C, D, E> PredictiveGrammar<Err> for (A, B, C, D, E)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C, D, E, F> Predictive<Err> for (A, B, C, D, E, F)
+impl<Err, A, B, C, D, E, F> PredictiveGrammar<Err> for (A, B, C, D, E, F)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C, D, E, F, G> Predictive<Err> for (A, B, C, D, E, F, G)
+impl<Err, A, B, C, D, E, F, G> PredictiveGrammar<Err> for (A, B, C, D, E, F, G)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
-    G: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
+    G: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
     }
 }
 
-impl<Err, A, B, C, D, E, F, G, H> Predictive<Err> for (A, B, C, D, E, F, G, H)
+impl<Err, A, B, C, D, E, F, G, H> PredictiveGrammar<Err> for (A, B, C, D, E, F, G, H)
 where
     Err: ParseError,
-    A: Predictive<Err>,
-    B: GrammarLike<Err>,
-    C: GrammarLike<Err>,
-    D: GrammarLike<Err>,
-    E: GrammarLike<Err>,
-    F: GrammarLike<Err>,
-    G: GrammarLike<Err>,
-    H: GrammarLike<Err>,
+    A: PredictiveGrammar<Err>,
+    B: Grammar<Err>,
+    C: Grammar<Err>,
+    D: Grammar<Err>,
+    E: Grammar<Err>,
+    F: Grammar<Err>,
+    G: Grammar<Err>,
+    H: Grammar<Err>,
 {
     fn predicate(&self) -> TokenSet {
         self.0.predicate()
