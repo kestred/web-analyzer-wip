@@ -110,7 +110,7 @@ macro_rules! syntax_kinds {
         $(
             $(#[doc($hidden:tt)])?
             $label:ident {
-                $($kind:ident $num:tt $(($raw:tt))?)*
+                $($kind:ident $num:tt $(($raw:tt))? $( [ $($alias:ident),+ ] )? )*
             }
         )*
     } => {
@@ -119,7 +119,10 @@ macro_rules! syntax_kinds {
             pub mod $label {
                 use super::$lang;
 
-                $(#[doc(hidden)] pub const $kind: $crate::SyntaxKind = $lang.syntax_kind($num);)*
+                $(
+                    #[doc(hidden)] pub const $kind: $crate::SyntaxKind = $lang.syntax_kind($num);
+                    $($(#[doc(hidden)] pub const $alias: $crate::SyntaxKind = $kind;)*)*
+                )*
 
                 /// Get the canonical string representation of the token, if one exists
                 pub fn as_str(k: $crate::SyntaxKind) -> Option<&'static str> {
@@ -147,8 +150,21 @@ macro_rules! syntax_kinds {
                 }
             }
             pub use self::$label::{
-                $($kind,)*
+                $(
+                    $kind,
+                    $($($alias,)*)*
+                )*
             };
         )*
     }
+}
+
+#[macro_export]
+macro_rules! catch {
+    ($block:block) => {
+        {
+            let mut _catch = || $block;
+            _catch()
+        }
+    };
 }

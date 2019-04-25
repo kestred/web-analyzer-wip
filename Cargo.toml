@@ -1,6 +1,7 @@
 [workspace]
 members = [
-  "lang/estree",
+  "codegen/antlr",
+  "codegen/estree",
   "lang/javascript",
   "lang/typescript",
   "lang/html",

@@ -31,7 +31,7 @@ syntax_kinds! {
         SHU 50 (">>>")
         SHU_EQ 51 (">>>=")
         EQEQEQ 52 ("===")
-        BANGEQEQ 53 ("!==")
+        BANG_EQEQ 53 ("!==")
     }
 
     keywords {
@@ -106,13 +106,21 @@ syntax_kinds! {
         THROWS_KW 166 ("throws")
         TRANSIENT_KW 167 ("transient")
         VOLATILE_KW 168 ("volatile")
+
+        // These are contextual keywords (which are treated as identifiers except in particular contexts)
+        AS_KW 170 ("as")
+        FROM_KW 171 ("from")
+        GET_KW 172 ("get")
+        SET_KW 173 ("set")
+        OF_KW 174 ("of")
+        ASYNC_KW 175 ("async")
     }
 
     literals {
-        NUMBER_TOKEN 201
-        STRING_TOKEN 202
-        REGEXP_TOKEN 203
-        TEMPLATE_TOKEN 204
+        NUMBER_LITERAL 201
+        STRING_LITERAL 202
+        REGEXP_LITERAL 203
+        TEMPLATE_LITERAL 204
     }
 }
 
@@ -131,14 +139,14 @@ pub fn is_javascript_punct(k: SyntaxKind) -> bool {
         _ if k == R_BRACK => true, // N.B. ignore when distinguishing regexp
         _ if k == L_ANGLE => true,
         _ if k == R_ANGLE => true,
-        _ if k == LTEQ => true,
-        _ if k == GTEQ => true,
+        _ if k == LT_EQ => true,
+        _ if k == GT_EQ => true,
         _ if k == EQ => true,
         _ if k == EQEQ => true,
         _ if k == EQEQEQ => true,
         _ if k == BANG => true,
-        _ if k == BANGEQ => true,
-        _ if k == BANGEQEQ => true,
+        _ if k == BANG_EQ => true,
+        _ if k == BANG_EQEQ => true,
         _ if k == PLUS => true,
         _ if k == PLUS_EQ => true,
         _ if k == MINUS => true,
@@ -165,7 +173,7 @@ pub fn is_javascript_punct(k: SyntaxKind) -> bool {
         _ if k == PIPE_EQ => true,
         _ if k == AND => true,
         _ if k == OR => true,
-        _ if k == TILDA => true,
+        _ if k == TILDE => true,
         _ => false,
     }
 }
@@ -181,7 +189,7 @@ pub fn to_javascript_symbol(c: char) -> Option<SyntaxKind> {
         ';' => Some(SEMI),
         ',' => Some(COMMA),
         '?' => Some(QUESTION),
-        '~' => Some(TILDA),
+        '~' => Some(TILDE),
         _ => None
     }
 }
@@ -252,6 +260,14 @@ pub fn to_javascript_keyword(s: &str) -> Option<SyntaxKind> {
         "throws" => Some(THROWS_KW),
         "transient" => Some(TRANSIENT_KW),
         "volatile" => Some(VOLATILE_KW),
+
+        // Contextual keywords
+        "as" => None,
+        "from" => None,
+        "get" => None,
+        "set" => None,
+        "of" => None,
+        "async" => None,
 
         _ => None,
     }

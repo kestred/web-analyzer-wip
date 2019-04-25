@@ -13,29 +13,34 @@
 //!     }
 //! }
 //!
-//! const ROOT: SyntaxKind = SyntaxKind(999);
+//! const ROOT: SyntaxKind = SyntaxKind(1000);
 //!
-//! fn my_grammar() -> impl GrammarNode {
-//!     token(EOF).is(ROOT) // i.e. build your grammar with combinators
+//! fn my_grammar(p: &mut Parser) {
+//!     p.start();
+//!     p.expect(EOF);
+//!     p.finish(ROOT);
 //! }
 //!
 //! /// Parse a syntax tree from text
 //! pub fn parse(text: &str) -> TreeNode {
 //!     let tokens = MyLexer.tokenize(text);
-//!     let mut parser = Parser::new((text, &tokens).into(), false);
+//!     let parser = Parser::new((text, &tokens).into(), false);
 //!     let (root, _remainder) = parser.parse(&my_grammar());
 //!     root
 //! }
 //! ```
 
+mod token_set;
 mod token_source;
 mod tree_sink;
 
-use crate::grammar::GrammarNode;
-use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE, WHITESPACE};
+use crate::syntax_kind::*;
 use rowan::SyntaxKind;
+use std::cell::Cell;
 use std::fmt::Debug;
+use std::rc::Rc;
 
+pub use self::token_set::*;
 pub use self::token_source::*;
 pub use self::tree_sink::*;
 
@@ -47,107 +52,212 @@ pub struct Parser<'a, E: 'static + Debug + Send + Sync = String> {
     source_pos: usize,
     source: TextTokenSource<'a>,
     sink: TextTreeSink<'a, E>,
-    preserve_whitespace: bool,
+    steps: Cell<u32>,
+    checkpoints: Rc<Cell<u32>>,
+
+    pub debug_repr: fn(SyntaxKind) -> Option<SyntaxKindMeta>,
+    pub max_rollback_size: u16,
+    pub preserve_whitespace: bool,
 }
 
 impl<'a, E: ParseError> Parser<'a, E> {
-    pub fn new(input: TokenInput<'a>, preserve_whitespace: bool) -> Parser<'a, E> {
+    pub fn new(input: TokenInput<'a>, debug_repr: fn(SyntaxKind) -> Option<SyntaxKindMeta>, preserve_whitespace: bool) -> Parser<'a, E> {
         let skip_predicate = if preserve_whitespace { skip_comments } else { skip_whitespace };
         Parser {
             events: Vec::new(),
             source_pos: 0,
             source: TextTokenSource::extract(input, skip_predicate),
             sink: TextTreeSink::new(input),
+            steps: Cell::new(0),
+            checkpoints: Rc::new(Cell::new(0)),
+
+            debug_repr,
+            max_rollback_size: 32,
             preserve_whitespace,
         }
     }
 
-    /// Parse the grammar completely and return the result root syntax node.
-    pub fn parse<G: GrammarNode<E>>(mut self, grammar: &G) -> (TreeNode, TokenInput<'a>) {
-        self.eval(grammar);
-        self.finish()
+    pub fn parse<F>(mut self, grammar: F) -> (TreeNode, TokenInput<'a>)
+    where
+        F: Fn(&mut Parser<'a, E>) -> Option<Continue>
+    {
+        grammar(&mut self);
+        self.finalize()
     }
 
-    /// Evaluate a single grammar rule.
+    /// Consume the parser and build a syntax tree.
+    pub fn finalize(mut self) -> (TreeNode, TokenInput<'a>) {
+        for op in self.events {
+            match op {
+                Event::StartNode { kind } if kind == TOMBSTONE => {}
+                Event::StartNode { kind } => {
+                    // eprintln!("start {:?} {{", (self.debug_repr)(kind).map(|k| k.name));
+                    self.sink.start_node(kind, if self.preserve_whitespace { skip_comments } else { skip_whitespace })
+                }
+                Event::CompleteNode => {
+                    // eprintln!("}}");
+                    self.sink.complete_node()
+                }
+                Event::Error { error } => self.sink.error(error),
+                Event::Span { kind, len } => self.sink.span(kind, len, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
+            }
+        }
+        self.sink.finalize()
+    }
+
+
+    /// Checks if the current token is a specified keyword.
     ///
-    /// This is intended to be called within a `GrammarNode` parsing function
-    /// to begin parsing a sub_grammar.
-    pub fn eval<G: GrammarNode<E>>(&mut self, grammar: &G) -> SyntaxKind {
-        let start = self.start_marker();
-        let kind = grammar.parse(self);
-        self.complete_marker(start, kind);
-        kind
+    /// Does not consider the SyntaxKind (e.g. to detect contextual keywords)
+    pub fn at_keyword(&self, kw: &str) -> bool {
+        self.source.is_keyword(self.source_pos, kw)
     }
 
-    /// [Internal API]
+    /// Checks if the next token is separated by ignored tokens (e.g. whitespace or comments).
+    pub fn at_whitespace(&self) -> bool {
+        !self.source.is_token_joint_to_next(self.source_pos)
+    }
+
+    /// Checks if the next token on the same line as the current token.
+    pub fn at_line_terminator(&self) -> bool {
+        !self.source.is_token_inline_to_next(self.source_pos)
+    }
+
     /// Checks if the current token is `kind`.
-    pub(crate) fn at(&self, kind: SyntaxKind) -> bool {
+    pub fn at(&self, kind: SyntaxKind) -> bool {
         self.current() == kind
     }
 
-    /// [Internal API]
+    /// Checks if the current token is `kind`.
+    pub fn at_ts(&self, ts: &TokenSet) -> bool {
+        ts.contains(&self.current())
+    }
+
     /// Lookahead returning the kind of the next nth token.
-    pub(crate) fn nth(&self, n: usize) -> SyntaxKind {
+    pub fn nth(&self, n: usize) -> SyntaxKind {
+        let steps = self.steps.get();
+        assert!(steps <= 10_000_000, "the parser seems stuck");
+        self.steps.set(steps + 1);
         self.source.token_kind(self.source_pos + n)
     }
 
-    /// [Internal API]
     /// Returns the kind of the current token.
     /// If parser has already reached the end of input,
     /// the special `EOF` kind is returned.
-    pub(crate) fn current(&self) -> SyntaxKind {
+    pub fn current(&self) -> SyntaxKind {
         self.nth(0)
     }
 
-    /// [Internal API]
-    /// Records the current state of the parser
-    /// so that it can be restored later with `Parser::rollback`
-    /// if it is necessary to backtrack.
-    pub(crate) fn checkpoint(&self) -> Checkpoint {
+    /// Records the current state of the parser so that it can either:
+    ///
+    /// - Be passed to `Parser::commit` which may possibly bactrack.
+    /// - Be used in relative comparisons against a marker.
+    ///
+    pub fn checkpoint(&self, allow_rollback: bool) -> Checkpoint {
+        let incr = self.checkpoints.get();
+        self.checkpoints.set(incr + 1);
         Checkpoint {
-            event_len: self.events.len(),
-            source_pos: self.source_pos
+            event_pos: self.events.len(),
+            source_pos: self.source_pos,
+            branch_pos: None,
+            rollback: if allow_rollback {
+                Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) }
+            } else {
+                Rollback::Prevent
+            },
         }
     }
 
-    /// [Internal API]
-    /// Backtracks to the checkpoint, undoing any events that were emitted.
-    pub(crate) fn rollback(&mut self, checkpoint: Checkpoint) {
-        self.events.truncate(checkpoint.event_len);
-        self.source_pos = checkpoint.source_pos;
-    }
-
-
-    /// [Internal API]
     /// Consumes the checkpoint.
     /// If there were any errors since the checkpoint began, restores from the checkpoint.
-    pub(crate) fn commit(&mut self, checkpoint: Checkpoint) -> Result<(), E> {
-        let error_idx = self.events[checkpoint.event_len..]
+    ///
+    /// If the current branch is beyond the max lookahead (configured with `max_rollback_size`)
+    /// then commit will instead return `None` to indicate that parsing should not continue;
+    /// in this case, no backtracking will occur.
+    pub fn commit(&mut self, checkpoint: Checkpoint) -> Option<Result<(), E>> {
+        let error_idx = self.events[checkpoint.event_pos..]
             .iter()
             .enumerate()
             .find(|(_key, val)| Event::is_err(val))
-            .map(|(key, _val)| key + checkpoint.event_len);
+            .map(|(key, _val)| key + checkpoint.event_pos);
         if let Some(idx) = error_idx {
-            let error = match self.events.remove(idx) {
-                Event::Error { error } => error,
-                _ => unreachable!()
-            };
-            self.rollback(checkpoint);
-            Err(error)
+            let distance = self.source_pos - checkpoint.source_pos;
+            if checkpoint.allows_rollback() && distance <= self.max_rollback_size as usize {
+                let error = match self.events.remove(idx) {
+                    Event::Error { error } => error,
+                    _ => unreachable!()
+                };
+                // eprintln!("rollback of size {} at {}: {:?}", self.source_pos - checkpoint.source_pos, (self.debug_repr)(self.current()).unwrap().name, error);
+                self.rollback(checkpoint);
+                Some(Err(error))
+            } else {
+                None
+            }
         } else {
-            Ok(())
+            Some(Ok(()))
         }
     }
 
-    /// [Internal API]
-    /// Emit error for the current node in the parse tree
-    pub(crate) fn error<T: Into<E>>(&mut self, error: T) {
-        self.events.push(Event::Error { error: error.into() });
+    /// Backtracks to the checkpoint, undoing any events that were emitted.
+    fn rollback(&mut self, checkpoint: Checkpoint) {
+        assert!(checkpoint.allows_rollback(), "attempted to rollback invalid checkpoint");
+        assert!(self.source_pos >= checkpoint.source_pos, "attempted to rollback expired checkpoint");
+        assert!(self.max_rollback_size as usize > self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
+        if let Some(branch_pos) = checkpoint.branch_pos {
+            match self.events[branch_pos] {
+                Event::StartNode { kind: ref mut slot, .. } => {
+                    *slot = TOMBSTONE;
+                }
+                _ => unreachable!(),
+            }
+        }
+        self.events.truncate(checkpoint.event_pos);
+        self.source_pos = checkpoint.source_pos;
     }
 
-    /// [Internal API]
+    /// Emit error for the current node in the parse tree
+    pub fn error<T: Into<E>>(&mut self, error: T) -> Option<Continue> {
+        self.events.push(Event::Error { error: error.into() });
+        if self.checkpoints.get() > 0 {
+            return None;
+        }
+        Some(Continue)
+    }
+
+    /// Consume the next token if it is `kind` or emit an error otherwise.
+    pub fn expect(&mut self, kind: SyntaxKind) -> Option<Continue> {
+        if self.eat(kind) {
+            Some(Continue)
+        } else {
+            self.expected(kind)
+        }
+    }
+
+    /// Emit an `unexpected` error message, with a single expected kind
+    pub fn expected(&mut self, kind: SyntaxKind) -> Option<Continue> {
+        let unexpected: &str = self.as_str(self.current());
+        self.error(format!("unexpected '{}', expected '{}'", unexpected, self.as_str(kind)))
+    }
+
+    /// Consume the next token if it is one of `kinds` or emit an error otherwise.
+    pub fn expect_ts(&mut self, kinds: &TokenSet) -> Option<Continue> {
+        if self.at_ts(kinds) {
+            self.bump();
+            Some(Continue)
+        } else {
+            self.expected_ts(kinds)
+        }
+    }
+
+    /// Emit an `unexpected` error message, with an expected set of syntax kinds
+    pub fn expected_ts(&mut self, expected: &TokenSet) -> Option<Continue> {
+        let unexpected: &str = self.as_str(self.current());
+        let expected: Vec<&str> = expected.tokens().map(|k| self.as_str(*k)).collect();
+        self.error(format!("unexpected \"{}\", expected one of: {:?}", unexpected, expected))
+    }
+
     /// Consume the next token if `kind` matches.
-    pub(crate) fn eat(&mut self, kind: SyntaxKind) -> bool {
+    pub fn eat(&mut self, kind: SyntaxKind) -> bool {
         if !self.at(kind) {
             return false;
         }
@@ -155,9 +265,8 @@ impl<'a, E: ParseError> Parser<'a, E> {
         true
     }
 
-    /// [Internal API]
     /// Advances the parser by one token unconditionally.
-    pub(crate) fn bump(&mut self) {
+    pub fn bump(&mut self) {
         let kind = self.nth(0);
         if kind == EOF {
             return;
@@ -168,22 +277,38 @@ impl<'a, E: ParseError> Parser<'a, E> {
     /// Starts a new node in the syntax tree. All nodes and tokens
     /// consumed between the `start` and the corresponding `Parser::complete_marker`
     /// belong to the same node.
-    fn start_marker(&mut self) -> Marker {
+    pub fn start(&mut self) -> Marker {
         let start = Marker { pos: self.events.len() };
-        self.events.push(Event::Start { kind: TOMBSTONE });
+        self.events.push(Event::StartNode { kind: TOMBSTONE });
         start
     }
 
     /// Finishes the syntax tree node and assigns `kind` to it.
-    fn complete_marker(&mut self, marker: Marker, kind: SyntaxKind) {
-        debug_assert!(self.events.len() - 1 > marker.pos, "Expected node to span at least 1 token");
+    pub fn complete(&mut self, marker: Marker, kind: SyntaxKind) {
+        debug_assert!(self.events.len() - 1 > marker.pos, "expected node to span at least 1 token");
         match self.events[marker.pos] {
-            Event::Start { kind: ref mut slot, .. } => {
+            Event::StartNode { kind: ref mut slot, .. } => {
                 *slot = kind;
             }
             _ => unreachable!(),
         }
-        self.events.push(Event::Finish { });
+        self.events.push(Event::CompleteNode);
+    }
+
+    /// Finish a syntax tree node, but insert a new placeholder before it
+    /// nesting the completed node within a new yet to be completed node.
+    ///
+    /// This supports building a tree with correct associativity in a left recursive garmmar.
+    pub fn complete_and_wrap(&mut self, marker: &Marker, kind: SyntaxKind) {
+        debug_assert!(self.events.len() - 1 > marker.pos, "expected node to span at least 1 token");
+        match self.events[marker.pos] {
+            Event::StartNode { kind: ref mut slot, .. } => {
+                *slot = kind;
+            }
+            _ => unreachable!(),
+        }
+        self.events.insert(marker.pos, Event::StartNode { kind: TOMBSTONE });
+        self.events.push(Event::CompleteNode);
     }
 
     /// Advance the parser.
@@ -192,18 +317,11 @@ impl<'a, E: ParseError> Parser<'a, E> {
         self.events.push(Event::Span { kind, len });
     }
 
-    /// Consume the parser and apply it's events to create the syntax tree.
-    fn finish(mut self) -> (TreeNode, TokenInput<'a>) {
-        for op in self.events {
-            match op {
-                Event::Start { kind } if kind == TOMBSTONE => {}
-                Event::Start { kind } => self.sink.start_node(kind, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
-                Event::Finish => self.sink.finish_node(),
-                Event::Error { error } => self.sink.error(error),
-                Event::Span { kind, len } => self.sink.span(kind, len, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
-            }
-        }
-        self.sink.finish()
+    /// Get a debug string representing the syntax kind.
+    fn as_str(&self, kind: SyntaxKind) -> &'static str {
+        (self.debug_repr)(kind)
+            .map(|info| info.canonical.unwrap_or(info.name) )
+            .unwrap_or("<anonymous token>")
     }
 }
 
@@ -220,8 +338,8 @@ fn skip_comments(k: SyntaxKind) -> bool {
 ///
 /// This allows for more fine-grained control of parsing in the middle.
 enum Event<E> {
-    Start { kind: SyntaxKind },
-    Finish,
+    StartNode { kind: SyntaxKind },
+    CompleteNode,
     Error { error: E },
     Span { kind: SyntaxKind, len: usize },
 }
@@ -235,16 +353,60 @@ impl<E> Event<E> {
     }
 }
 
+/// A zero-sized type returned by `error` to indicate that parsing should
+/// continue (to produce a partial parse tree) rather than returning.
+///
+/// Used within `Option` to control flow with `?`.
+pub struct Continue;
+
 /// See `Parser::start_marker`.
-pub(crate) struct Marker {
+pub struct Marker {
     /// An offset into the parser's events
     pos: usize
 }
 
 /// See `Parser::checkpoint`.
-pub(crate) struct Checkpoint {
+pub struct Checkpoint {
     /// The number of events processed by the parser when the checkpoint was created
-    event_len: usize,
+    event_pos: usize,
     /// The offset into the token source when the checkpoint was created
-    source_pos: usize
+    source_pos: usize,
+    /// The position of the marker to undo if this checkpoint is rolled-back.
+    branch_pos: Option<usize>,
+    /// Whether the checkpoint allows rollback or not
+    rollback: Rollback,
+}
+
+impl Checkpoint {
+    /// Create a copy of a node start position that will be cleared
+    /// if `rollback` is called with this checkpoint.
+    pub fn branch(&mut self, marker: &Marker) -> Marker {
+        assert!(self.branch_pos.is_none(), "attempted to branch twice with the same checkpoint");
+        self.branch_pos = Some(marker.pos);
+        Marker { pos: marker.pos }
+    }
+
+    fn allows_rollback(&self) -> bool {
+        match self.rollback {
+            Rollback::Allow { .. } => true,
+            Rollback::Prevent => false
+        }
+    }
+}
+
+enum Rollback {
+    Prevent,
+    Allow { checkpoints: Rc<Cell<u32>>,  }
+}
+
+impl Drop for Rollback {
+    fn drop(&mut self) {
+        match self {
+            Rollback::Prevent => (),
+            Rollback::Allow { checkpoints } => {
+                let decr = checkpoints.get();
+                checkpoints.set(decr - 1);
+            }
+        }
+    }
 }

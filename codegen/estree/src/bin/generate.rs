@@ -1,6 +1,6 @@
 use combine::parser::Parser;
 use combine::stream::state::State;
-use estree_grammar::{ast, scan, grammar};
+use estree_codegen::{ast, scan, grammar};
 use heck::ShoutySnakeCase;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -9,12 +9,12 @@ const BASE_SYNTAX_KIND: u16 = 205;
 
 fn main() -> Result<(), std::io::Error> {
     let filepaths = &[
-        "lang/estree/spec/es5.md",
-        "lang/estree/spec/es2015.md",
-        "lang/estree/spec/es2016.md",
-        "lang/estree/spec/es2017.md",
-        "lang/estree/spec/es2018.md",
-        "lang/estree/spec/es2019.md",
+        "codegen/estree/spec/es5.md",
+        "codegen/estree/spec/es2015.md",
+        "codegen/estree/spec/es2016.md",
+        "codegen/estree/spec/es2017.md",
+        "codegen/estree/spec/es2018.md",
+        "codegen/estree/spec/es2019.md",
     ];
     let mut spec = Tree::default();
     for filepath in filepaths {
@@ -42,7 +42,7 @@ fn main() -> Result<(), std::io::Error> {
 // Do not edit manually.
 #![allow(dead_code)]
 
-//! This module contains an auto-generated JavaScript AST.
+//! This module contains an auto-generated JAVASCRIPT AST.
 
 "#[1..]);
 
@@ -84,7 +84,13 @@ fn main() -> Result<(), std::io::Error> {
         out.push_str("    ast_node!(");
         out.push_str(&node.name);
         out.push_str(", ");
-        out.push_str(&node.name.to_shouty_snake_case());
+        if node.name == "Super" {
+            out.push_str("SUPER_EXPRESSION");
+        } else if node.name == "TemplateLiteral" {
+            out.push_str("TEMPLATE_EXPRESSION");
+        } else {
+            out.push_str(&node.name.to_shouty_snake_case());
+        }
         out.push_str(");\n");
         let type_ = node.fields.iter().find(|f| f.name == "type").map(|f| &f.type_);
         if let Some(ast::Type::StringLiteral(literal)) = type_ {
@@ -108,8 +114,18 @@ fn main() -> Result<(), std::io::Error> {
     out.push_str("        language JAVASCRIPT;\n\n");
     out.push_str("        nodes {\n");
     for node in &leaf_nodes {
+        if node.name == "Identifier" {
+            continue;
+        }
+
         out.push_str("            ");
-        out.push_str(&node.name.to_shouty_snake_case());
+        if node.name == "Super" {
+            out.push_str("SUPER_EXPRESSION");
+        } else if node.name == "TemplateLiteral" {
+            out.push_str("TEMPLATE_EXPRESSION");
+        } else {
+            out.push_str(&node.name.to_shouty_snake_case());
+        }
         out.push(' ');
         out.push_str(&next_syntax_kind.to_string());
         out.push('\n');
@@ -171,7 +187,13 @@ fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
 
                 if is_leaf_node(spec, child) {
                     out.push_str(" = ");
-                    out.push_str(&child.name.to_shouty_snake_case());
+                    if child.name == "Super" {
+                        out.push_str("SUPER_EXPRESSION");
+                    } else if child.name == "TemplateLiteral" {
+                        out.push_str("TEMPLATE_EXPRESSION");
+                    } else {
+                        out.push_str(&child.name.to_shouty_snake_case());
+                    }
                 }
                 out.push_str(",\n");
             }

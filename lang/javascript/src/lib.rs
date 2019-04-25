@@ -1,4 +1,5 @@
 mod generated;
+mod grammar_ext;
 
 pub mod grammar;
 pub mod lexer;

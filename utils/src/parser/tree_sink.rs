@@ -12,6 +12,7 @@ pub struct TextTreeSink<'a, E: 'static + Debug + Send + Sync> {
     text_pos: TextUnit,
     token_pos: usize,
     builder: GreenNodeBuilder,
+    started: bool,
     errors: Vec<(E, Location)>,
 }
 
@@ -23,6 +24,7 @@ impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
             text_pos: 0.into(),
             token_pos: 0,
             builder: GreenNodeBuilder::new(),
+            started: false,
             errors: Vec::new(),
         }
     }
@@ -52,20 +54,23 @@ impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
     where
         F: Fn(SyntaxKind) -> bool
     {
-        while let Some(&token) = self.tokens.get(self.token_pos) {
-            if !skip(token.kind) {
-                break;
+        if self.started {
+            while let Some(&token) = self.tokens.get(self.token_pos) {
+                if !skip(token.kind) {
+                    break;
+                }
+                self.advance(token.kind, token.len, 1);
             }
-            self.advance(token.kind, token.len, 1);
         }
         self.builder.start_node(kind);
+        self.started = true;
     }
 
-    pub fn finish_node(&mut self) {
+    pub fn complete_node(&mut self) {
         self.builder.finish_node();
     }
 
-    pub fn finish(self) -> (TreeNode, TokenInput<'a>)  {
+    pub fn finalize(self) -> (TreeNode, TokenInput<'a>)  {
         let green = self.builder.finish();
         let output = SyntaxNode::new(green, Some(Box::new(self.errors)));
         let input = TokenInput {

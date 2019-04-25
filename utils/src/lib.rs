@@ -1,18 +1,17 @@
 mod ast;
 mod location;
 mod macros;
-mod parser;
 mod scanner;
 
-pub mod grammar;
 pub mod lexer;
+pub mod parser;
 pub mod scan;
 pub mod syntax_kind;
 
 pub use crate::ast::AstNode;
 pub use crate::lexer::{Lexer, Token};
 pub use crate::location::Location;
-pub use crate::parser::{Parser, TokenInput, TreeNode};
+pub use crate::parser::{Parser, TokenInput, TokenSet, TreeNode};
 pub use crate::scanner::Scanner;
 pub use crate::syntax_kind::LanguageKind;
 pub use rowan::{SmolStr, SyntaxKind, SyntaxNode, TextRange, TextUnit};

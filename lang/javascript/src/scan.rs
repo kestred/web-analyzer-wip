@@ -57,7 +57,7 @@ pub fn scan_template_literal(s: &mut Scanner, mut lexer: impl ResetableLexer) ->
             }
         }
     }
-    TEMPLATE_TOKEN
+    TEMPLATE_LITERAL
 }
 
 /// Assumes preceding `/`
@@ -190,11 +190,11 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
                 (Some('='), Some('=')) => {
                     s.bump();
                     s.bump();
-                    BANGEQEQ
+                    BANG_EQEQ
                 }
                 (Some('='), _) => {
                     s.bump();
-                    BANGEQ
+                    BANG_EQ
                 }
                 _ => BANG,
             }
@@ -299,7 +299,7 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
                 }
                 (Some('='), _) => {
                     s.bump();
-                    LTEQ
+                    LT_EQ
                 }
                 _ => L_ANGLE,
             }
@@ -324,7 +324,7 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
                 }
                 (Some('='), _, _) => {
                     s.bump();
-                    GTEQ
+                    GT_EQ
                 }
                 _ => R_ANGLE,
             }

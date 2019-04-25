@@ -25,6 +25,8 @@ pub trait TokenSource {
     fn token_kind(&self, pos: usize) -> SyntaxKind;
     /// Is the current token joined to the next one (`> >` vs `>>`).
     fn is_token_joint_to_next(&self, pos: usize) -> bool;
+    /// Is the current token on the same line as the next one (`> >` vs `>>`).
+    fn is_token_inline_to_next(&self, pos: usize) -> bool;
     /// Is the current token a specified keyword?
     fn is_keyword(&self, pos: usize, kw: &str) -> bool;
 }
@@ -61,6 +63,15 @@ impl<'t> TokenSource for TextTokenSource<'t> {
             return true;
         }
         self.start_offsets[pos] + self.tokens[pos].len == self.start_offsets[pos + 1]
+    }
+    fn is_token_inline_to_next(&self, pos: usize) -> bool {
+        if !(pos + 1 < self.tokens.len()) {
+            return true;
+        }
+        let left = self.start_offsets[pos] + self.tokens[pos].len;
+        let right = self.start_offsets[pos + 1];
+        let range = TextRange::from_to(left, right);
+        self.text[range].chars().all(|c| c != '\n' || c != '\r')
     }
     fn is_keyword(&self, pos: usize, kw: &str) -> bool {
         if !(pos < self.tokens.len()) {

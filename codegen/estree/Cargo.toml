@@ -1,9 +1,14 @@
 [package]
-name = "javascript_grammar"
+name = "estree_codegen"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
+[[bin]]
+name = "estree_generate"
+path = "src/bin/generate.rs"
+
 [dependencies]
 web_grammar_utils = { path = "../../utils" }
 combine = "3.8.1"
+heck = "0.3.1"

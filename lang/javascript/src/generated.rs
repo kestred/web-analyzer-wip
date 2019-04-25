@@ -2,7 +2,7 @@
 // Do not edit manually.
 #![allow(dead_code)]
 
-//! This module contains an auto-generated JavaScript AST.
+//! This module contains an auto-generated JAVASCRIPT AST.
 
 pub mod ast {
     use crate::syntax_kind::*;
@@ -18,7 +18,7 @@ pub mod ast {
         Expression,
         Property = PROPERTY,
         Pattern,
-        Super = SUPER,
+        Super = SUPER_EXPRESSION,
         SpreadElement = SPREAD_ELEMENT,
         TemplateElement = TEMPLATE_ELEMENT,
         Class,
@@ -127,7 +127,7 @@ pub mod ast {
         SequenceExpression = SEQUENCE_EXPRESSION,
         ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
         YieldExpression = YIELD_EXPRESSION,
-        TemplateLiteral = TEMPLATE_LITERAL,
+        TemplateLiteral = TEMPLATE_EXPRESSION,
         TaggedTemplateExpression = TAGGED_TEMPLATE_EXPRESSION,
         ClassExpression = CLASS_EXPRESSION,
         MetaProperty = META_PROPERTY,
@@ -540,7 +540,7 @@ pub mod ast {
             "SpreadElement"
         }
     }
-    ast_node!(Super, SUPER);
+    ast_node!(Super, SUPER_EXPRESSION);
     impl Super {
         pub fn type_(&self) -> &'static str {
             "Super"
@@ -570,7 +570,7 @@ pub mod ast {
             "TemplateElement"
         }
     }
-    ast_node!(TemplateLiteral, TEMPLATE_LITERAL);
+    ast_node!(TemplateLiteral, TEMPLATE_EXPRESSION);
     impl TemplateLiteral {
         pub fn type_(&self) -> &'static str {
             "TemplateLiteral"
@@ -675,43 +675,42 @@ pub mod syntax_kind {
             FOR_STATEMENT 231
             FUNCTION_DECLARATION 232
             FUNCTION_EXPRESSION 233
-            IDENTIFIER 234
-            IF_STATEMENT 235
-            IMPORT_DECLARATION 236
-            IMPORT_DEFAULT_SPECIFIER 237
-            IMPORT_NAMESPACE_SPECIFIER 238
-            IMPORT_SPECIFIER 239
-            LABELED_STATEMENT 240
-            LITERAL 241
-            LOGICAL_EXPRESSION 242
-            MEMBER_EXPRESSION 243
-            META_PROPERTY 244
-            METHOD_DEFINITION 245
-            NEW_EXPRESSION 246
-            OBJECT_EXPRESSION 247
-            OBJECT_PATTERN 248
-            PROGRAM 249
-            PROPERTY 250
-            REST_ELEMENT 251
-            RETURN_STATEMENT 252
-            SEQUENCE_EXPRESSION 253
-            SPREAD_ELEMENT 254
-            SUPER 255
-            SWITCH_CASE 256
-            SWITCH_STATEMENT 257
-            TAGGED_TEMPLATE_EXPRESSION 258
-            TEMPLATE_ELEMENT 259
-            TEMPLATE_LITERAL 260
-            THIS_EXPRESSION 261
-            THROW_STATEMENT 262
-            TRY_STATEMENT 263
-            UNARY_EXPRESSION 264
-            UPDATE_EXPRESSION 265
-            VARIABLE_DECLARATION 266
-            VARIABLE_DECLARATOR 267
-            WHILE_STATEMENT 268
-            WITH_STATEMENT 269
-            YIELD_EXPRESSION 270
+            IF_STATEMENT 234
+            IMPORT_DECLARATION 235
+            IMPORT_DEFAULT_SPECIFIER 236
+            IMPORT_NAMESPACE_SPECIFIER 237
+            IMPORT_SPECIFIER 238
+            LABELED_STATEMENT 239
+            LITERAL 240
+            LOGICAL_EXPRESSION 241
+            MEMBER_EXPRESSION 242
+            META_PROPERTY 243
+            METHOD_DEFINITION 244
+            NEW_EXPRESSION 245
+            OBJECT_EXPRESSION 246
+            OBJECT_PATTERN 247
+            PROGRAM 248
+            PROPERTY 249
+            REST_ELEMENT 250
+            RETURN_STATEMENT 251
+            SEQUENCE_EXPRESSION 252
+            SPREAD_ELEMENT 253
+            SUPER_EXPRESSION 254
+            SWITCH_CASE 255
+            SWITCH_STATEMENT 256
+            TAGGED_TEMPLATE_EXPRESSION 257
+            TEMPLATE_ELEMENT 258
+            TEMPLATE_EXPRESSION 259
+            THIS_EXPRESSION 260
+            THROW_STATEMENT 261
+            TRY_STATEMENT 262
+            UNARY_EXPRESSION 263
+            UPDATE_EXPRESSION 264
+            VARIABLE_DECLARATION 265
+            VARIABLE_DECLARATOR 266
+            WHILE_STATEMENT 267
+            WITH_STATEMENT 268
+            YIELD_EXPRESSION 269
         }
     }
 }

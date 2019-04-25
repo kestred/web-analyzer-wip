@@ -43,7 +43,7 @@ impl JavascriptLexer {
                     return COMMENT;
                 }
                 if scan_regexp_literal(s, self.prev_tokens) {
-                    return REGEXP_TOKEN;
+                    return REGEXP_LITERAL;
                 }
             }
             _ => (),
@@ -59,7 +59,7 @@ impl JavascriptLexer {
 
         if is_decimal(c) {
             scan_number(c, s);
-            return NUMBER_TOKEN;
+            return NUMBER_LITERAL;
         }
 
         // One-byte symbols/operations/punctuation.
@@ -75,7 +75,7 @@ impl JavascriptLexer {
         match c {
             '\'' | '"' => {
                 scan_string(c, s);
-                return STRING_TOKEN;
+                return STRING_LITERAL;
             }
             '`' => {
                 return scan_template_literal(s, JavascriptLexer::new());
@@ -124,13 +124,13 @@ if (/^[A-Za-z_]+$/g.test(x)) return true;
 
         let expect = vec![
             // let foo = /abc/.test(3);
-            LET_KW, IDENT, EQ, REGEXP_TOKEN, DOT, IDENT, L_PAREN, NUMBER_TOKEN, R_PAREN, SEMI,
+            LET_KW, IDENT, EQ, REGEXP_LITERAL, DOT, IDENT, L_PAREN, NUMBER_LITERAL, R_PAREN, SEMI,
 
             // let bar = 12 / 3.5;
-            LET_KW, IDENT, EQ, NUMBER_TOKEN, SLASH, NUMBER_TOKEN, SEMI,
+            LET_KW, IDENT, EQ, NUMBER_LITERAL, SLASH, NUMBER_LITERAL, SEMI,
 
             // if (/^[A-Za-z_]+\/$/g.test(x)) return true;
-            IF_KW, L_PAREN, REGEXP_TOKEN, DOT, IDENT, L_PAREN, IDENT, R_PAREN, R_PAREN, RETURN_KW, TRUE_KW, SEMI
+            IF_KW, L_PAREN, REGEXP_LITERAL, DOT, IDENT, L_PAREN, IDENT, R_PAREN, R_PAREN, RETURN_KW, TRUE_KW, SEMI
         ];
         assert_eq!(tokens, expect);
     }
@@ -148,7 +148,7 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
             .filter(|k| *k != WHITESPACE)
             .collect::<Vec<_>>();
 
-        let expect = vec![LET_KW, IDENT, EQ, TEMPLATE_TOKEN, PLUS, TEMPLATE_TOKEN, PLUS, STRING_TOKEN, SEMI];
+        let expect = vec![LET_KW, IDENT, EQ, TEMPLATE_LITERAL, PLUS, TEMPLATE_LITERAL, PLUS, STRING_LITERAL, SEMI];
         assert_eq!(tokens, expect);
     }
 
@@ -162,7 +162,7 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
             .collect::<Vec<_>>();
         let expect = &[
             WHITESPACE, VAR_KW, WHITESPACE, IDENT, WHITESPACE, EQ, // var rows =
-            WHITESPACE, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI, // prompt("How many rows for your multiplication table?");
+            WHITESPACE, IDENT, L_PAREN, STRING_LITERAL, R_PAREN, SEMI, // prompt("How many rows for your multiplication table?");
         ];
         assert_eq!(&tokens[..expect.len()], expect);
 
@@ -172,16 +172,16 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
             .collect::<Vec<_>>();
         let expect = vec![
             // var rows = prompt("How many rows for your multiplication table?");
-            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI,
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LITERAL, R_PAREN, SEMI,
 
             // var cols = prompt("How many columns for your multiplication table?");
-            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_TOKEN, R_PAREN, SEMI,
+            VAR_KW, IDENT, EQ, IDENT, L_PAREN, STRING_LITERAL, R_PAREN, SEMI,
 
             // if(rows == "" || rows == null) rows = 10;
-            IF_KW, L_PAREN, IDENT, EQEQ, STRING_TOKEN, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_TOKEN, SEMI,
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LITERAL, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LITERAL, SEMI,
 
             // if(cols== "" || cols== null) cols = 10;
-            IF_KW, L_PAREN, IDENT, EQEQ, STRING_TOKEN, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_TOKEN, SEMI,
+            IF_KW, L_PAREN, IDENT, EQEQ, STRING_LITERAL, OR, IDENT, EQEQ, NULL_KW, R_PAREN, IDENT, EQ, NUMBER_LITERAL, SEMI,
 
             // createTable(rows, cols);
             IDENT, L_PAREN, IDENT, COMMA, IDENT, R_PAREN, SEMI,
@@ -197,9 +197,6 @@ let foo = `${bar + 3} and ${ "hello" + `_${baz}_` } in \`myfile.txt\`` + `1` + '
         let example = crate::samples::SAMPLE_2;
         let tokens = JavascriptLexer::new().tokenize(example);
         let errors = tokens.iter().enumerate().filter(|(_, t)| t.kind == ERROR).collect::<Vec<_>>();
-        eprintln!("{}", tokens.iter().map(|t| {
-            as_debug_repr(t.kind).map(|meta| format!("[{} | {}]", meta.name, meta.kind.0)).unwrap_or("[None".to_string())
-        }).collect::<Vec<_>>().join("\n"));
         assert!(errors.is_empty(), "Found errors: {:?}", errors);
     }
 }
