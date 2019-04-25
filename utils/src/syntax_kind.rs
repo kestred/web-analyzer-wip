@@ -69,6 +69,6 @@ syntax_kinds!{
         CARET_EQ 54 ("^=")
         TILDA 55 ("~")
         DOLLAR 56 ("$")
-        ALPHASAND 57 ("@")
+        AT 57 ("@")
     }
 }

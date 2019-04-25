@@ -1,6 +1,10 @@
-use crate::{Location, Token};
+use crate::lexer::Token;
+use crate::location::Location;
+use crate::parser::TokenInput;
 use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TextUnit, TreeArc};
 use std::fmt::Debug;
+
+pub type TreeNode = TreeArc<SyntaxNode>;
 
 pub struct TextTreeSink<'a, E: 'static + Debug + Send + Sync> {
     text: &'a str,
@@ -12,10 +16,10 @@ pub struct TextTreeSink<'a, E: 'static + Debug + Send + Sync> {
 }
 
 impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
-    pub fn new(text: &'a str, tokens: &'a [Token]) -> TextTreeSink<'a, E> {
+    pub fn new(input: TokenInput<'a>) -> TextTreeSink<'a, E> {
         TextTreeSink {
-            text,
-            tokens,
+            text: input.text,
+            tokens: input.tokens,
             text_pos: 0.into(),
             token_pos: 0,
             builder: GreenNodeBuilder::new(),
@@ -61,9 +65,14 @@ impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
         self.builder.finish_node();
     }
 
-    pub fn finish(self) -> TreeArc<SyntaxNode> {
+    pub fn finish(self) -> (TreeNode, TokenInput<'a>)  {
         let green = self.builder.finish();
-        SyntaxNode::new(green, Some(Box::new(self.errors)))
+        let output = SyntaxNode::new(green, Some(Box::new(self.errors)));
+        let input = TokenInput {
+            text: &self.text[self.text_pos.to_usize()..],
+            tokens: &self.tokens[self.token_pos..]
+        };
+        (output, input)
     }
 
     fn advance(&mut self, kind: SyntaxKind, len: TextUnit, num_tokens: usize) {

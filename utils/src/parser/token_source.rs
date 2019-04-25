@@ -4,6 +4,12 @@ use crate::Token;
 use crate::syntax_kind::EOF;
 use rowan::{SyntaxKind, TextRange, TextUnit};
 
+#[derive(Copy, Clone, Debug)]
+pub struct TokenInput<'a> {
+    pub text: &'a str,
+    pub tokens: &'a [Token]
+}
+
 /// `TokenSource` abstracts the source of the tokens parser operates one.
 pub trait TokenSource {
     /// What is the current token?
@@ -59,14 +65,14 @@ impl<'t> TokenSource for TextTokenSource<'t> {
 
 impl<'t> TextTokenSource<'t> {
     /// Generate input from tokens (allowing some tokens to be skipped, such as comment and whitespace).
-    pub fn extract<F>(text: &'t str, raw_tokens: &'t [Token], skip: F) -> TextTokenSource<'t>
+    pub fn extract<F>(raw_input: TokenInput<'t>, skip: F) -> TextTokenSource<'t>
     where
         F: Fn(SyntaxKind) -> bool
     {
         let mut tokens = Vec::new();
         let mut start_offsets = Vec::new();
         let mut len = 0.into();
-        for &token in raw_tokens.iter() {
+        for &token in raw_input.tokens.iter() {
             if !skip(token.kind) {
                 tokens.push(token);
                 start_offsets.push(len);
@@ -74,6 +80,10 @@ impl<'t> TextTokenSource<'t> {
             len += token.len;
         }
 
-        TextTokenSource { text, start_offsets, tokens }
+        TextTokenSource {
+            text: raw_input.text,
+            start_offsets,
+            tokens
+        }
     }
 }

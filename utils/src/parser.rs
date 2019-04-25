@@ -1,7 +1,7 @@
 //! An example of how to implement parsing using the utils.
 //!
 //! ```rust
-//! use web_grammars_utils::{Lexer, Parser, Scanner, SyntaxKind, SyntaxNode, TreeArc};
+//! use web_grammars_utils::{Lexer, Parser, Scanner, SyntaxKind, TreeNode};
 //! use web_grammars_utils::grammar::*;
 //! use web_grammars_utils::syntax_kind::*;
 //!
@@ -20,10 +20,11 @@
 //! }
 //!
 //! /// Parse a syntax tree from text
-//! pub fn parse(text: &str) -> TreeArc<SyntaxNode> {
+//! pub fn parse(text: &str) -> TreeNode {
 //!     let tokens = MyLexer.tokenize(text);
 //!     let mut parser = Parser::new(text, &tokens, false);
-//!     parser.parse(&my_grammar())
+//!     let (root, _remainder) = parser.parse(&my_grammar());
+//!     root
 //! }
 //! ```
 
@@ -31,13 +32,12 @@ mod token_source;
 mod tree_sink;
 
 use crate::grammar::GrammarNode;
-use crate::lexer::Token;
 use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE, WHITESPACE};
-use rowan::{SyntaxKind, SyntaxNode, TreeArc};
+use rowan::SyntaxKind;
 use std::fmt::Debug;
 
-use self::token_source::{TokenSource, TextTokenSource};
-use self::tree_sink::TextTreeSink;
+pub use self::token_source::*;
+pub use self::tree_sink::*;
 
 pub trait ParseError: 'static + From<String> + Debug + Send + Sync {}
 impl<E> ParseError for E where E: 'static + From<String> + Debug + Send + Sync {}
@@ -51,18 +51,19 @@ pub struct Parser<'a, E: 'static + Debug + Send + Sync = String> {
 }
 
 impl<'a, E: ParseError> Parser<'a, E> {
-    pub fn new(text: &'a str, tokens: &'a [Token], preserve_whitespace: bool) -> Parser<'a, E> {
+    pub fn new(input: TokenInput<'a>, preserve_whitespace: bool) -> Parser<'a, E> {
+        let skip_predicate = if preserve_whitespace { skip_comments } else { skip_whitespace };
         Parser {
             events: Vec::new(),
             source_pos: 0,
-            source: TextTokenSource::extract(text, tokens, if preserve_whitespace { skip_comments } else { skip_whitespace }),
-            sink: TextTreeSink::new(text, tokens),
+            source: TextTokenSource::extract(input, skip_predicate),
+            sink: TextTreeSink::new(input),
             preserve_whitespace,
         }
     }
 
     /// Parse the grammar completely and return the result root syntax node.
-    pub fn parse<G: GrammarNode<E>>(mut self, grammar: &G) -> TreeArc<SyntaxNode> {
+    pub fn parse<G: GrammarNode<E>>(mut self, grammar: &G) -> (TreeNode, TokenInput<'a>) {
         self.eval(grammar);
         self.finish()
     }
@@ -192,7 +193,7 @@ impl<'a, E: ParseError> Parser<'a, E> {
     }
 
     /// Consume the parser and apply it's events to create the syntax tree.
-    fn finish(mut self) -> TreeArc<SyntaxNode> {
+    fn finish(mut self) -> (TreeNode, TokenInput<'a>) {
         for op in self.events {
             match op {
                 Event::Start { kind } if kind == TOMBSTONE => {}
