@@ -22,7 +22,7 @@ mod tree_sink;
 
 use crate::grammar::Grammar;
 use crate::lexer::Token;
-use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE};
+use crate::syntax_kind::{COMMENT, EOF, TOMBSTONE, WHITESPACE};
 use rowan::{SyntaxKind, SyntaxNode, TreeArc};
 use std::fmt::Debug;
 
@@ -37,15 +37,17 @@ pub struct Parser<'a, E: 'static + Debug + Send + Sync = String> {
     source_pos: usize,
     source: TextTokenSource<'a>,
     sink: TextTreeSink<'a, E>,
+    preserve_whitespace: bool,
 }
 
 impl<'a, E: ParseError> Parser<'a, E> {
-    pub fn new(text: &'a str, tokens: &'a [Token]) -> Parser<'a, E> {
+    pub fn new(text: &'a str, tokens: &'a [Token], preserve_whitespace: bool) -> Parser<'a, E> {
         Parser {
             events: Vec::new(),
             source_pos: 0,
-            source: TextTokenSource::extract(text, tokens, skip_predicate),
+            source: TextTokenSource::extract(text, tokens, if preserve_whitespace { skip_comments } else { skip_whitespace }),
             sink: TextTreeSink::new(text, tokens),
+            preserve_whitespace,
         }
     }
 
@@ -59,25 +61,11 @@ impl<'a, E: ParseError> Parser<'a, E> {
     ///
     /// This is intended to be called within a `Grammar` parsing function
     /// to begin parsing a sub_grammar.
-    pub fn eval<G: Grammar<E>>(&mut self, grammar: &G) {
+    pub fn eval<G: Grammar<E>>(&mut self, grammar: &G) -> SyntaxKind {
         let start = self.start_marker();
         let kind = grammar.parse(self);
         self.complete_marker(start, kind);
-    }
-
-    #[cfg(debug_assertions)]
-    #[doc(hidden)] // only used for testing right now
-    pub fn has_errors(&self) -> bool {
-        self.events.iter().any(|e| match e {
-            Event::Error { .. } => true,
-            _ => false,
-        })
-    }
-
-    #[cfg(debug_assertions)]
-    #[doc(hidden)] // only used for testing right now
-    pub fn is_eof(&self) -> bool {
-        self.nth(self.source_pos) == EOF
+        kind
     }
 
     /// [Internal API]
@@ -198,10 +186,10 @@ impl<'a, E: ParseError> Parser<'a, E> {
         for op in self.events {
             match op {
                 Event::Start { kind } if kind == TOMBSTONE => {}
-                Event::Start { kind } => self.sink.start_node(kind, skip_predicate),
+                Event::Start { kind } => self.sink.start_node(kind, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
                 Event::Finish => self.sink.finish_node(),
                 Event::Error { error } => self.sink.error(error),
-                Event::Span { kind, len } => self.sink.span(kind, len, skip_predicate),
+                Event::Span { kind, len } => self.sink.span(kind, len, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
             }
         }
         self.sink.finish()
@@ -209,7 +197,10 @@ impl<'a, E: ParseError> Parser<'a, E> {
 }
 
 /// This method defines the default ignore behavior.
-fn skip_predicate(k: SyntaxKind) -> bool {
+fn skip_whitespace(k: SyntaxKind) -> bool {
+    k == WHITESPACE
+}
+fn skip_comments(k: SyntaxKind) -> bool {
     k == COMMENT
 }
 

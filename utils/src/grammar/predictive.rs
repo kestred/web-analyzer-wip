@@ -5,7 +5,11 @@ use crate::parser::ParseError;
 //
 // - Allows more efficient parsing of LL(1)-like than arbitrary lookahead (TODO: Benchmark).
 // - Can be used to generate a list of expected tokens
-pub trait Predictive<Err: ParseError>: GrammarLike<Err> {
+pub trait Predictive<Err: ParseError = String>: GrammarLike<Err> {
+    fn predicate(&self) -> TokenSet;
+}
+
+pub trait PredictiveNode<Err: ParseError = String>: Grammar<Err> {
     fn predicate(&self) -> TokenSet;
 }
 
@@ -19,6 +23,27 @@ where
         ts
     }
 }
+
+impl<Err, G> Predictive<Err> for Node<Err, G>
+where
+    Err: ParseError,
+    G: PredictiveNode<Err>,
+{
+    fn predicate(&self) -> TokenSet {
+      self.grammar.predicate()
+    }
+}
+
+impl<Err, G> PredictiveNode<Err> for NodeLike<Err, G>
+where
+    Err: ParseError,
+    G: Predictive<Err>,
+{
+    fn predicate(&self) -> TokenSet {
+      self.grammar.predicate()
+    }
+}
+
 
 impl<Err, O> Predictive<Err> for Many1<Err, O>
 where

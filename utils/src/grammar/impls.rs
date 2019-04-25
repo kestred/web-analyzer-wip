@@ -3,7 +3,7 @@ use crate::parser::{ParseError, Parser};
 use crate::parse_ok;
 use rowan::SyntaxKind;
 
-impl<Func, Err> Grammar<Err> for Func
+impl<Err, Func> Grammar<Err> for Func
 where
     Func: Fn(&mut Parser<Err>) -> SyntaxKind,
     Err: ParseError,

@@ -1,47 +1,19 @@
 mod impls;
+mod outcome;
 mod predictive;
 mod token_set;
 
 use crate::parser::{Parser, ParseError};
-use crate::syntax_kind::ERROR;
+use crate::parse_ok;
 use rowan::SyntaxKind;
 use std::marker::PhantomData;
 
+pub use self::outcome::Outcome;
 pub use self::predictive::Predictive;
 pub use self::token_set::TokenSet;
 
-#[derive(Debug)]
-pub enum Outcome {
-    Ok,
-    Err,
-}
-impl Outcome {
-    /// Ignores the outcome if it shouldn't cause the current grammar to fail.
-    pub fn ignore(self) {}
-}
-impl From<SyntaxKind> for Outcome {
-    fn from(k: SyntaxKind) -> Outcome {
-        if k == ERROR {
-            Outcome::Err
-        } else {
-            Outcome::Ok
-        }
-    }
-}
-
-#[macro_export]
-/// Like `try!` but for `Outcome`.
-macro_rules! parse_ok {
-    ($expr:expr) => {
-        match $expr {
-            Outcome::Ok => (),
-            Outcome::Err => return Outcome::Err,
-        }
-    };
-}
-
 // TODO: Docs
-pub trait Grammar<Err: ParseError> {
+pub trait Grammar<Err: ParseError = String> {
     fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind;
 
     // TODO: Docs
@@ -57,10 +29,18 @@ pub trait Grammar<Err: ParseError> {
         p.commit(start)?;
         Ok(kind)
     }
+
+    // TODO: Docs
+    fn commit(self) -> Node<Err, Self> where Self: Sized {
+        Node {
+            errtype: PhantomData,
+            grammar: self,
+        }
+    }
 }
 
 // TODO: Docs
-pub trait GrammarLike<Err: ParseError> {
+pub trait GrammarLike<Err: ParseError = String> {
     #[must_use]
     fn parse(&self, p: &mut Parser<Err>) -> Outcome;
 
@@ -78,17 +58,54 @@ pub trait GrammarLike<Err: ParseError> {
     }
 
     // TODO: Docs
+    fn commit(self, kind: SyntaxKind) -> Node<Err, NodeLike<Err, Self>> where Self: Sized {
+        self.is(kind).commit()
+    }
+
+    // TODO: Docs
     fn then<G: GrammarLike<Err>>(self, next: G) -> (Self, G) where Self: Sized {
        (self, next)
     }
 
-    // // TODO: Docs
-    // pub fn is(self, kind: SyntaxKind) -> impl Grammar<Err> {
-    //     move |p: &mut Parser<Err>| {
-    //         self.parse(p);
-    //         kind
-    //     }
-    // }
+    // TODO: Docs
+    fn is(self, kind: SyntaxKind) -> NodeLike<Err, Self> where Self: Sized {
+        NodeLike {
+            errtype: PhantomData,
+            grammar: self,
+            kind
+        }
+    }
+}
+
+/// Represents the return type of `grammar.commit(kind)`.
+pub struct Node<Err: ParseError, G: Grammar<Err>> {
+    errtype: PhantomData<Err>,
+    grammar: G,
+}
+impl<Err, G> GrammarLike<Err> for Node<Err, G>
+where
+    Err: ParseError,
+    G: Grammar<Err>
+{
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        p.eval(&self.grammar).into()
+    }
+}
+
+/// Represents the return type of `grammar.is(kind)`.
+pub struct NodeLike<Err: ParseError, G: GrammarLike<Err>> {
+    errtype: PhantomData<Err>,
+    grammar: G,
+    kind: SyntaxKind,
+}
+impl<Err, G> Grammar<Err> for NodeLike<Err, G>
+where
+    Err: ParseError,
+    G: GrammarLike<Err>
+{
+    fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind {
+        self.grammar.parse(p).map(self.kind)
+    }
 }
 
 // TODO: Docs
