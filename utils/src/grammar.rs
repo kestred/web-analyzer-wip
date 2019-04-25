@@ -1,4 +1,5 @@
-mod impls;
+mod bitor;
+mod builtin;
 mod outcome;
 mod predictive;
 mod token_set;
@@ -9,7 +10,7 @@ use rowan::SyntaxKind;
 use std::marker::PhantomData;
 
 pub use self::outcome::Outcome;
-pub use self::predictive::PredictiveGrammar;
+pub use self::predictive::*;
 pub use self::token_set::TokenSet;
 
 // TODO: Docs
@@ -32,6 +33,15 @@ pub trait Grammar<Err: ParseError = String> {
     }
 
     // TODO: Docs
+    fn is(self, kind: SyntaxKind) -> Uncommitted<Err, Self> where Self: Sized {
+        Uncommitted {
+            errtype: PhantomData,
+            grammar: self,
+            kind
+        }
+    }
+
+    // TODO: Docs
     fn commit(self, kind: SyntaxKind) -> Committed<Err, Uncommitted<Err, Self>> where Self: Sized {
         self.is(kind).commit()
     }
@@ -39,15 +49,6 @@ pub trait Grammar<Err: ParseError = String> {
     // TODO: Docs
     fn then<G: Grammar<Err>>(self, next: G) -> (Self, G) where Self: Sized {
        (self, next)
-    }
-
-    // TODO: Docs
-    fn is(self, kind: SyntaxKind) -> Uncommitted<Err, Self> where Self: Sized {
-        Uncommitted {
-            errtype: PhantomData,
-            grammar: self,
-            kind
-        }
     }
 }
 
@@ -140,74 +141,6 @@ where
         }
     }
 }
-
-pub fn either<Err: ParseError, L: PredictiveGrammar<Err>, R: PredictiveGrammar<Err>>(left: L, right: R) -> Either<Err, L, R> {
-    Either {
-        errtype: PhantomData,
-        left,
-        right,
-    }
-}
-pub struct Either<Err: ParseError, L: PredictiveGrammar<Err>, R: PredictiveGrammar<Err>> {
-    errtype: PhantomData<Err>,
-    left: L,
-    right: R,
-}
-impl<Err, L, R> Grammar<Err> for Either<Err, L, R>
-where
-    Err: ParseError,
-    L: PredictiveGrammar<Err>,
-    R: PredictiveGrammar<Err>,
-{
-    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
-        let tok = p.current();
-        let err_left = if self.left.predicate().contains(&tok) {
-            match self.left.try_parse(p) {
-                Ok(()) => return Outcome::Ok,
-                Err(err) => Some(err),
-            }
-        } else {
-            None
-        };
-        let err_right = if self.right.predicate().contains(&tok) {
-            match self.right.try_parse(p) {
-                Ok(()) => return Outcome::Ok,
-                Err(err) => Some(err),
-            }
-        } else {
-            None
-        };
-        let err = match (err_left, err_right) {
-            (Some(left), _) => err_left,
-            (None, Some(right)) => err_right,
-            (None, None) => {
-                format!("expected one of {}",
-                // TODO: Maybe collect into small vec to avoid allocating?
-                // FIXME: Allow a language-specific to_debug_repr method to be configured
-                    self.predicate().iter().map(|kind| {
-                        crate::syntax_kind::default::as_debug_repr(kind)
-                            .map(|k| format!("{:?}", k.name))
-                            .unwrap_or_else(|| format!("[{};", kind.0.to_string()))
-                    }).collect::<Vec<_>>().join(",")
-                )
-            }
-        };
-        p.error(err);
-        return Outcome::Err;
-    }
-}
-
-impl<Err, L, R> std::ops::BitOr<R> for L
-where
-    Err: ParseError,
-    L: PredictiveGrammar<Err>,
-    R: PredictiveGrammar<Err>,
-{
-    type Output = Either<Err, L, R>;
-    fn bitor(self, rhs: R) -> Self::Output { either(self, rhs) }
-}
-
-
 
 /// See `GrammarNode::try_parse`.
 pub fn attempt<Err: ParseError, O: Grammar<Err>>(once: O) -> Attempt<Err, O> {
