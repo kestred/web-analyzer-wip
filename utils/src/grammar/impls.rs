@@ -1,5 +1,6 @@
-use crate::grammar::{Grammar, GrammarLike};
+use crate::grammar::{Grammar, GrammarLike, Outcome};
 use crate::parser::{ParseError, Parser};
+use crate::parse_ok;
 use rowan::SyntaxKind;
 
 impl<Func, Err> Grammar<Err> for Func
@@ -16,9 +17,10 @@ impl<Err, Func, Return> GrammarLike<Err> for Func
 where
     Err: ParseError,
     Func: Fn(&mut Parser<Err>) -> Return,
+    Return: Into<Outcome>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        self(p).into()
     }
 }
 
@@ -27,8 +29,8 @@ where
     Err: ParseError,
     A: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        self.0.parse(p)
     }
 }
 
@@ -38,9 +40,9 @@ where
     A: GrammarLike<Err>,
     B: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        self.1.parse(p)
     }
 }
 
@@ -51,10 +53,10 @@ where
     B: GrammarLike<Err>,
     C: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        self.2.parse(p)
     }
 }
 
@@ -66,11 +68,11 @@ where
     C: GrammarLike<Err>,
     D: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
-        self.3.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        parse_ok!(self.2.parse(p));
+        self.3.parse(p)
     }
 }
 
@@ -83,12 +85,12 @@ where
     D: GrammarLike<Err>,
     E: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
-        self.3.parse(p);
-        self.4.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        parse_ok!(self.2.parse(p));
+        parse_ok!(self.3.parse(p));
+        self.4.parse(p)
     }
 }
 
@@ -102,13 +104,13 @@ where
     E: GrammarLike<Err>,
     F: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
-        self.3.parse(p);
-        self.4.parse(p);
-        self.5.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        parse_ok!(self.2.parse(p));
+        parse_ok!(self.3.parse(p));
+        parse_ok!(self.4.parse(p));
+        self.5.parse(p)
     }
 }
 
@@ -123,14 +125,14 @@ where
     F: GrammarLike<Err>,
     G: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
-        self.3.parse(p);
-        self.4.parse(p);
-        self.5.parse(p);
-        self.6.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        parse_ok!(self.2.parse(p));
+        parse_ok!(self.3.parse(p));
+        parse_ok!(self.4.parse(p));
+        parse_ok!(self.5.parse(p));
+        self.6.parse(p)
     }
 }
 
@@ -146,14 +148,14 @@ where
     G: GrammarLike<Err>,
     H: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.0.parse(p);
-        self.1.parse(p);
-        self.2.parse(p);
-        self.3.parse(p);
-        self.4.parse(p);
-        self.5.parse(p);
-        self.6.parse(p);
-        self.7.parse(p);
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.0.parse(p));
+        parse_ok!(self.1.parse(p));
+        parse_ok!(self.2.parse(p));
+        parse_ok!(self.3.parse(p));
+        parse_ok!(self.4.parse(p));
+        parse_ok!(self.5.parse(p));
+        parse_ok!(self.6.parse(p));
+        self.7.parse(p)
     }
 }

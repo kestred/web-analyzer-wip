@@ -3,11 +3,42 @@ mod predictive;
 mod token_set;
 
 use crate::parser::{Parser, ParseError};
+use crate::syntax_kind::ERROR;
 use rowan::SyntaxKind;
 use std::marker::PhantomData;
 
 pub use self::predictive::Predictive;
 pub use self::token_set::TokenSet;
+
+#[derive(Debug)]
+pub enum Outcome {
+    Ok,
+    Err,
+}
+impl Outcome {
+    /// Ignores the outcome if it shouldn't cause the current grammar to fail.
+    pub fn ignore(self) {}
+}
+impl From<SyntaxKind> for Outcome {
+    fn from(k: SyntaxKind) -> Outcome {
+        if k == ERROR {
+            Outcome::Err
+        } else {
+            Outcome::Ok
+        }
+    }
+}
+
+#[macro_export]
+/// Like `try!` but for `Outcome`.
+macro_rules! parse_ok {
+    ($expr:expr) => {
+        match $expr {
+            Outcome::Ok => (),
+            Outcome::Err => return Outcome::Err,
+        }
+    };
+}
 
 // TODO: Docs
 pub trait Grammar<Err: ParseError> {
@@ -18,6 +49,8 @@ pub trait Grammar<Err: ParseError> {
     // N.B. optional parsing via arbitrary backtracking;
     //      probably use `optional` instead when possible
     //      to avoid unnecessary backtracking (TODO: Benchmark)
+    //
+    // Doesn't emit errors nor consume tokens if parsing fails.
     fn try_parse(&self, p: &mut Parser<Err>) -> Result<SyntaxKind, Err> {
         let start = p.checkpoint();
         let kind = self.parse(p);
@@ -28,16 +61,19 @@ pub trait Grammar<Err: ParseError> {
 
 // TODO: Docs
 pub trait GrammarLike<Err: ParseError> {
-    fn parse(&self, p: &mut Parser<Err>);
+    #[must_use]
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome;
 
     // TODO: Docs
     //
     // N.B. optional parsing via arbitrary backtracking;
     //      probably use `optional` instead when possible
     //      to avoid unnecessary backtracking (TODO: Benchmark)
+    //
+    // Doesn't emit errors nor consume tokens if parsing fails.
     fn try_parse(&self, p: &mut Parser<Err>) -> Result<(), Err> {
         let start = p.checkpoint();
-        self.parse(p);
+        self.parse(p).ignore();
         p.commit(start)
     }
 
@@ -72,39 +108,45 @@ impl<Err> GrammarLike<Err> for Expect<Err>
 where
     Err: ParseError,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         if !p.eat(self.kind) {
-            p.error(format!("expected {:?}", self.kind))
+            p.error(format!("expected {:?}", self.kind));
+            Outcome::Err
+        } else {
+            Outcome::Ok
         }
     }
 }
 
 /// See `Grammar::try_parse`.
-pub fn attempt<Err: ParseError, O: GrammarLike<Err>>(once: O) -> Try<Err, O> {
-    Try {
+pub fn attempt<Err: ParseError, O: GrammarLike<Err>>(once: O) -> Attempt<Err, O> {
+    Attempt {
         errtype: PhantomData,
         once
     }
 }
 
 /// Represents the return type of `attempt(grammar)`.
-pub struct Try<Err: ParseError, O: GrammarLike<Err>> {
+pub struct Attempt<Err: ParseError, O: GrammarLike<Err>> {
     errtype: PhantomData<Err>,
     once: O,
 }
-impl<Err, O> GrammarLike<Err> for Try<Err, O>
+impl<Err, O> GrammarLike<Err> for Attempt<Err, O>
 where
     Err: ParseError,
     O: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         self.once.try_parse(p).ok();
+        Outcome::Ok
     }
 }
 
 // TODO: Docs
 //
 // N.B. optional parsing that _tries_ to avoid backtracking via lookahead
+//
+// Doesn't emit errors nor consume tokens if parsing fails.
 pub fn optional<Err: ParseError, O: Predictive<Err>>(once: O) -> Optional<Err, O> {
     Optional {
         errtype: PhantomData,
@@ -120,10 +162,11 @@ where
     Err: ParseError,
     O: Predictive<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
         if self.once.predicate().contains(&p.current()) {
             self.once.try_parse(p).ok();
         }
+        Outcome::Ok
     }
 }
 
@@ -159,13 +202,12 @@ where
     Err: ParseError,
     O: GrammarLike<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.once.parse(p);
-
-        // Eat as many as we can
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.once.parse(p));
         while let Ok(()) = self.once.try_parse(p) {
             // noop
         }
+        Outcome::Ok
     }
 }
 
@@ -181,16 +223,14 @@ where
     O: GrammarLike<Err>,
     S: Predictive<Err>,
 {
-    fn parse(&self, p: &mut Parser<Err>) {
-        self.once.parse(p);
-
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        parse_ok!(self.once.parse(p));
         while self.sep.predicate().contains(&p.current()) {
             match self.sep.try_parse(p) {
-                Ok(()) => {
-                    self.once.parse(p);
-                }
+                Ok(()) => parse_ok!(self.once.parse(p)),
                 Err(_) => break,
             }
         }
+        Outcome::Ok
     }
 }
