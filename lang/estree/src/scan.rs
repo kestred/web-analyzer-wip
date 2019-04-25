@@ -1,4 +1,4 @@
-use web_grammars_utils::Scanner;
+use web_grammar_utils::Scanner;
 
 pub fn is_markdown_lang_char(c: char) -> bool {
     (c >= 'a' && c <= 'z')

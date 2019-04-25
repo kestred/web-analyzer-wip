@@ -1,4 +1,4 @@
-use web_grammars_utils::LanguageKind;
+use web_grammar_utils::LanguageKind;
 
 #[test]
 fn test_language_kinds() {

@@ -1,9 +1,9 @@
 //! An example of how to implement parsing using the utils.
 //!
 //! ```rust
-//! use web_grammars_utils::{Lexer, Parser, Scanner, SyntaxKind, TreeNode};
-//! use web_grammars_utils::grammar::*;
-//! use web_grammars_utils::syntax_kind::*;
+//! use web_grammar_utils::{Lexer, Parser, Scanner, SyntaxKind, TreeNode};
+//! use web_grammar_utils::grammar::*;
+//! use web_grammar_utils::syntax_kind::*;
 //!
 //! struct MyLexer;
 //!
@@ -22,7 +22,7 @@
 //! /// Parse a syntax tree from text
 //! pub fn parse(text: &str) -> TreeNode {
 //!     let tokens = MyLexer.tokenize(text);
-//!     let mut parser = Parser::new(text, &tokens, false);
+//!     let mut parser = Parser::new((text, &tokens).into(), false);
 //!     let (root, _remainder) = parser.parse(&my_grammar());
 //!     root
 //! }

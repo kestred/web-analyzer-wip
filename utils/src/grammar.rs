@@ -33,6 +33,11 @@ pub trait Grammar<Err: ParseError = String> {
     }
 
     // TODO: Docs
+    fn into_boxed<'a>(self) -> Boxed<'a, Err> where Self: 'a + Sized {
+        Boxed { grammar: Box::new(self) }
+    }
+
+    // TODO: Docs
     fn is(self, kind: SyntaxKind) -> Uncommitted<Err, Self> where Self: Sized {
         Uncommitted {
             errtype: PhantomData,
@@ -71,6 +76,11 @@ pub trait GrammarNode<Err: ParseError = String> {
     }
 
     // TODO: Docs
+    fn into_boxed<'a>(self) -> BoxedNode<'a, Err> where Self: 'a + Sized {
+        BoxedNode { grammar: Box::new(self) }
+    }
+
+    // TODO: Docs
     fn commit(self) -> Committed<Err, Self> where Self: Sized {
         Committed {
             errtype: PhantomData,
@@ -79,7 +89,33 @@ pub trait GrammarNode<Err: ParseError = String> {
     }
 }
 
-/// Represents the return type of `grammar.commit()`.
+/// Represents the return type of `grammar.into_boxed()`.
+pub struct Boxed<'a, Err: ParseError> {
+    grammar: Box<dyn Grammar<Err> + 'a>,
+}
+impl<'a, Err> Grammar<Err> for Boxed<'a, Err>
+where
+    Err: ParseError,
+{
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        self.grammar.parse(p)
+    }
+}
+
+/// Represents the return type of `grammar_node.into_boxed()`.
+pub struct BoxedNode<'a, Err: ParseError> {
+    grammar: Box<dyn GrammarNode<Err> + 'a>,
+}
+impl<'a, Err> GrammarNode<Err> for BoxedNode<'a, Err>
+where
+    Err: ParseError,
+{
+    fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind {
+        self.grammar.parse(p)
+    }
+}
+
+/// Represents the return type of `grammar_node.commit()`.
 pub struct Committed<Err: ParseError, G: GrammarNode<Err>> {
     errtype: PhantomData<Err>,
     grammar: G,

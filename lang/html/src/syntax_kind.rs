@@ -1,6 +1,6 @@
-use web_grammars_utils::{LanguageKind, SyntaxKind};
+use web_grammar_utils::{LanguageKind, SyntaxKind};
 
-pub use web_grammars_utils::syntax_kind::*;
+pub use web_grammar_utils::syntax_kind::*;
 
 pub const HTML: LanguageKind = LanguageKind(1);
 

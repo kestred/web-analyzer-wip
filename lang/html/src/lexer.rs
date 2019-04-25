@@ -5,8 +5,8 @@ use crate::scan::{
     scan_html_symbol,
     scan_html_comment,
 };
-use web_grammars_utils::{Lexer, Scanner, SyntaxKind};
-use web_grammars_utils::scan::{is_whitespace, scan_string};
+use web_grammar_utils::{Lexer, Scanner, SyntaxKind};
+use web_grammar_utils::scan::{is_whitespace, scan_string};
 
 pub struct HtmlLexer {
     // N.B. There will probably have config in here eventually...

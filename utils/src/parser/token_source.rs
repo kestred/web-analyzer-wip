@@ -10,6 +10,15 @@ pub struct TokenInput<'a> {
     pub tokens: &'a [Token]
 }
 
+impl<'a, Slice: AsRef<[Token]>> From<(&'a str, &'a Slice)> for TokenInput<'a> {
+    fn from(from: (&'a str, &'a Slice)) -> TokenInput<'a> {
+        TokenInput {
+            text: from.0,
+            tokens: from.1.as_ref(),
+        }
+    }
+}
+
 /// `TokenSource` abstracts the source of the tokens parser operates one.
 pub trait TokenSource {
     /// What is the current token?

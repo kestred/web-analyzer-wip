@@ -1,7 +1,7 @@
 use crate::syntax_kind::*;
-use web_grammars_utils::{Scanner, SyntaxKind};
-use web_grammars_utils::lexer::ResetableLexer;
-use web_grammars_utils::scan::{is_decimal, scan_string};
+use web_grammar_utils::{Scanner, SyntaxKind};
+use web_grammar_utils::lexer::ResetableLexer;
+use web_grammar_utils::scan::{is_decimal, scan_string};
 
 pub fn is_javascript_ident_prefix(c: char) -> bool {
     (c >= 'a' && c <= 'z')

@@ -1,5 +1,5 @@
 use crate::syntax_kind::*;
-use web_grammars_utils::{Scanner, SyntaxKind};
+use web_grammar_utils::{Scanner, SyntaxKind};
 
 pub fn is_html_tag_prefix(c: char) -> bool {
     (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')

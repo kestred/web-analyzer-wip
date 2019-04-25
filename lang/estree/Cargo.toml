@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 combine = "3.8.1"
-web_grammars_utils = { path = "../../utils" }
+web_grammar_utils = { path = "../../utils" }
 heck = "0.3.1"

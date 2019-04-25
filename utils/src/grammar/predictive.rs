@@ -12,6 +12,11 @@ pub trait PredictiveGrammar<Err: ParseError = String>: Grammar<Err> {
     // TODO: docs
     fn predicate(&self) -> TokenSet;
 
+    // TODO: Docs
+    fn into_predictive_boxed<'a>(self) -> PredictiveBoxed<'a, Err> where Self: 'a + Sized {
+        PredictiveBoxed { grammar: Box::new(self) }
+    }
+
     // TODO: docs
     fn or<R: PredictiveGrammar<Err>>(self, right: R) -> Either<Err, Self, R> where Self: Sized {
         Either {
@@ -27,6 +32,11 @@ pub trait PredictiveGrammarNode<Err: ParseError = String>: GrammarNode<Err> {
     // TODO: docs
     fn predicate(&self) -> TokenSet;
 
+    // TODO: Docs
+    fn into_predictive_boxed<'a>(self) -> PredictiveBoxedNode<'a, Err> where Self: 'a + Sized {
+        PredictiveBoxedNode { grammar: Box::new(self) }
+    }
+
     // TODO: docs
     fn or<R: PredictiveGrammarNode<Err>>(self, right: R) -> EitherNode<Err, Self, R> where Self: Sized {
         EitherNode {
@@ -37,9 +47,45 @@ pub trait PredictiveGrammarNode<Err: ParseError = String>: GrammarNode<Err> {
     }
 }
 
-pub fn never<Err: ParseError>() -> Never<Err> {
-    Never {
-        errtype: PhantomData
+/// Represents the return type of `predictive_grammar.into_boxed()`.
+pub struct PredictiveBoxed<'a, Err: ParseError> {
+    grammar: Box<dyn PredictiveGrammar<Err> + 'a>,
+}
+impl<'a, Err> Grammar<Err> for PredictiveBoxed<'a, Err>
+where
+    Err: ParseError,
+{
+    fn parse(&self, p: &mut Parser<Err>) -> Outcome {
+        self.grammar.parse(p)
+    }
+}
+impl<'a, Err> PredictiveGrammar<Err> for PredictiveBoxed<'a, Err>
+where
+    Err: ParseError,
+{
+    fn predicate(&self) -> TokenSet {
+        self.grammar.predicate()
+    }
+}
+
+/// Represents the return type of `predictive_grammar_node.into_boxed()`.
+pub struct PredictiveBoxedNode<'a, Err: ParseError> {
+    grammar: Box<dyn PredictiveGrammarNode<Err> + 'a>,
+}
+impl<'a, Err> GrammarNode<Err> for PredictiveBoxedNode<'a, Err>
+where
+    Err: ParseError,
+{
+    fn parse(&self, p: &mut Parser<Err>) -> SyntaxKind {
+        self.grammar.parse(p)
+    }
+}
+impl<'a, Err> PredictiveGrammarNode<Err> for PredictiveBoxedNode<'a, Err>
+where
+    Err: ParseError,
+{
+    fn predicate(&self) -> TokenSet {
+        self.grammar.predicate()
     }
 }
 
@@ -47,6 +93,13 @@ pub fn never<Err: ParseError>() -> Never<Err> {
 //
 // N.B. matches nothing and parses nothing, intended to be used to bootstrap
 //      the `bitor` combinator when only opaque types are available
+pub fn never<Err: ParseError>() -> Never<Err> {
+    Never {
+        errtype: PhantomData
+    }
+}
+
+/// Represents the return type of `never()`.
 pub struct Never<Err: ParseError> {
     errtype: PhantomData<Err>,
 }

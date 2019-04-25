@@ -56,7 +56,7 @@ version = "0.1.0"
 dependencies = [
  "combine 3.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "web_grammars_utils 0.1.0",
+ "web_grammar_utils 0.1.0",
 ]
 
 [[package]]
@@ -76,14 +76,14 @@ dependencies = [
 name = "html_grammar"
 version = "0.1.0"
 dependencies = [
- "web_grammars_utils 0.1.0",
+ "web_grammar_utils 0.1.0",
 ]
 
 [[package]]
 name = "javascript_grammar"
 version = "0.1.0"
 dependencies = [
- "web_grammars_utils 0.1.0",
+ "web_grammar_utils 0.1.0",
 ]
 
 [[package]]
@@ -313,7 +313,7 @@ name = "typescript_grammar"
 version = "0.1.0"
 dependencies = [
  "javascript_grammar 0.1.0",
- "web_grammars_utils 0.1.0",
+ "web_grammar_utils 0.1.0",
 ]
 
 [[package]]
@@ -339,11 +339,11 @@ name = "vue_grammar"
 version = "0.1.0"
 dependencies = [
  "html_grammar 0.1.0",
- "web_grammars_utils 0.1.0",
+ "web_grammar_utils 0.1.0",
 ]
 
 [[package]]
-name = "web_grammars_utils"
+name = "web_grammar_utils"
 version = "0.1.0"
 dependencies = [
  "rowan 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",

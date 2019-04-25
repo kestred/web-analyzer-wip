@@ -1,6 +1,6 @@
 use crate::syntax_kind::*;
-// use web_grammars_utils::{Parser, SyntaxKind};
-use web_grammars_utils::grammar::*;
+// use web_grammar_utils::{Parser, SyntaxKind};
+use web_grammar_utils::grammar::*;
 
 pub fn program() -> impl GrammarNode {
     ( token(EOF)
@@ -15,7 +15,10 @@ pub fn directive() -> impl PredictiveGrammar {
 
 pub fn statement() -> impl PredictiveGrammar {
     ( never()
-    | expression_statement()
+
+    // FIXME: Implement proper arbitrary lookahead to avoid infinite recursion
+    // | expression_statement()
+
     // TODO: Implement
     // BlockStatement = BLOCK_STATEMENT,
     // EmptyStatement = EMPTY_STATEMENT,
@@ -34,7 +37,7 @@ pub fn statement() -> impl PredictiveGrammar {
     // ForStatement = FOR_STATEMENT,
     // ForInStatement = FOR_IN_STATEMENT,
     | declaration()
-    )
+    ).into_predictive_boxed()
 }
 
 pub fn expression_statement() -> impl PredictiveGrammar {
@@ -69,10 +72,13 @@ pub fn variable_initializer() -> impl PredictiveGrammar {
     token(EQ).then(expression())
 }
 
+pub fn pattern() -> impl PredictiveGrammar {
+    token(IDENT) // TODO: Implement destructuring
+}
+
 pub fn expression() -> impl PredictiveGrammar {
     ( token(IDENT)
     | literal()
-
     // TODO: Implement
     // ThisExpression = THIS_EXPRESSION,
     // ArrayExpression = ARRAY_EXPRESSION,
@@ -85,7 +91,7 @@ pub fn expression() -> impl PredictiveGrammar {
     // LogicalExpression = LOGICAL_EXPRESSION,
     // MemberExpression = MEMBER_EXPRESSION,
     // ConditionalExpression = CONDITIONAL_EXPRESSION,
-    // CallExpression = CALL_EXPRESSION,
+    | call_expression()
     // NewExpression = NEW_EXPRESSION,
     // SequenceExpression = SEQUENCE_EXPRESSION,
     // ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
@@ -95,7 +101,19 @@ pub fn expression() -> impl PredictiveGrammar {
     // ClassExpression = CLASS_EXPRESSION,
     // MetaProperty = META_PROPERTY,
     // AwaitExpression = AWAIT_EXPRESSION,
-    )
+    ).into_predictive_boxed()
+}
+
+pub fn call_expression() -> impl PredictiveGrammar {
+  ( expression()
+  , token(L_PAREN)
+  // TODO: Parse arguments
+  , token(R_PAREN)
+  )
+//   CALL_EXPRESSION
+//     type: "CallExpression";
+//     callee: Expression;
+//     arguments: [ Expression ];
 }
 
 pub fn literal() -> impl PredictiveGrammar {
@@ -108,15 +126,11 @@ pub fn literal() -> impl PredictiveGrammar {
     ).commit(LITERAL)
 }
 
-pub fn pattern() -> impl PredictiveGrammar {
-    token(IDENT) // TODO: Implement destructuring
-}
-
 #[cfg(test)]
 mod test {
-    use crate::lexer::JavascriptLexer;
     use super::*;
-    use web_grammars_utils::{Lexer, Parser};
+    use crate::lexer::JavascriptLexer;
+    use web_grammar_utils::{Lexer, Parser};
 
   #[test]
     fn test_variable_declaration() {
@@ -128,9 +142,9 @@ mod test {
             "var foo = 'hello', bar;",
             "var foo = 'hello', bar = 'world';",
         ];
-        for text in examples {
+        for &text in examples {
             let tokens = JavascriptLexer::new().tokenize(text);
-            let mut parser = Parser::new(text, &tokens, false);
+            let mut parser = Parser::new((text, &tokens).into(), false);
             assert!(variable_declaration().parse(&mut parser).is_ok());
         }
     }
@@ -139,15 +153,17 @@ mod test {
     fn test_parse_sample1() {
         let text = crate::samples::SAMPLE_1;
         let tokens = JavascriptLexer::new().tokenize(text);
-        let mut parser = Parser::new(text, &tokens, false);
-        assert!(program().parse(&mut parser).is_ok());
+        let parser = Parser::new((text, &tokens).into(), false);
+        let (_, remaining) = parser.parse(&program());
+        assert!(remaining.tokens.is_empty());
     }
 
   #[test]
     fn test_parse_sample2() {
         let text = crate::samples::SAMPLE_2;
         let tokens = JavascriptLexer::new().tokenize(text);
-        let mut parser = Parser::new(text, &tokens, false);
-        assert!(program().parse(&mut parser).is_ok());
+        let parser = Parser::new((text, &tokens).into(), false);
+        let (_, remaining) = parser.parse(&program());
+        assert!(remaining.tokens.is_empty());
     }
 }
