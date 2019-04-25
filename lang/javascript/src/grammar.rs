@@ -30,7 +30,7 @@ pub fn literal() -> impl PredictiveGrammar {
     | token(FALSE_KW)
     | token(TRUE_KW)
     | token(NULL_KW)
-    ).commit(LITERAL) | token(TEMPLATE_TOKEN).commit(TEMPLATE_LITERAL)
+    ).commit(LITERAL)
 }
 
 pub fn pattern() -> impl PredictiveGrammar {
