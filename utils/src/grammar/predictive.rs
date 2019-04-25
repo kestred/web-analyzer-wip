@@ -2,6 +2,7 @@ use crate::grammar::*;
 use crate::parser::ParseError;
 use crate::syntax_kind::ERROR;
 use rowan::SyntaxKind;
+use std::marker::PhantomData;
 
 // TODO: Docs
 //
@@ -33,6 +34,36 @@ pub trait PredictiveGrammarNode<Err: ParseError = String>: GrammarNode<Err> {
             left: self,
             right,
         }
+    }
+}
+
+pub fn never<Err: ParseError>() -> Never<Err> {
+    Never {
+        errtype: PhantomData
+    }
+}
+
+// TODO: doc comment
+//
+// N.B. matches nothing and parses nothing, intended to be used to bootstrap
+//      the `bitor` combinator when only opaque types are available
+pub struct Never<Err: ParseError> {
+    errtype: PhantomData<Err>,
+}
+impl<Err> Grammar<Err> for Never<Err>
+where
+    Err: ParseError,
+{
+    fn parse(&self, _: &mut Parser<Err>) -> Outcome {
+        Outcome::Err
+    }
+}
+impl<Err> PredictiveGrammar<Err> for Never<Err>
+where
+    Err: ParseError,
+{
+    fn predicate(&self) -> TokenSet {
+        TokenSet::new()
     }
 }
 

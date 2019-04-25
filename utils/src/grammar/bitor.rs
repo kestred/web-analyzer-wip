@@ -1,51 +1,62 @@
 use crate::grammar::*;
 use std::ops::BitOr;
 
-impl<Err, L, R> BitOr<R> for Either<Err, L, R>
+impl<Err, Rhs> BitOr<Rhs> for Never<Err>
+where
+    Rhs: PredictiveGrammar<Err>,
+    Err: ParseError,
+{
+    type Output = Either<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
+}
+
+impl<Err, Rhs, L, R> BitOr<Rhs> for Either<Err, L, R>
 where
     Err: ParseError,
+    Rhs: PredictiveGrammar<Err>,
     L: PredictiveGrammar<Err>,
     R: PredictiveGrammar<Err>,
 {
-    type Output = Either<Err, Self, R>;
-    fn bitor(self, rhs: R) -> Self::Output { self.or(rhs) }
+    type Output = Either<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
 }
 
-impl<Err, L, R> BitOr<R> for EitherNode<Err, L, R>
+impl<Err, Rhs, L, R> BitOr<Rhs> for EitherNode<Err, L, R>
 where
     Err: ParseError,
+    Rhs: PredictiveGrammarNode<Err>,
     L: PredictiveGrammarNode<Err>,
     R: PredictiveGrammarNode<Err>,
 {
-    type Output = EitherNode<Err, Self, R>;
-    fn bitor(self, rhs: R) -> Self::Output { self.or(rhs) }
+    type Output = EitherNode<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
 }
 
-impl<Err, R> BitOr<R> for Expect<Err>
+impl<Err, Rhs> BitOr<Rhs> for Expect<Err>
 where
     Err: ParseError,
-    R: PredictiveGrammar<Err>,
+    Rhs: PredictiveGrammar<Err>,
 {
-    type Output = Either<Err, Self, R>;
-    fn bitor(self, rhs: R) -> Self::Output { self.or(rhs) }
+    type Output = Either<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
 }
 
-impl<Err, G, R> BitOr<R> for Committed<Err, G>
+impl<Err, Rhs, G> BitOr<Rhs> for Committed<Err, G>
 where
     Err: ParseError,
+    Rhs: PredictiveGrammar<Err>,
     G: PredictiveGrammarNode<Err>,
-    R: PredictiveGrammar<Err>,
 {
-    type Output = Either<Err, Self, R>;
-    fn bitor(self, rhs: R) -> Self::Output { self.or(rhs) }
+    type Output = Either<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
 }
 
-impl<Err, G, R> BitOr<R> for Uncommitted<Err, G>
+impl<Err, Rhs, G> BitOr<Rhs> for Uncommitted<Err, G>
 where
     Err: ParseError,
+    Rhs: PredictiveGrammarNode<Err>,
     G: PredictiveGrammar<Err>,
-    R: PredictiveGrammarNode<Err>,
 {
-    type Output = EitherNode<Err, Self, R>;
-    fn bitor(self, rhs: R) -> Self::Output { self.or(rhs) }
+    type Output = EitherNode<Err, Self, Rhs>;
+    fn bitor(self, rhs: Rhs) -> Self::Output { self.or(rhs) }
 }

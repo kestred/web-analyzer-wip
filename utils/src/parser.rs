@@ -1,19 +1,29 @@
 //! An example of how to implement parsing using the utils.
 //!
-//! ```ignore
-//! use web_grammars_utils::{Lexer, Parser, SyntaxKind};
+//! ```rust
+//! use web_grammars_utils::{Lexer, Parser, Scanner, SyntaxKind, SyntaxNode, TreeArc};
 //! use web_grammars_utils::grammar::*;
+//! use web_grammars_utils::syntax_kind::*;
 //!
-//! struct MyLexer { ... }
+//! struct MyLexer;
 //!
-//! impl Lexer for MyLexer { ... }
+//! impl Lexer for MyLexer {
+//!     fn scan(&mut self, c: char, s: &mut Scanner) -> SyntaxKind {
+//!         unimplemented!()
+//!     }
+//! }
 //!
-//! fn my_grammar(p: &mut Parser) -> SyntaxKind { ... }
+//! const ROOT: SyntaxKind = SyntaxKind(999);
 //!
-//! fn parse(text: &str) -> SyntaxNode {
-//!     let tokens = MyLexer::new().tokenize(text);
-//!     let parser = Parser::new(text, &tokens);
-//!     parser.parse(my_grammar)
+//! fn my_grammar() -> impl GrammarNode {
+//!     token(EOF).is(ROOT) // i.e. build your grammar with combinators
+//! }
+//!
+//! /// Parse a syntax tree from text
+//! pub fn parse(text: &str) -> TreeArc<SyntaxNode> {
+//!     let tokens = MyLexer.tokenize(text);
+//!     let mut parser = Parser::new(text, &tokens, false);
+//!     parser.parse(&my_grammar())
 //! }
 //! ```
 
