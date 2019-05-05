@@ -15,7 +15,7 @@ syntax_kinds! {
         TOMBSTONE 0
         ERROR 1
         EOF 2
-        WHITESPACE 3
+        WHITESPACE 3 [WS]
         COMMENT 4
         IDENTIFIER 5 [IDENT]
         SHEBANG 6 ("#!/")

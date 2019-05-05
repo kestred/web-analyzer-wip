@@ -1,14 +1,35 @@
-use web_grammar_utils::{LanguageKind, SyntaxKind};
+use web_grammar_utils::{syntax_kinds, LanguageKind, SyntaxKind};
 
 pub use web_grammar_utils::syntax_kind::*;
 
 pub const HTML: LanguageKind = LanguageKind(1);
+pub const TAG_NAME: SyntaxKind = IDENTIFIER;
+pub const TAG_CLOSE: SyntaxKind = R_ANGLE;
 
-// Any text in the middle of the document, excluding whitespace
-pub const RAW_TEXT: SyntaxKind = HTML.syntax_kind(1);
-pub const QUOTED_STRING: SyntaxKind = HTML.syntax_kind(2);
+pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
+    self::default::as_str(k)
+        .or(self::text::as_str(k))
+        .or(self::symbols::as_str(k))
+}
 
-// HTML Symbols
-pub const L_ANGLE_BANG: SyntaxKind = HTML.syntax_kind(11); // '<!'
-pub const L_ANGLE_SLASH: SyntaxKind = HTML.syntax_kind(12); // '</'
-pub const R_ANGLE_SLASH: SyntaxKind = HTML.syntax_kind(13); // '/>'
+pub fn as_debug_repr(k: SyntaxKind) -> Option<SyntaxKindMeta> {
+    self::default::as_debug_repr(k)
+        .or(self::text::as_debug_repr(k))
+        .or(self::symbols::as_debug_repr(k))
+}
+
+syntax_kinds! {
+    language HTML;
+
+    text {
+        TEXT 1    // any text in the middle of the document, excluding whitespace
+        QUOTED 2  // a quoted string (e.g. in an attribute <input id="hello">)
+        SCRIPT 3  // non-plaintext inside a special tag (e.g. CSS or JS)
+    }
+
+    symbols {
+        L_ANGLE_BANG 11 ("<!")
+        L_ANGLE_SLASH 12 ("</") [TAG_OPEN]
+        SLASH_R_ANGLE 13 ("/>") [TAG_SELF_CLOSE]
+    }
+}

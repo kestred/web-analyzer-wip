@@ -561,6 +561,9 @@ pub fn to_token_of_literal(lit: &str) -> &'static str {
         "?" => "QUESTION",
         "->" => "THIN_ARROW",
         "=>" => "FAT_ARROW",
+        "<!" => "L_ANGLE_BANG",
+        "</" => "L_ANGLE_SLASH",
+        "/>" => "SLASH_R_ANGLE",
         _ => panic!("unhandled literal {}", lit),
     }
 }
