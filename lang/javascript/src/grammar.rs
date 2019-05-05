@@ -54,7 +54,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         if p.at_keyword("from") && p.at(IDENTIFIER) {
             from_kw(p)?;
             if !(p.at(STRING_LITERAL)) {
-                p.error("<failed predicate>")?;
+                p.error("expected input to be at STRING_LITERAL")?;
             }
             literal(p)?;
         }
@@ -95,7 +95,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.bump();
         from_kw(p)?;
         if !(p.at(STRING_LITERAL)) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at STRING_LITERAL")?;
         }
         literal(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
@@ -134,7 +134,7 @@ pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
         import_declaration_list(p)?;
         from_kw(p)?;
         if !(p.at(STRING_LITERAL)) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at STRING_LITERAL")?;
         }
         literal(p)?;
         Some(Continue)
@@ -349,7 +349,7 @@ pub fn expression_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(!p.at(L_CURLY) && !p.at(FUNCTION_KW)) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be not at L_CURLY and not at FUNCTION_KW")?;
         }
         expression_sequence(p)?;
         eos(p)?;
@@ -528,9 +528,6 @@ pub fn return_statement(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(RETURN_KW)?;
         if !p.at_line_terminator() && p.at_ts(&AT_EXPRESSION) {
-            if !(!p.at_line_terminator()) {
-                p.error("<failed predicate>")?;
-            }
             expression_sequence(p)?;
         }
         eos(p)?;
@@ -627,7 +624,7 @@ pub fn throw_statement(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(THROW_KW)?;
         if !(!p.at_line_terminator()) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be not at line terminator")?;
         }
         expression_sequence(p)?;
         eos(p)?;
@@ -688,9 +685,7 @@ pub fn function_declaration(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(FUNCTION_KW)?;
-        if p.at(ASTERISK) {
-            p.bump();
-        }
+        p.eat(ASTERISK);
         p.expect(IDENTIFIER)?;
         p.expect(L_PAREN)?;
         if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
@@ -733,9 +728,7 @@ pub fn class_tail(p: &mut Parser) -> Option<Continue> {
 
 pub fn class_element(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_METHOD_DEFINITION) {
-        if p.at(STATIC_KW) {
-            p.bump();
-        }
+        p.eat(STATIC_KW);
         method_definition(p)?;
     } else if p.at(SEMICOLON) {
         empty_statement(p)?;
@@ -933,9 +926,7 @@ pub fn object_expression(p: &mut Parser) -> Option<Continue> {
                 property(p)?;
             }
         }
-        if p.at(COMMA) {
-            p.bump();
-        }
+        p.eat(COMMA);
         p.expect(R_CURLY)?;
         Some(Continue)
     });
@@ -1071,9 +1062,7 @@ pub fn class_expression(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(CLASS_KW)?;
-        if p.at(IDENTIFIER) {
-            p.bump();
-        }
+        p.eat(IDENTIFIER);
         class_tail(p)?;
         Some(Continue)
     });
@@ -1085,9 +1074,7 @@ pub fn function_expression(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(FUNCTION_KW)?;
-        if p.at(IDENTIFIER) {
-            p.bump();
-        }
+        p.eat(IDENTIFIER);
         p.expect(L_PAREN)?;
         if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
             formal_parameter_list(p)?;
@@ -1205,7 +1192,7 @@ pub fn as_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("as")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'as'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1218,7 +1205,7 @@ pub fn from_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("from")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'from'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1231,7 +1218,7 @@ pub fn get_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("get")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'get'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1244,7 +1231,7 @@ pub fn set_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("set")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'set'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1257,7 +1244,7 @@ pub fn of_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("of")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'of'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1270,7 +1257,7 @@ pub fn async_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("async")) {
-            p.error("<failed predicate>")?;
+            p.error("expected input to be at keyword 'async'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)

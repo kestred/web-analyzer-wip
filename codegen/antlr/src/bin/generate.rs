@@ -163,8 +163,15 @@ fn emit_pattern<'a>(
         Pattern::Repeat(pat, repeat) => {
             match repeat {
                 Repeat::ZeroOrOne => {
-                    emit_depth(out, dep);
                     let ts = db.next_predicates_of(pat);
+                    if pat.is_term() {
+                        emit_depth(out, dep);
+                        out.push_str("p.eat(");
+                        out.push_str(&ts.into_iter().next().map(|t| t.token).unwrap());
+                        out.push_str(");\n");
+                        return PatternType::Unit;
+                    }
+                    emit_depth(out, dep);
                     out.push_str("if ");
                     emit_lookahead(out, db, &ts, false);
                     out.push_str(" {\n");
@@ -235,13 +242,15 @@ fn emit_pattern<'a>(
         Pattern::Predicate(expr, pat) => {
             let includes = precond.includes.unwrap_or_default();
             let excludes = precond.excludes.unwrap_or_default();
-            if includes.len() != 1 || !includes.iter().all(|t| &t.predicate == expr) {
+            if includes.len() == 0 || !includes.iter().all(|t| &t.predicate == expr) {
                 emit_depth(out, dep);
                 out.push_str("if !(");
                 emit_predicate_expr(out, expr);
                 out.push_str(") {\n");
                 emit_depth(out, dep + 1);
-                out.push_str("p.error(\"<failed predicate>\")?;\n");
+                out.push_str("p.error(\"expected input to be ");
+                emit_predicate_description(out, expr);
+                out.push_str("\")?;\n");
                 emit_depth(out, dep);
                 out.push_str("}\n");
             }
@@ -744,6 +753,47 @@ fn emit_predicate_expr(out: &mut String, expr: &PredicateExpression) {
             out.push_str(oper);
             out.push(' ');
             emit_predicate_expr(out, right);
+        }
+    }
+}
+
+fn emit_predicate_description(out: &mut String, expr: &PredicateExpression) {
+    match expr {
+        PredicateExpression::True => out.push_str("true"),
+        PredicateExpression::Call { method, args } => {
+            out.push_str(&method.replace("_", " "));
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(" (with ");
+                    out.push_str(&arg);
+                    out.push(')');
+                } else {
+                    out.push(' ');
+                    out.push_str(&arg.replace("\\", "\\\\").replace("\"", "'"));
+                }
+            }
+        }
+        PredicateExpression::Unary { oper, expr } => {
+            if *oper == '!' {
+                out.push_str("not ");
+            } else {
+                out.push(*oper);
+                out.push(' ');
+            }
+            emit_predicate_description(out, expr);
+        }
+        PredicateExpression::Binary { left, oper, right } => {
+            emit_predicate_description(out, left);
+            out.push(' ');
+            if *oper == "&&" {
+                out.push_str("and");
+            } else if *oper == "||" {
+                out.push_str("or");
+            } else {
+                out.push_str(*oper);
+            }
+            out.push(' ');
+            emit_predicate_description(out, right);
         }
     }
 }
