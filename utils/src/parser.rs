@@ -1,8 +1,8 @@
 //! An example of how to implement parsing using the utils.
 //!
 //! ```rust
-//! use web_grammar_utils::{Lexer, Parser, Scanner, SyntaxKind, TreeNode};
-//! use web_grammar_utils::grammar::*;
+//! use web_grammar_utils::{LanguageKind, Lexer, Parser, Scanner, SyntaxKind, TreeNode};
+//! use web_grammar_utils::parser::Continue;
 //! use web_grammar_utils::syntax_kind::*;
 //!
 //! struct MyLexer;
@@ -13,19 +13,21 @@
 //!     }
 //! }
 //!
-//! const ROOT: SyntaxKind = SyntaxKind(1000);
+//! const MY_LANGUAGE: LanguageKind = LanguageKind(1);
+//! const AST_ROOT: SyntaxKind = MY_LANGUAGE.syntax_kind(1);
 //!
-//! fn my_grammar(p: &mut Parser) {
-//!     p.start();
+//! fn my_grammar(p: &mut Parser) -> Option<Continue> {
+//!     let start = p.start();
 //!     p.expect(EOF);
-//!     p.finish(ROOT);
+//!     p.complete(start, AST_ROOT);
+//!     None
 //! }
 //!
 //! /// Parse a syntax tree from text
 //! pub fn parse(text: &str) -> TreeNode {
 //!     let tokens = MyLexer.tokenize(text);
-//!     let parser = Parser::new((text, &tokens).into(), false);
-//!     let (root, _remainder) = parser.parse(&my_grammar());
+//!     let parser = Parser::new((text, &tokens).into(), default::as_debug_repr, false);
+//!     let (root, _remainder) = parser.parse(&my_grammar);
 //!     root
 //! }
 //! ```
