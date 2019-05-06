@@ -1,7 +1,5 @@
-use crate::lexer::JavascriptLexer;
-use crate::grammar::program;
-use crate::syntax_kind::{self, *};
-use web_grammar_utils::{Lexer, Location, Parser};
+use crate::ast::Program;
+use crate::syntax_kind::*;
 
 pub const SAMPLE_1: &'static str = r#"
 var rows = prompt("How many rows for your multiplication table?");
@@ -28,16 +26,11 @@ function createTable(rows, cols) {
 
 #[test]
 fn test_parse_sample1() {
-    let text = crate::samples::SAMPLE_1;
-    let tokens = JavascriptLexer::new().tokenize(text);
-    let mut parser = Parser::new((text, &tokens).into(), syntax_kind::as_debug_repr, false);
-    parser.max_rollback_size = 4;
-    let (root, remainder) = parser.parse(program);
-    let errors = &root.root_data().unwrap().downcast_ref::<Vec<(String, Location)>>().unwrap();
-    let success = errors.is_empty() && remainder.text.trim().is_empty();
-    assert!(success, "failed to parse:\n\n{}\n\nerror:\n\t{:?}\n\n", remainder.text, errors[0]);
-    assert_eq!(root.kind(), PROGRAM);
-    assert_eq!(root.children().map(|n| n.kind()).collect::<Vec<_>>(), &[
+    let (root, tail) = Program::parse(SAMPLE_1);
+    let success = root.errors().is_empty() && tail.trim().is_empty();
+    assert!(success, "failed to parse:\n\n{}\n\nerror:\n\t{:?}\n\n", tail, root.errors()[0]);
+    assert_eq!(root.syntax.kind(), PROGRAM);
+    assert_eq!(root.syntax.children().map(|n| n.kind()).collect::<Vec<_>>(), &[
         VARIABLE_DECLARATION,
         VARIABLE_DECLARATION,
         IF_STATEMENT,
@@ -95,21 +88,16 @@ export default Vue.extend({
 
 #[test]
 fn test_parse_sample2() {
-    let text = crate::samples::SAMPLE_2;
-    let tokens = JavascriptLexer::new().tokenize(text);
-    let mut parser = Parser::new((text, &tokens).into(), syntax_kind::as_debug_repr, false);
-    parser.max_rollback_size = 4;
-    let (root, remainder) = parser.parse(program);
-    let errors = &root.root_data().unwrap().downcast_ref::<Vec<(String, Location)>>().unwrap();
-    let success = errors.is_empty() && remainder.text.trim().is_empty();
-    assert!(success, "failed to parse:\n\n{}\n\nerror:\n\t{:?}\n\n", remainder.text, errors[0]);
-    assert_eq!(root.kind(), PROGRAM);
-    assert_eq!(root.children().map(|n| n.kind()).collect::<Vec<_>>(), &[
+    let (root, tail) = Program::parse(SAMPLE_2);
+    let success = root.errors().is_empty() && tail.trim().is_empty();
+    assert!(success, "failed to parse:\n\n{}\n\nerror:\n\t{:?}\n\n", tail, root.errors()[0]);
+    assert_eq!(root.syntax.kind(), PROGRAM);
+    assert_eq!(root.syntax.children().map(|n| n.kind()).collect::<Vec<_>>(), &[
         IMPORT_DECLARATION,
         EMPTY_STATEMENT,
         EXPORT_DEFAULT_DECLARATION,
     ]);
-    let export_decl = root.children().nth(2).unwrap();
+    let export_decl = root.syntax.children().nth(2).unwrap();
     assert_eq!(export_decl.children().map(|n| n.kind()).collect::<Vec<_>>(), &[
         CALL_EXPRESSION
     ]);

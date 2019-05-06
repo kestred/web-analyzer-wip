@@ -6,9 +6,9 @@ use std::fmt::Debug;
 
 pub type TreeNode = TreeArc<SyntaxNode>;
 
-pub struct TextTreeSink<'a, E: 'static + Debug + Send + Sync> {
+pub struct TextTreeSink<'a, 'b, E: 'static + Debug + Send + Sync> {
     text: &'a str,
-    tokens: &'a [Token],
+    tokens: &'b [Token],
     text_pos: TextUnit,
     token_pos: usize,
     builder: GreenNodeBuilder,
@@ -16,8 +16,8 @@ pub struct TextTreeSink<'a, E: 'static + Debug + Send + Sync> {
     errors: Vec<(E, Location)>,
 }
 
-impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
-    pub fn new(input: TokenInput<'a>) -> TextTreeSink<'a, E> {
+impl<'a, 'b, E: 'static + Debug + Send + Sync> TextTreeSink<'a, 'b, E> {
+    pub fn new(input: TokenInput<'a, 'b>) -> TextTreeSink<'a, 'b, E> {
         TextTreeSink {
             text: input.text,
             tokens: input.tokens,
@@ -70,7 +70,7 @@ impl<'a, E: 'static + Debug + Send + Sync> TextTreeSink<'a, E> {
         self.builder.finish_node();
     }
 
-    pub fn finalize(self) -> (TreeNode, TokenInput<'a>)  {
+    pub fn finalize(self) -> (TreeNode, TokenInput<'a, 'b>)  {
         let green = self.builder.finish();
         let output = SyntaxNode::new(green, Some(Box::new(self.errors)));
         let input = TokenInput {

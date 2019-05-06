@@ -26,7 +26,7 @@
 //! /// Parse a syntax tree from text
 //! pub fn parse(text: &str) -> TreeNode {
 //!     let tokens = MyLexer.tokenize(text);
-//!     let parser = Parser::new((text, &tokens).into(), default::as_debug_repr, false);
+//!     let parser = Parser::new((text, &tokens).into(), Default::default());
 //!     let (root, _remainder) = parser.parse(&my_grammar);
 //!     root
 //! }
@@ -49,59 +49,70 @@ pub use self::tree_sink::*;
 pub trait ParseError: 'static + From<String> + Debug + Send + Sync {}
 impl<E> ParseError for E where E: 'static + From<String> + Debug + Send + Sync {}
 
-pub struct Parser<'a, E: 'static + Debug + Send + Sync = String> {
-    events: Vec<Event<E>>,
-    source_pos: usize,
-    source: TextTokenSource<'a>,
-    sink: TextTreeSink<'a, E>,
-    steps: Cell<u32>,
-    checkpoints: Rc<Cell<u32>>,
-
+#[derive(Debug)]
+pub struct ParseConfig {
     pub debug_repr: fn(SyntaxKind) -> Option<SyntaxKindMeta>,
     pub max_rollback_size: u16,
     pub preserve_whitespace: bool,
 }
 
-impl<'a, E: ParseError> Parser<'a, E> {
-    pub fn new(input: TokenInput<'a>, debug_repr: fn(SyntaxKind) -> Option<SyntaxKindMeta>, preserve_whitespace: bool) -> Parser<'a, E> {
-        let skip_predicate = if preserve_whitespace { skip_comments } else { skip_whitespace };
+impl Default for ParseConfig {
+    fn default() -> ParseConfig {
+        ParseConfig {
+            debug_repr: default::as_debug_repr,
+            max_rollback_size: 32,
+            preserve_whitespace: false,
+        }
+    }
+}
+
+pub struct Parser<'a, 'b, E: 'static + Debug + Send + Sync = String> {
+    config: ParseConfig,
+    events: Vec<Event<E>>,
+    source_pos: usize,
+    source: TextTokenSource<'a>,
+    sink: TextTreeSink<'a, 'b, E>,
+    steps: Cell<u32>,
+    checkpoints: Rc<Cell<u32>>,
+}
+
+impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
+    pub fn new(input: TokenInput<'a, 'b>, config: ParseConfig) -> Parser<'a, 'b, E> {
+        let skip_predicate = if config.preserve_whitespace { skip_comments } else { skip_whitespace };
         Parser {
+            config,
             events: Vec::new(),
             source_pos: 0,
             source: TextTokenSource::extract(input, skip_predicate),
             sink: TextTreeSink::new(input),
             steps: Cell::new(0),
             checkpoints: Rc::new(Cell::new(0)),
-
-            debug_repr,
-            max_rollback_size: 32,
-            preserve_whitespace,
         }
     }
 
-    pub fn parse<F>(mut self, grammar: F) -> (TreeNode, TokenInput<'a>)
+    pub fn parse<F>(mut self, grammar: F) -> (TreeNode, TokenInput<'a, 'b>)
     where
-        F: Fn(&mut Parser<'a, E>) -> Option<Continue>
+        F: Fn(&mut Parser<'a, 'b, E>) -> Option<Continue>
     {
         grammar(&mut self);
         self.finalize()
     }
 
     /// Consume the parser and build a syntax tree.
-    pub fn finalize(mut self) -> (TreeNode, TokenInput<'a>) {
+    pub fn finalize(mut self) -> (TreeNode, TokenInput<'a, 'b>) {
         for op in self.events {
             match op {
                 Event::StartNode { kind } if kind == TOMBSTONE => {}
                 Event::StartNode { kind } => {
-                    // eprintln!("start {:?} {{", (self.debug_repr)(kind).map(|k| k.name));
-                    self.sink.start_node(kind, if self.preserve_whitespace { skip_comments } else { skip_whitespace })
+                    // eprintln!("start {:?} {{", (self.config.debug_repr)(kind).map(|k| k.name));
+                    self.sink.start_node(kind, if self.config.preserve_whitespace { skip_comments } else { skip_whitespace })
                 }
                 Event::CompleteNode => {
                     // eprintln!("}}");
                     self.sink.complete_node()
                 }
                 Event::Error { error } => self.sink.error(error),
-                Event::Span { kind, len } => self.sink.span(kind, len, if self.preserve_whitespace { skip_comments } else { skip_whitespace }),
+                Event::Span { kind, len } => self.sink.span(kind, len, if self.config.preserve_whitespace { skip_comments } else { skip_whitespace }),
             }
         }
         self.sink.finalize()
@@ -184,12 +195,12 @@ impl<'a, E: ParseError> Parser<'a, E> {
             .map(|(key, _val)| key + checkpoint.event_pos);
         if let Some(idx) = error_idx {
             let distance = self.source_pos - checkpoint.source_pos;
-            if checkpoint.allows_rollback() && distance <= self.max_rollback_size as usize {
+            if checkpoint.allows_rollback() && distance <= self.config.max_rollback_size as usize {
                 let error = match self.events.remove(idx) {
                     Event::Error { error } => error,
                     _ => unreachable!()
                 };
-                // eprintln!("rollback of size {} at {}: {:?}", self.source_pos - checkpoint.source_pos, (self.debug_repr)(self.current()).unwrap().name, error);
+                // eprintln!("rollback of size {} at {}: {:?}", self.source_pos - checkpoint.source_pos, (self.config.debug_repr)(self.current()).unwrap().name, error);
                 self.rollback(checkpoint);
                 Some(Err(error))
             } else {
@@ -204,7 +215,7 @@ impl<'a, E: ParseError> Parser<'a, E> {
     fn rollback(&mut self, checkpoint: Checkpoint) {
         assert!(checkpoint.allows_rollback(), "attempted to rollback invalid checkpoint");
         assert!(self.source_pos >= checkpoint.source_pos, "attempted to rollback expired checkpoint");
-        assert!(self.max_rollback_size as usize > self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
+        assert!(self.config.max_rollback_size as usize > self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
         if let Some(branch_pos) = checkpoint.branch_pos {
             match self.events[branch_pos] {
                 Event::StartNode { kind: ref mut slot, .. } => {
@@ -321,7 +332,7 @@ impl<'a, E: ParseError> Parser<'a, E> {
 
     /// Get a debug string representing the syntax kind.
     fn as_str(&self, kind: SyntaxKind) -> &'static str {
-        (self.debug_repr)(kind)
+        (self.config.debug_repr)(kind)
             .map(|info| info.canonical.unwrap_or(info.name) )
             .unwrap_or("<anonymous token>")
     }

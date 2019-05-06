@@ -30,7 +30,8 @@
 grammar HTML;
 
 html_document
-    : WS? dtd? WS? html_elements*
+    : WS? doctype? WS? html_elements*
+    # DOCUMENT
     ;
 
 html_elements
@@ -38,19 +39,22 @@ html_elements
     ;
 
 html_element
-    : '<' TAG_NAME WS? (html_attribute WS?)* '>' SCRIPT
-    | '<' TAG_NAME WS? (html_attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+    : '<' TAG_NAME WS? (html_attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+    # ELEMENT
     | '<' TAG_NAME WS? (html_attribute WS?)* '/>'
+    # ELEMENT
     | '<' TAG_NAME WS? (html_attribute WS?)* '>'
+    # ELEMENT
     ;
 
 html_content
     : html_chardata? ((html_element | COMMENT) html_chardata?)*
+    | SCRIPT?
     ;
 
 html_attribute
-    : TAG_NAME WS? '=' WS? html_attribute_value
-    | TAG_NAME
+    : TAG_NAME (WS? '=' WS? html_attribute_value)?
+    # ATTRIBUTE
     ;
 
 html_attribute_value
@@ -68,6 +72,7 @@ html_misc
     | WHITESPACE
     ;
 
-dtd
+doctype
     : '<!' {at_keyword("DOCTYPE")}? IDENT WS? ((IDENT | QUOTED) WS?)+ '>'
+    # DOCUMENT_TYPE
     ;

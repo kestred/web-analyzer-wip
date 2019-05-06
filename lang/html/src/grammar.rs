@@ -9,15 +9,20 @@ use web_grammar_utils::{catch, tokenset, Parser, TokenSet};
 use web_grammar_utils::parser::Continue;
 
 pub fn html_document(p: &mut Parser) -> Option<Continue> {
-    p.eat(WS);
-    if p.at(L_ANGLE_BANG) {
-        dtd(p)?;
-    }
-    p.eat(WS);
-    while p.at_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE]) {
-        html_elements(p)?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.eat(WS);
+        if p.at(L_ANGLE_BANG) {
+            doctype(p)?;
+        }
+        p.eat(WS);
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE]) {
+            html_elements(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, DOCUMENT);
+    _ok
 }
 
 pub fn html_elements(p: &mut Parser) -> Option<Continue> {
@@ -32,6 +37,8 @@ pub fn html_elements(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn html_element(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
     p.expect(L_ANGLE)?;
     p.expect(TAG_NAME)?;
     p.eat(WS);
@@ -40,18 +47,7 @@ pub fn html_element(p: &mut Parser) -> Option<Continue> {
         p.eat(WS);
     }
     if p.at(R_ANGLE) && {
-        // try --> > SCRIPT
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            p.bump();
-            p.expect(SCRIPT)?;
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if p.at(R_ANGLE) && {
-        // try --> > html_content (< / | </) (WS)? TAG_NAME (WS)? >
+        // try --> > html_content (< / | </) (WS)? TAG_NAME (WS)? > #ELEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             p.bump();
@@ -68,6 +64,7 @@ pub fn html_element(p: &mut Parser) -> Option<Continue> {
             p.expect(TAG_NAME)?;
             p.eat(WS);
             p.expect(R_ANGLE)?;
+            p.complete(_checkpoint.branch(&_marker), ELEMENT);
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
@@ -75,8 +72,10 @@ pub fn html_element(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at(SLASH_R_ANGLE) {
         p.bump();
+        p.complete(_checkpoint.branch(&_marker), ELEMENT);
     } else if p.at(R_ANGLE) {
         p.bump();
+        p.complete(_checkpoint.branch(&_marker), ELEMENT);
     } else {
         // otherwise, emit an error
         p.expected_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
@@ -85,33 +84,42 @@ pub fn html_element(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn html_content(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-        html_chardata(p)?;
-    }
-    while p.at_ts(&tokenset![COMMENT, L_ANGLE]) {
-        if p.at(L_ANGLE) {
-            html_element(p)?;
-        } else if p.at(COMMENT) {
-            p.bump();
-        }
+    if p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
         if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
             html_chardata(p)?;
         }
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE]) {
+            if p.at(L_ANGLE) {
+                html_element(p)?;
+            } else if p.at(COMMENT) {
+                p.bump();
+            }
+            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+                html_chardata(p)?;
+            }
+        }
+    } else if p.at(SCRIPT) {
+        p.eat(SCRIPT);
+    } else {
+        p.expected_ts(&AT_HTML_CONTENT)?;
     }
     Some(Continue)
 }
 
 pub fn html_attribute(p: &mut Parser) -> Option<Continue> {
-    p.expect(TAG_NAME)?;
-    if p.at_ts(&tokenset![EQ, WS]) {
-        p.eat(WS);
-        p.expect(EQ)?;
-        p.eat(WS);
-        html_attribute_value(p)?;
-    } else {
-        p.expected_ts(&tokenset![EQ, WS])?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(TAG_NAME)?;
+        if p.at_ts(&tokenset![EQ, WS]) {
+            p.eat(WS);
+            p.expect(EQ)?;
+            p.eat(WS);
+            html_attribute_value(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, ATTRIBUTE);
+    _ok
 }
 
 pub fn html_attribute_value(p: &mut Parser) -> Option<Continue> {
@@ -126,18 +134,25 @@ pub fn html_misc(p: &mut Parser) -> Option<Continue> {
     p.expect_ts(&tokenset![COMMENT, WHITESPACE])
 }
 
-pub fn dtd(p: &mut Parser) -> Option<Continue> {
-    p.expect(L_ANGLE_BANG)?;
-    if !(p.at_keyword("DOCTYPE")) {
-        p.error("expected input to be at keyword 'DOCTYPE'")?;
-    }
-    p.expect(IDENT)?;
-    p.eat(WS);
-    loop {
-        p.expect_ts(&tokenset![IDENT, QUOTED])?;
+pub fn doctype(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_ANGLE_BANG)?;
+        if !(p.at_keyword("DOCTYPE")) {
+            p.error("expected input to be at keyword 'DOCTYPE'")?;
+        }
+        p.expect(IDENT)?;
         p.eat(WS);
-        if !p.at_ts(&tokenset![IDENT, QUOTED]) { break }
-    }
-    p.expect(R_ANGLE)?;
-    Some(Continue)
+        loop {
+            p.expect_ts(&tokenset![IDENT, QUOTED])?;
+            p.eat(WS);
+            if !p.at_ts(&tokenset![IDENT, QUOTED]) { break }
+        }
+        p.expect(R_ANGLE)?;
+        Some(Continue)
+    });
+    p.complete(_marker, DOCUMENT_TYPE);
+    _ok
 }
+
+const AT_HTML_CONTENT: TokenSet = tokenset![COMMENT, L_ANGLE, SCRIPT, TEXT, WHITESPACE];

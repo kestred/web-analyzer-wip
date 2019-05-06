@@ -14,7 +14,7 @@ pub use crate::location::Location;
 pub use crate::parser::{Parser, TokenInput, TokenSet, TreeNode};
 pub use crate::scanner::Scanner;
 pub use crate::syntax_kind::LanguageKind;
-pub use rowan::{SmolStr, SyntaxKind, SyntaxNode, TextRange, TextUnit};
+pub use rowan::{SmolStr, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TextRange, TextUnit, TreeArc, WalkEvent};
 
 #[doc(hidden)]
-pub use rowan::{TreeArc, TransparentNewType};
+pub use rowan::TransparentNewType;

@@ -5,13 +5,13 @@ use crate::syntax_kind::EOF;
 use rowan::{SyntaxKind, TextRange, TextUnit};
 
 #[derive(Copy, Clone, Debug)]
-pub struct TokenInput<'a> {
+pub struct TokenInput<'a, 'b> {
     pub text: &'a str,
-    pub tokens: &'a [Token]
+    pub tokens: &'b [Token]
 }
 
-impl<'a, Slice: AsRef<[Token]>> From<(&'a str, &'a Slice)> for TokenInput<'a> {
-    fn from(from: (&'a str, &'a Slice)) -> TokenInput<'a> {
+impl<'a, 'b, Slice: AsRef<[Token]>> From<(&'a str, &'b Slice)> for TokenInput<'a, 'b> {
+    fn from(from: (&'a str, &'b Slice)) -> TokenInput<'a, 'b> {
         TokenInput {
             text: from.0,
             tokens: from.1.as_ref(),
@@ -85,7 +85,7 @@ impl<'t> TokenSource for TextTokenSource<'t> {
 
 impl<'t> TextTokenSource<'t> {
     /// Generate input from tokens (allowing some tokens to be skipped, such as comment and whitespace).
-    pub fn extract<F>(raw_input: TokenInput<'t>, skip: F) -> TextTokenSource<'t>
+    pub fn extract<'o, F>(raw_input: TokenInput<'t, 'o>, skip: F) -> TextTokenSource<'t>
     where
         F: Fn(SyntaxKind) -> bool
     {

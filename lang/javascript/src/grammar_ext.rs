@@ -106,7 +106,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             let kind = p.current();
             let unexpected: &str = syntax_kind::as_str(kind)
                 .or_else(|| syntax_kind::as_debug_repr(kind).map(|x| x.name))
-                .unwrap_or("UNKNOWN");
+                .unwrap_or("<anonymous token>");
             p.error(format!("unexpected \"{}\", expected an expression", unexpected))?;
         }
         Some(Continue)

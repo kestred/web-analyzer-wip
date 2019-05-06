@@ -28,10 +28,10 @@ syntax_kinds! {
 
     symbols {
         // Unusual javascript symbols
-        SHU 50 (">>>")
-        SHU_EQ 51 (">>>=")
-        EQEQEQ 52 ("===")
-        BANG_EQEQ 53 ("!==")
+        SHU 10 (">>>")
+        SHU_EQ 11 (">>>=")
+        EQEQEQ 12 ("===")
+        BANG_EQEQ 13 ("!==")
     }
 
     keywords {

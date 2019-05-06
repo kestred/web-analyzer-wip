@@ -1,13 +1,12 @@
 [workspace]
 members = [
+  "analysis/vue",
   "codegen/antlr",
   "codegen/estree",
   "lang/javascript",
   "lang/typescript",
   "lang/html",
   "lang/vue",
-  "utils"
+  "utils/analysis",
+  "utils/grammar",
 ]
-
-[patch.crates-io]
-smol_str = { git = "https://github.com/kestred/smol_str.git", branch = "kstenerson/from_iterator" }
