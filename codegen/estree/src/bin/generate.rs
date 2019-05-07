@@ -135,7 +135,7 @@ fn main() -> Result<(), std::io::Error> {
     out.push_str("    }\n");
     out.push_str("}\n");
 
-    fs::write("lang/javascript/src/generated.rs", out.as_bytes())?;
+    fs::write("grammar/javascript/src/generated.rs", out.as_bytes())?;
 
     Ok(())
 }

@@ -11,8 +11,8 @@ const MIN_CONST_TOKENSET: usize = 5;
 
 fn main() -> Result<(), std::io::Error> {
     let filepaths = &[
-        ("codegen/antlr/grammars/html.g", "lang/html/src/grammar.rs"),
-        ("codegen/antlr/grammars/javascript.g", "lang/javascript/src/grammar.rs")
+        ("codegen/antlr/grammars/html.g", "grammar/html/src/grammar.rs"),
+        ("codegen/antlr/grammars/javascript.g", "grammar/javascript/src/grammar.rs")
     ];
     for (input, output) in filepaths {
         let content = fs::read_to_string(input)?;
