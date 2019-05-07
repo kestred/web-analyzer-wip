@@ -1,21 +1,20 @@
 use rustc_hash::FxHashMap;
 use parking_lot::Mutex;
+use std::fmt;
 use std::hash::Hash;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-pub trait IdType {
+pub trait ArenaId {
     fn into_id_type(id: u32) -> Self;
     fn from_id_type(self) -> u32;
 }
 
-/// e.g. `id!(pub struct ExampleId);`
 #[macro_export]
-macro_rules! impl_id_type {
+macro_rules! impl_arena_id {
     ($name:ident) => {
-        $vis struct $name(u32);
-        impl $crate::IdType for $name {
+        impl $crate::ArenaId for $name {
             fn into_id_type(id: u32) -> Self {
                 $name(id)
             }
@@ -43,7 +42,7 @@ macro_rules! impl_intern_key {
 #[derive(Default)]
 pub struct Interner<Id, Data>
 where
-    Id: Clone + IdType,
+    Id: Clone + ArenaId,
     Data: Clone + Eq + Hash,
 {
     map: Mutex<Store<Id, Data>>,
@@ -51,7 +50,7 @@ where
 
 impl<Id, Data> Interner<Id, Data>
 where
-    Id: Clone + IdType,
+    Id: Clone + ArenaId,
     Data: Clone + Eq + Hash,
 {
     pub fn len(&self) -> usize {
@@ -68,7 +67,7 @@ where
 #[derive(Default)]
 struct Store<Id, Data>
 where
-    Id: Clone + IdType,
+    Id: Clone + ArenaId,
     Data: Clone + Eq + Hash,
 {
     arena: Arena<Id, Data>,
@@ -77,7 +76,7 @@ where
 
 impl<Id, Data> Store<Id, Data>
 where
-    Id: Clone + IdType,
+    Id: Clone + ArenaId,
     Data: Clone + Eq + Hash,
 {
     pub fn len(&self) -> usize {
@@ -100,12 +99,12 @@ where
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct Arena<Id: IdType, T> {
+pub struct Arena<Id: ArenaId, T> {
     data: Vec<T>,
     _ty: PhantomData<Id>,
 }
 
-impl<Id: IdType, T> Arena<Id, T> {
+impl<Id: ArenaId, T> Arena<Id, T> {
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -113,7 +112,7 @@ impl<Id: IdType, T> Arena<Id, T> {
         self.data.is_empty()
     }
     pub fn alloc(&mut self, value: T) -> Id {
-        let id = IdType::into_id_type(self.data.len() as u32);
+        let id = ArenaId::into_id_type(self.data.len() as u32);
         self.data.push(value);
         id
     }
@@ -122,13 +121,19 @@ impl<Id: IdType, T> Arena<Id, T> {
     }
 }
 
-impl<Id: IdType, T> Default for Arena<Id, T> {
+impl<Id: ArenaId, T: fmt::Debug> fmt::Debug for Arena<Id, T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Arena").field("len", &self.len()).field("data", &self.data).finish()
+    }
+}
+
+impl<Id: ArenaId, T> Default for Arena<Id, T> {
     fn default() -> Arena<Id, T> {
         Arena { data: Vec::new(), _ty: PhantomData }
     }
 }
 
-impl<Id: IdType, T> Index<Id> for Arena<Id, T> {
+impl<Id: ArenaId, T> Index<Id> for Arena<Id, T> {
     type Output = T;
     fn index(&self, idx: Id) -> &T {
         let idx = idx.from_id_type() as usize;
@@ -136,14 +141,14 @@ impl<Id: IdType, T> Index<Id> for Arena<Id, T> {
     }
 }
 
-impl<Id: IdType, T> IndexMut<Id> for Arena<Id, T> {
+impl<Id: ArenaId, T> IndexMut<Id> for Arena<Id, T> {
     fn index_mut(&mut self, idx: Id) -> &mut T {
         let idx = idx.from_id_type() as usize;
         &mut self.data[idx]
     }
 }
 
-impl<Id: IdType, T> FromIterator<T> for Arena<Id, T> {
+impl<Id: ArenaId, T> FromIterator<T> for Arena<Id, T> {
     fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = T>,

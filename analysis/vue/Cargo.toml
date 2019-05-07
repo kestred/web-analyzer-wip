@@ -9,6 +9,8 @@ analysis_utils = { path = "../../utils/analysis" }
 grammar_utils = { path = "../../utils/grammar" }
 html_grammar = { path = "../../grammar/html" }
 javascript_grammar = { path = "../../grammar/javascript" }
+typescript_grammar = { path = "../../grammar/typescript" }
+vue_grammar = { path = "../../grammar/vue" }
 salsa = "0.12.0"
 
 [dev-dependencies]

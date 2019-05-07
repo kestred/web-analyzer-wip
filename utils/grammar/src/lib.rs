@@ -14,7 +14,7 @@ pub use crate::lexer::{Lexer, Token};
 pub use crate::location::Location;
 pub use crate::parser::{Parser, TokenInput, TokenSet, TreeNode};
 pub use crate::scanner::Scanner;
-pub use crate::syntax_kind::LanguageKind;
+pub use crate::syntax_kind::SyntaxLanguage;
 pub use crate::syntax_error::SyntaxError;
 pub use rowan::{SmolStr, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TextRange, TextUnit, TreeArc, WalkEvent};
 

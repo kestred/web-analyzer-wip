@@ -1,9 +1,9 @@
-use grammar_utils::LanguageKind;
+use grammar_utils::SyntaxLanguage;
 
 #[test]
 fn test_language_kinds() {
   let langs = [
-    LanguageKind(0),
+    SyntaxLanguage(0),
     javascript_grammar::syntax_kind::JAVASCRIPT,
     typescript_grammar::syntax_kind::TYPESCRIPT,
     html_grammar::syntax_kind::HTML,
@@ -12,7 +12,7 @@ fn test_language_kinds() {
 
   // Check language kind is within the allowed range
   for lang in &langs {
-    assert!(lang.0 <= LanguageKind::MAX);
+    assert!(lang.0 <= SyntaxLanguage::MAX);
   }
 
   // Check all language kinds are distinct

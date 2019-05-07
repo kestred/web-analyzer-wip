@@ -6,6 +6,5 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33.0"
-grammar_utils = { path = "../../utils/grammar" }
-html_grammar = { path = "../../grammar/html" }
-javascript_grammar = { path = "../../grammar/javascript" }
+vue_analysis = { path = "../vue" }
+

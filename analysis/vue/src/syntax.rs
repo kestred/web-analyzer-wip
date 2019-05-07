@@ -1,29 +1,31 @@
-use crate::db::VueDatabase;
-use crate::parse::ParseDatabase;
+use crate::database::RootDatabase;
+use crate::parse::{InputId, ParseDatabase, SourceLanguage};
 use analysis_utils::FileId;
-use grammar_utils::{ast, AstNode, LanguageKind, SyntaxNode, SyntaxToken, SyntaxElement, TextRange};
+use grammar_utils::{ast, AstNode, SyntaxNode, SyntaxToken, SyntaxElement, TextRange};
 use grammar_utils::syntax_kind::default as default_syntax;
 use html_grammar::ast as html;
-use html_grammar::syntax_kind::{self as html_syntax, HTML, SCRIPT};
+use html_grammar::syntax_kind as html_syntax;
 use javascript_grammar::ast as javascript;
-use javascript_grammar::syntax_kind::{self as javascript_syntax, JAVASCRIPT};
+use javascript_grammar::syntax_kind as javascript_syntax;
 
-pub(crate) fn syntax_tree(
-    db: &VueDatabase,
+pub(crate) fn debug_syntax_tree(
+    db: &RootDatabase,
     file_id: FileId,
-    file_lang: LanguageKind,
-    text_source: Option<(TextRange, LanguageKind)>,
+    file_lang: SourceLanguage,
+    text_source: Option<(TextRange, SourceLanguage)>,
 ) -> String {
     let syntax = match file_lang {
-        k if k == HTML => db.parse_html(file_id).syntax.to_owned(),
-        k if k == JAVASCRIPT => db.parse_javascript(file_id).syntax.to_owned(),
+        SourceLanguage::Html => db.parse_html(InputId::File(file_id)).syntax.to_owned(),
+        SourceLanguage::Javascript => db.parse_javascript(InputId::File(file_id)).syntax.to_owned(),
         _ => panic!("unimplemented source language: {:?}", file_lang),
     };
     if let Some((text_range, text_lang)) = text_source {
         let node = match syntax.covering_node(text_range).into() {
-            SyntaxElement::Node(_) => panic!("in call to `syntax_tree` with text source expected token, but found node"),
+            SyntaxElement::Node(node) => {
+                node
+            },
             SyntaxElement::Token(token) => {
-                if let Some(tree) = syntax_tree_for_script(token, text_range, text_lang) {
+                if let Some(tree) = debug_syntax_tree_for_script(token, text_range, text_lang) {
                     return tree;
                 }
                 token.parent()
@@ -37,14 +39,15 @@ pub(crate) fn syntax_tree(
 }
 
 /// Attempts parsing the script contents of a token as the given language.
-fn syntax_tree_for_script(token: SyntaxToken, text_range: TextRange, text_lang: LanguageKind) -> Option<String> {
+fn debug_syntax_tree_for_script(token: SyntaxToken, text_range: TextRange, text_lang: SourceLanguage) -> Option<String> {
     match token.kind() {
-        SCRIPT => syntax_tree_for_token(token, text_range, text_lang),
+        html_syntax::SCRIPT | html_syntax::SCRIPT_BODY =>
+            debug_syntax_tree_for_token(token, text_range, text_lang),
         _ => None,
     }
 }
 
-fn syntax_tree_for_token(node: SyntaxToken, text_range: TextRange, text_lang: LanguageKind) -> Option<String> {
+fn debug_syntax_tree_for_token(node: SyntaxToken, text_range: TextRange, text_lang: SourceLanguage) -> Option<String> {
     // Range of the full node
     let node_range = node.range();
     let text = node.text().to_string();
@@ -69,30 +72,34 @@ fn syntax_tree_for_token(node: SyntaxToken, text_range: TextRange, text_lang: La
 
     // If the source parses without errors, return its syntax.
     let text = &text[start..end];
-    if text_lang == HTML {
-        let (parsed, _) = html::Document::parse(text);
-        if parsed.errors().is_empty() {
-            return Some(debug_dump(HTML, &parsed.syntax));
+    match text_lang {
+        SourceLanguage::Html => {
+            let (parsed, _) = html::Document::parse(text);
+            if parsed.errors().is_empty() {
+                return Some(debug_dump(text_lang, &parsed.syntax));
+            }
         }
-    } else if text_lang == JAVASCRIPT {
-        let (parsed, _) = javascript::Program::parse(text);
-        if parsed.errors().is_empty() {
-            return Some(debug_dump(JAVASCRIPT, &parsed.syntax));
+        SourceLanguage::Javascript => {
+            let (parsed, _) = javascript::Program::parse(text);
+            if parsed.errors().is_empty() {
+                return Some(debug_dump(text_lang, &parsed.syntax));
+            }
         }
+        _ => (),
     }
 
     None
 }
 
-fn debug_dump(lang: LanguageKind, node: &SyntaxNode) -> String {
+fn debug_dump(lang: SourceLanguage, node: &SyntaxNode) -> String {
     let as_debug_repr = match lang {
-        k if k == HTML => html_syntax::as_debug_repr,
-        k if k == JAVASCRIPT => javascript_syntax::as_debug_repr,
+        SourceLanguage::Html => html_syntax::as_debug_repr,
+        SourceLanguage::Javascript => javascript_syntax::as_debug_repr,
         _ => default_syntax::as_debug_repr,
     };
     let errors = match lang {
-        k if k == HTML => node.ancestors().find_map(html::Document::cast).map(|x| x.errors().to_vec()),
-        k if k == JAVASCRIPT => node.ancestors().find_map(javascript::Program::cast).map(|x| x.errors().to_vec()),
+        SourceLanguage::Html => node.ancestors().find_map(html::Document::cast).map(|x| x.errors().to_vec()),
+        SourceLanguage::Javascript => node.ancestors().find_map(javascript::Program::cast).map(|x| x.errors().to_vec()),
         _ => None,
     }.unwrap_or_default();
     let formatter = |k| as_debug_repr(k).map(|k| k.name).unwrap_or("UNKNOWN_SYNTAX_KIND");
@@ -101,19 +108,18 @@ fn debug_dump(lang: LanguageKind, node: &SyntaxNode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::VueDatabase;
-    use analysis_utils::{FileId, FileDatabase};
+    use crate::database::RootDatabase;
+    use crate::parse::SourceLanguage::{Html, Javascript};
+    use analysis_utils::{FileId, SourceDatabase};
     use grammar_utils::TextRange;
-    use html_grammar::syntax_kind::HTML;
-    use javascript_grammar::syntax_kind::JAVASCRIPT;
     use test_utils::assert_diff;
 
     #[test]
-    fn test_syntax_tree_without_range() {
-        let mut db = VueDatabase::default();
+    fn test_debug_syntax_tree_without_range() {
+        let mut db = RootDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "function foo() {}".to_string().into());
-        let syn = super::syntax_tree(&db, file_id, JAVASCRIPT, None);
+        let syn = super::debug_syntax_tree(&db, file_id, Javascript, None);
         assert_diff!(
             syn.trim(),
             r#"
@@ -132,10 +138,10 @@ PROGRAM@[0; 17)
             .trim()
         );
 
-        let mut db = VueDatabase::default();
+        let mut db = RootDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "<template><img alt='Hello World' /></template>".to_string().into());
-        let syn = super::syntax_tree(&db, file_id, HTML, None);
+        let syn = super::debug_syntax_tree(&db, file_id, Html, None);
         assert_diff!(
             syn.trim(),
             r#"
@@ -163,15 +169,15 @@ DOCUMENT@[0; 46)
     }
 
     #[test]
-    fn test_syntax_tree_inside_script() {
-        let mut db = VueDatabase::default();
+    fn test_debug_syntax_tree_inside_script() {
+        let mut db = RootDatabase::default();
         let file_id = FileId(1);
         let file_text = "<script>function foo() {}</script>";
         db.set_file_text(file_id, file_text.to_string().into());
         let start = file_text.chars().position(|c| c == 'f').unwrap() as u32;
         let end = file_text.chars().position(|c| c == '}').unwrap() as u32 + 1;
         let range = TextRange::from_to(start.into(), end.into());
-        let syn = super::syntax_tree(&db, file_id, HTML, Some((range, JAVASCRIPT)));
+        let syn = super::debug_syntax_tree(&db, file_id, Html, Some((range, Javascript)));
         assert_diff!(
             syn.trim(),
             r#"

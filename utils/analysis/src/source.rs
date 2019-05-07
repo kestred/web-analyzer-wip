@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 /// Database which stores all significant input facts: source code and
 /// dependencies. Everything else is derived from these queries.
-#[salsa::query_group(FileDatabaseStorage)]
-pub trait FileDatabase: std::fmt::Debug {
+#[salsa::query_group(SourceDatabaseStorage)]
+pub trait SourceDatabase: std::fmt::Debug {
     /// Text of the file.
     #[salsa::input]
     fn file_text(&self, file_id: FileId) -> Arc<String>;
@@ -23,17 +23,25 @@ pub trait FileDatabase: std::fmt::Debug {
     /// Contents of the source root.
     #[salsa::input]
     fn source_root(&self, id: SourceRootId) -> Arc<SourceRoot>;
-    fn source_root_libraries(&self, id: SourceRootId) -> Arc<Vec<PackageId>>;
+    fn source_root_dependencies(&self, id: SourceRootId) -> Arc<Vec<PackageId>>;
+    /// The set of "local" (that is, from the current workspace) roots.
+    /// Files in local roots are assumed to change frequently.
+    #[salsa::input]
+    fn local_roots(&self) -> Arc<Vec<SourceRootId>>;
+    /// The set of roots for dependencies.
+    /// Files are assumed to rarely change.
+    #[salsa::input]
+    fn foreign_roots(&self) -> Arc<Vec<SourceRootId>>;
     /// The package graph.
     #[salsa::input]
     fn package_graph(&self) -> Arc<PackageGraph>;
 }
 
-fn file_extension(db: &impl FileDatabase, file_id: FileId) -> Option<SmolStr> {
+fn file_extension(db: &impl SourceDatabase, file_id: FileId) -> Option<SmolStr> {
     db.file_relative_path(file_id).extension().map(|ext| ext.into())
 }
 
-fn source_root_libraries(db: &impl FileDatabase, id: SourceRootId) -> Arc<Vec<PackageId>> {
+fn source_root_dependencies(db: &impl SourceDatabase, id: SourceRootId) -> Arc<Vec<PackageId>> {
     let root = db.source_root(id);
     let graph = db.package_graph();
     let res = root.files
@@ -81,7 +89,7 @@ pub struct SourceRoot {
 }
 
 /// `PackageGraph` is a bit of information which turns a set of text files into a
-/// number of projects/libraries. Each package is defined by the `FileId` of its
+/// number of projects/dependencies. Each package is defined by the `FileId` of its
 /// root module, contextual information and the set of its dependencies.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PackageGraph {

@@ -1,8 +1,8 @@
-use grammar_utils::{syntax_kinds, LanguageKind, SyntaxKind};
+use grammar_utils::{syntax_kinds, SyntaxKind, SyntaxLanguage};
 
 pub use grammar_utils::syntax_kind::*;
 
-pub const HTML: LanguageKind = LanguageKind(1);
+pub const HTML: SyntaxLanguage = SyntaxLanguage(1);
 pub const TAG_NAME: SyntaxKind = IDENTIFIER;
 pub const TAG_CLOSE: SyntaxKind = R_ANGLE;
 

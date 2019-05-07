@@ -1,25 +1,33 @@
 mod input;
+mod language;
 mod stable;
 
-use analysis_utils::{FileId, FileDatabase};
-use grammar_utils::{LanguageKind, SyntaxKind, TreeArc};
+use analysis_utils::{FileId, LineIndex, SourceDatabase};
+use grammar_utils::{AstNode, SyntaxKind, TreeArc};
 use html_grammar::ast as html;
 use javascript_grammar::ast as javascript;
 use std::{marker::PhantomData, sync::Arc};
 
-pub(crate) use self::input::{InputId, ScriptId}
-pub(crate) use self::stable::{AstId, AstMapId};
+pub(crate) use self::input::{InputId, ScriptId, ScriptSource};
+pub(crate) use self::language::SourceLanguage;
+pub(crate) use self::stable::{AstId, AstIdMap};
 
 #[salsa::query_group(ParseDatabaseStorage)]
-pub(crate) trait ParseDatabase: FileDatabase {
+pub(crate) trait ParseDatabase: SourceDatabase {
     fn input_text(&self, input_id: InputId) -> Arc<String>;
-    fn input_language(&self, input_id: InputId) -> Option<LanguageKind>;
+    fn input_language(&self, input_id: InputId) -> Option<SourceLanguage>;
+    fn input_line_index(&self, input_id: InputId) -> Arc<LineIndex>;
     fn parse_html(&self, input_id: InputId) -> TreeArc<html::Document>;
     fn parse_javascript(&self, input_id: InputId) -> TreeArc<javascript::Program>;
     fn source_map_html(&self, input_id: InputId) -> Arc<AstIdMap>;
 
     #[salsa::interned]
-    fn script_id(&self, script: ScriptDefinition) -> ScriptId;
+    fn script_id(&self, script: ScriptSource) -> ScriptId;
+}
+
+pub(crate) fn input_line_index(db: &dyn ParseDatabase, input_id: InputId) -> Arc<LineIndex> {
+    let text = db.input_text(input_id);
+    Arc::new(LineIndex::new(&*text))
 }
 
 pub(crate) fn input_text(db: &dyn ParseDatabase, input_id: InputId) -> Arc<String> {
@@ -29,14 +37,14 @@ pub(crate) fn input_text(db: &dyn ParseDatabase, input_id: InputId) -> Arc<Strin
     }
 }
 
-pub(crate) fn input_language(db: &dyn ParseDatabase, input_id: InputId) -> Option<LanguageKind> {
+pub(crate) fn input_language(db: &dyn ParseDatabase, input_id: InputId) -> Option<SourceLanguage> {
     match input_id {
-        InputId::File(file_id) => match db.file_exension(file_id) {
-            "htm" | "html" => Some(html_grammar::syntax_kind::HTML),
-            "js" => Some(javascript_grammar::syntax_kind::JAVASCRIPT),
+        InputId::File(file_id) => match db.file_extension(file_id)?.as_str() {
+            "htm" | "html" => Some(SourceLanguage::Html),
+            "js" => Some(SourceLanguage::Javascript),
             _ => None,
-        }
-        InputId::Script(script_id) => db.lookup_script_id(script_id).language,
+        },
+        InputId::Script(script_id) => Some(db.lookup_script_id(script_id).language),
     }
 }
 
@@ -52,11 +60,11 @@ pub(crate) fn parse_javascript(db: &dyn ParseDatabase, input_id: InputId) -> Tre
 
 pub(crate) fn source_map_html(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {
     let document = db.parse_html(input_id);
-    Arc::new(AstIdMap::from_root(&document.syntax), |node| {
-        if let Some(node) = ScriptContent::cast(node) {
-            Some(node.syntax)
+    Arc::new(AstIdMap::from_root(&document.syntax, |node| {
+        if let Some(node) = html::Script::cast(node) {
+            Some(&node.syntax)
         } else {
             None
         }
-    })
+    }))
 }

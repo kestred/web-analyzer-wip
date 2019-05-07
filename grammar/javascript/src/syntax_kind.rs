@@ -1,9 +1,9 @@
-use grammar_utils::{syntax_kinds, LanguageKind, SyntaxKind};
+use grammar_utils::{syntax_kinds, SyntaxKind, SyntaxLanguage};
 
 pub use crate::generated::syntax_kind::*;
 pub use grammar_utils::syntax_kind::*;
 
-pub const JAVASCRIPT: LanguageKind = LanguageKind(2);
+pub const JAVASCRIPT: SyntaxLanguage = SyntaxLanguage(2);
 
 pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
     self::default::as_str(k)

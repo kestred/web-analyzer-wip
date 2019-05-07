@@ -1,7 +1,7 @@
 //! An example of how to implement parsing using the utils.
 //!
 //! ```rust
-//! use grammar_utils::{LanguageKind, Lexer, Parser, Scanner, SyntaxKind, TreeNode};
+//! use grammar_utils::{Lexer, Parser, Scanner, SyntaxKind, SyntaxLanguage, TreeNode};
 //! use grammar_utils::parser::Continue;
 //! use grammar_utils::syntax_kind::*;
 //!
@@ -13,7 +13,7 @@
 //!     }
 //! }
 //!
-//! const MY_LANGUAGE: LanguageKind = LanguageKind(1);
+//! const MY_LANGUAGE: SyntaxLanguage = SyntaxLanguage(1);
 //! const AST_ROOT: SyntaxKind = MY_LANGUAGE.syntax_kind(1);
 //!
 //! fn my_grammar(p: &mut Parser) -> Option<Continue> {

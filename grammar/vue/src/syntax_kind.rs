@@ -1,5 +1,5 @@
-use grammar_utils::LanguageKind;
+use grammar_utils::SyntaxLanguage;
 
 pub use html_grammar::syntax_kind::*;
 
-pub const VUE: LanguageKind = LanguageKind(4);
+pub const VUE: SyntaxLanguage = SyntaxLanguage(4);

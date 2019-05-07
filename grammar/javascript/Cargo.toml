@@ -7,4 +7,3 @@ edition = "2018"
 [dependencies]
 grammar_utils = { path = "../../utils/grammar" }
 test_utils = { path = "../../utils/test" }
-combine = "3.8.1"

@@ -3,10 +3,10 @@ mod meta;
 
 use crate::syntax_kinds;
 
-pub use self::language_kind::LanguageKind;
+pub use self::language_kind::SyntaxLanguage;
 pub use self::meta::SyntaxKindMeta;
 
-const DEFAULT: LanguageKind = LanguageKind(0);
+const DEFAULT: SyntaxLanguage = SyntaxLanguage(0);
 
 syntax_kinds! {
     language DEFAULT;
