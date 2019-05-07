@@ -18,6 +18,7 @@ impl Program {
         let parser = Parser::new((text, &tokens).into(), ParseConfig {
             debug_repr: syntax_kind::as_debug_repr,
             max_rollback_size: 4,
+            preserve_comments: false,
             preserve_whitespace: false,
         });
         let (root, remainder) = parser.parse(grammar::program);

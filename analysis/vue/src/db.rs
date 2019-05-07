@@ -1,7 +1,7 @@
-use analysis_utils::SourceDatabase;
+use analysis_utils::FileDatabase;
 
 #[salsa::database(
-    analysis_utils::SourceDatabaseStorage,
+    analysis_utils::FileDatabaseStorage,
     crate::parse::ParseDatabaseStorage,
 )]
 #[derive(Debug)]

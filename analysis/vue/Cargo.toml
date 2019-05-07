@@ -1,5 +1,5 @@
 [package]
-name = "vue_analyzer"
+name = "vue_analysis"
 version = "0.1.0"
 authors = ["Kevin Stenerson <kstenerson@developers.wyyerd.com>"]
 edition = "2018"

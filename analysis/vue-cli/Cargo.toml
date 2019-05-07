@@ -1,0 +1,11 @@
+[package]
+name = "vue_analyzer"
+version = "0.1.0"
+authors = ["Kevin Stenerson <developer@stenerson.me>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.0"
+grammar_utils = { path = "../../utils/grammar" }
+html_grammar = { path = "../../grammar/html" }
+javascript_grammar = { path = "../../grammar/javascript" }

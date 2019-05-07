@@ -49,7 +49,12 @@ html_element
 
 html_content
     : html_chardata? ((html_element | COMMENT) html_chardata?)*
-    | SCRIPT?
+    | script?
+    ;
+
+script
+    : SCRIPT_BODY
+    # SCRIPT
     ;
 
 html_attribute

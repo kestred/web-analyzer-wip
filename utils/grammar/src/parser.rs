@@ -53,14 +53,41 @@ impl<E> ParseError for E where E: 'static + From<String> + Debug + Send + Sync {
 pub struct ParseConfig {
     pub debug_repr: fn(SyntaxKind) -> Option<SyntaxKindMeta>,
     pub max_rollback_size: u16,
+    pub preserve_comments: bool,
     pub preserve_whitespace: bool,
 }
+
+impl ParseConfig {
+    fn skip_predicate(&self) -> fn(SyntaxKind) -> bool {
+        fn skip_everything(k: SyntaxKind) -> bool {
+            k == WHITESPACE || k == WHITESPACE
+        }
+        fn skip_whitespace(k: SyntaxKind) -> bool {
+            k == WHITESPACE
+        }
+        fn skip_comments(k: SyntaxKind) -> bool {
+            k == COMMENT
+        }
+        fn skip_none(k: SyntaxKind) -> bool {
+            false
+        }
+
+        match (self.preserve_whitespace, self.preserve_comments) {
+            (false, false) => skip_everything,
+            (false, true) => skip_whitespace,
+            (true, false) => skip_comments,
+            (true, true) => skip_none,
+        }
+    }
+}
+
 
 impl Default for ParseConfig {
     fn default() -> ParseConfig {
         ParseConfig {
             debug_repr: default::as_debug_repr,
             max_rollback_size: 32,
+            preserve_comments: false,
             preserve_whitespace: false,
         }
     }
@@ -78,7 +105,7 @@ pub struct Parser<'a, 'b, E: 'static + Debug + Send + Sync = String> {
 
 impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     pub fn new(input: TokenInput<'a, 'b>, config: ParseConfig) -> Parser<'a, 'b, E> {
-        let skip_predicate = if config.preserve_whitespace { skip_comments } else { skip_whitespace };
+        let skip_predicate = config.skip_predicate();
         Parser {
             config,
             events: Vec::new(),
@@ -105,14 +132,14 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
                 Event::StartNode { kind } if kind == TOMBSTONE => {}
                 Event::StartNode { kind } => {
                     // eprintln!("start {:?} {{", (self.config.debug_repr)(kind).map(|k| k.name));
-                    self.sink.start_node(kind, if self.config.preserve_whitespace { skip_comments } else { skip_whitespace })
+                    self.sink.start_node(kind, self.config.skip_predicate())
                 }
                 Event::CompleteNode => {
                     // eprintln!("}}");
                     self.sink.complete_node()
                 }
                 Event::Error { error } => self.sink.error(error),
-                Event::Span { kind, len } => self.sink.span(kind, len, if self.config.preserve_whitespace { skip_comments } else { skip_whitespace }),
+                Event::Span { kind, len } => self.sink.span(kind, len, self.config.skip_predicate()),
             }
         }
         self.sink.finalize()
@@ -336,14 +363,6 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
             .map(|info| info.canonical.unwrap_or(info.name) )
             .unwrap_or("<anonymous token>")
     }
-}
-
-/// This method defines the default ignore behavior.
-fn skip_whitespace(k: SyntaxKind) -> bool {
-    k == WHITESPACE
-}
-fn skip_comments(k: SyntaxKind) -> bool {
-    k == COMMENT
 }
 
 /// The `Parser` builds up a list of `Event`s which are

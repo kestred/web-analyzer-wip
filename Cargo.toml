@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "analysis/vue",
+  "analysis/vue-cli",
   "codegen/antlr",
   "codegen/estree",
   "grammar/javascript",

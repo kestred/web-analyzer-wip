@@ -54,7 +54,7 @@ impl Lexer for HtmlLexer {
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                SCRIPT
+                SCRIPT_BODY
             }
             HtmlLexerMode::Style => {
                 while let Some(c) = s.current() {
@@ -66,7 +66,7 @@ impl Lexer for HtmlLexer {
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                SCRIPT
+                SCRIPT_BODY
             }
             HtmlLexerMode::Text => {
                 s.bump_while(|c| c != '<');

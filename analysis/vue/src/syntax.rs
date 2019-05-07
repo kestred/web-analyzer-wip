@@ -102,7 +102,8 @@ fn debug_dump(lang: LanguageKind, node: &SyntaxNode) -> String {
 #[cfg(test)]
 mod tests {
     use crate::db::VueDatabase;
-    use analysis_utils::{FileId, SourceDatabase};
+    use analysis_utils::{FileId, FileDatabase};
+    use grammar_utils::TextRange;
     use html_grammar::syntax_kind::HTML;
     use javascript_grammar::syntax_kind::JAVASCRIPT;
     use test_utils::assert_diff;
@@ -161,122 +162,32 @@ DOCUMENT@[0; 46)
         );
     }
 
-/*
     #[test]
     fn test_syntax_tree_inside_script() {
-        let (analysis, range) = single_file_with_range(
-            r#"fn test() {
-    assert!("
-<|>fn foo() {
-}<|>
-fn bar() {
-}
-    ", "");
-}"#
-            .trim(),
-        );
-        let syn = analysis.syntax_tree(range.file_id, Some(range.range));
+        let mut db = VueDatabase::default();
+        let file_id = FileId(1);
+        let file_text = "<script>function foo() {}</script>";
+        db.set_file_text(file_id, file_text.to_string().into());
+        let start = file_text.chars().position(|c| c == 'f').unwrap() as u32;
+        let end = file_text.chars().position(|c| c == '}').unwrap() as u32 + 1;
+        let range = TextRange::from_to(start.into(), end.into());
+        let syn = super::syntax_tree(&db, file_id, HTML, Some((range, JAVASCRIPT)));
         assert_diff!(
             syn.trim(),
             r#"
-SOURCE_FILE@[0; 12)
-  FN_DEF@[0; 12)
-    FN_KW@[0; 2) "fn"
-    WHITESPACE@[2; 3) " "
-    NAME@[3; 6)
-      IDENT@[3; 6) "foo"
-    PARAM_LIST@[6; 8)
-      L_PAREN@[6; 7) "("
-      R_PAREN@[7; 8) ")"
-    WHITESPACE@[8; 9) " "
-    BLOCK@[9; 12)
-      L_CURLY@[9; 10) "{"
-      WHITESPACE@[10; 11) "\n"
-      R_CURLY@[11; 12) "}"
-"#
-            .trim()
-        );
-
-        // With a raw string
-        let (analysis, range) = single_file_with_range(
-            r###"fn test() {
-    assert!(r#"
-<|>fn foo() {
-}<|>
-fn bar() {
-}
-    "#, "");
-}"###
-                .trim(),
-        );
-        let syn = analysis.syntax_tree(range.file_id, Some(range.range));
-        assert_diff!(
-            syn.trim(),
-            r#"
-SOURCE_FILE@[0; 12)
-  FN_DEF@[0; 12)
-    FN_KW@[0; 2) "fn"
-    WHITESPACE@[2; 3) " "
-    NAME@[3; 6)
-      IDENT@[3; 6) "foo"
-    PARAM_LIST@[6; 8)
-      L_PAREN@[6; 7) "("
-      R_PAREN@[7; 8) ")"
-    WHITESPACE@[8; 9) " "
-    BLOCK@[9; 12)
-      L_CURLY@[9; 10) "{"
-      WHITESPACE@[10; 11) "\n"
-      R_CURLY@[11; 12) "}"
-"#
-            .trim()
-        );
-
-        // With a raw string
-        let (analysis, range) = single_file_with_range(
-            r###"fn test() {
-    assert!(r<|>#"
-fn foo() {
-}
-fn bar() {
-}"<|>#, "");
-}"###
-                .trim(),
-        );
-        let syn = analysis.syntax_tree(range.file_id, Some(range.range));
-        assert_diff!(
-            syn.trim(),
-            r#"
-SOURCE_FILE@[0; 25)
-  FN_DEF@[0; 12)
-    FN_KW@[0; 2) "fn"
-    WHITESPACE@[2; 3) " "
-    NAME@[3; 6)
-      IDENT@[3; 6) "foo"
-    PARAM_LIST@[6; 8)
-      L_PAREN@[6; 7) "("
-      R_PAREN@[7; 8) ")"
-    WHITESPACE@[8; 9) " "
-    BLOCK@[9; 12)
-      L_CURLY@[9; 10) "{"
-      WHITESPACE@[10; 11) "\n"
-      R_CURLY@[11; 12) "}"
-  WHITESPACE@[12; 13) "\n"
-  FN_DEF@[13; 25)
-    FN_KW@[13; 15) "fn"
-    WHITESPACE@[15; 16) " "
-    NAME@[16; 19)
-      IDENT@[16; 19) "bar"
-    PARAM_LIST@[19; 21)
-      L_PAREN@[19; 20) "("
-      R_PAREN@[20; 21) ")"
-    WHITESPACE@[21; 22) " "
-    BLOCK@[22; 25)
-      L_CURLY@[22; 23) "{"
-      WHITESPACE@[23; 24) "\n"
-      R_CURLY@[24; 25) "}"
+PROGRAM@[0; 17)
+  FUNCTION_DECLARATION@[0; 17)
+    FUNCTION_KW@[0; 8)
+    WHITESPACE@[8; 9)
+    IDENTIFIER@[9; 12)
+    L_PAREN@[12; 13)
+    R_PAREN@[13; 14)
+    WHITESPACE@[14; 15)
+    BLOCK_STATEMENT@[15; 17)
+      L_CURLY@[15; 16)
+      R_CURLY@[16; 17)
 "#
             .trim()
         );
     }
-*/
 }

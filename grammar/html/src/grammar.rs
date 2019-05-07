@@ -98,12 +98,21 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
                 html_chardata(p)?;
             }
         }
-    } else if p.at(SCRIPT) {
-        p.eat(SCRIPT);
+    } else if p.at(SCRIPT_BODY) {
+        if p.at(SCRIPT_BODY) {
+            script(p)?;
+        }
     } else {
         p.expected_ts(&AT_HTML_CONTENT)?;
     }
     Some(Continue)
+}
+
+pub fn script(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({ p.expect(SCRIPT_BODY) });
+    p.complete(_marker, SCRIPT);
+    _ok
 }
 
 pub fn html_attribute(p: &mut Parser) -> Option<Continue> {
@@ -155,4 +164,4 @@ pub fn doctype(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
-const AT_HTML_CONTENT: TokenSet = tokenset![COMMENT, L_ANGLE, SCRIPT, TEXT, WHITESPACE];
+const AT_HTML_CONTENT: TokenSet = tokenset![COMMENT, L_ANGLE, SCRIPT_BODY, TEXT, WHITESPACE];

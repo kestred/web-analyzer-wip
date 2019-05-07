@@ -6,16 +6,17 @@ use rowan::{SmolStr, TextRange, TextUnit};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
-/// Database which stores all significant input facts: source code and project
-/// model. Everything else in rust-analyzer is derived from these queries.
-#[salsa::query_group(SourceDatabaseStorage)]
-pub trait SourceDatabase: std::fmt::Debug {
+/// Database which stores all significant input facts: source code and
+/// dependencies. Everything else is derived from these queries.
+#[salsa::query_group(FileDatabaseStorage)]
+pub trait FileDatabase: std::fmt::Debug {
     /// Text of the file.
     #[salsa::input]
     fn file_text(&self, file_id: FileId) -> Arc<String>;
     /// Path to a file, relative to the root of its source root.
     #[salsa::input]
     fn file_relative_path(&self, file_id: FileId) -> RelativePathBuf;
+    fn file_extension(&self, file_id: FileId) -> Option<SmolStr>;
     /// Source root of the file.
     #[salsa::input]
     fn file_source_root(&self, file_id: FileId) -> SourceRootId;
@@ -28,7 +29,11 @@ pub trait SourceDatabase: std::fmt::Debug {
     fn package_graph(&self) -> Arc<PackageGraph>;
 }
 
-fn source_root_libraries(db: &impl SourceDatabase, id: SourceRootId) -> Arc<Vec<PackageId>> {
+fn file_extension(db: &impl FileDatabase, file_id: FileId) -> Option<SmolStr> {
+    db.file_relative_path(file_id).extension().map(|ext| ext.into())
+}
+
+fn source_root_libraries(db: &impl FileDatabase, id: SourceRootId) -> Arc<Vec<PackageId>> {
     let root = db.source_root(id);
     let graph = db.package_graph();
     let res = root.files

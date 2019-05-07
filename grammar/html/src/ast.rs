@@ -1,11 +1,12 @@
 use crate::grammar;
 use crate::lexer::HtmlLexer;
-use crate::syntax_kind::{self, DOCUMENT, ELEMENT};
+use crate::syntax_kind::{self, DOCUMENT, ELEMENT, SCRIPT};
 use grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
 use grammar_utils::parser::ParseConfig;
 
 ast_node!(Document, DOCUMENT);
 ast_node!(Element, ELEMENT);
+ast_node!(Script, SCRIPT);
 
 impl Document {
     fn new(root: TreeArc<SyntaxNode>) -> TreeArc<Document> {
@@ -18,7 +19,8 @@ impl Document {
         let parser = Parser::new((text, &tokens).into(), ParseConfig {
             debug_repr: syntax_kind::as_debug_repr,
             max_rollback_size: 4,
-            preserve_whitespace: false,
+            preserve_comments: true,
+            preserve_whitespace: true,
         });
         let (root, remainder) = parser.parse(grammar::html_document);
         let node = Document::new(root.to_owned());
