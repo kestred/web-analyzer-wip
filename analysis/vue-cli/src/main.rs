@@ -1,7 +1,8 @@
 use clap::{App, Arg, SubCommand};
 use vue_analysis::Analysis;
+use std::{fs, io};
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     let args = App::new("vue_analyzer")
         .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
@@ -12,18 +13,22 @@ fn main() {
     match args.subcommand() {
         ("lint", Some(lint_args)) => {
             let filename = lint_args.value_of("file").unwrap();
-            let (analysis, file_id) = Analysis::from_single_file(filename.into());
+            let filetext = fs::read_to_string(filename)?;
+            let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
             let diagnostics = analysis.diagnostics(file_id.into());
             if diagnostics.is_empty() {
                 println!("Nothing to report!");
+                std::process::exit(0);
             }
 
-
-            println!("Found {} issues:", diagnostics.len());
+            let total = diagnostics.len();
             for line in diagnostics {
-                println!("  {}", line);
+                eprintln!("{}", line);
             }
+            eprintln!("(total: {})", total);
+            std::process::exit(1);
         }
         _ => (),
     }
+    Ok(())
 }

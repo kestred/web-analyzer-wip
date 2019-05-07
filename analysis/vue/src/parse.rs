@@ -42,6 +42,8 @@ pub(crate) fn input_language(db: &dyn ParseDatabase, input_id: InputId) -> Optio
         InputId::File(file_id) => match db.file_extension(file_id)?.as_str() {
             "htm" | "html" => Some(SourceLanguage::Html),
             "js" => Some(SourceLanguage::Javascript),
+            "ts" => Some(SourceLanguage::Typescript),
+            "vue" => Some(SourceLanguage::Vue),
             _ => None,
         },
         InputId::Script(script_id) => Some(db.lookup_script_id(script_id).language),

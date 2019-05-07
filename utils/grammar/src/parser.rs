@@ -60,7 +60,7 @@ pub struct ParseConfig {
 impl ParseConfig {
     fn skip_predicate(&self) -> fn(SyntaxKind) -> bool {
         fn skip_everything(k: SyntaxKind) -> bool {
-            k == WHITESPACE || k == WHITESPACE
+            k == WHITESPACE || k == COMMENT
         }
         fn skip_whitespace(k: SyntaxKind) -> bool {
             k == WHITESPACE

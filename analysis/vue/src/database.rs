@@ -20,6 +20,8 @@ impl Default for RootDatabase {
         let mut db = RootDatabase {
             runtime: salsa::Runtime::default(),
         };
+        db.set_local_roots(Default::default());
+        db.set_foreign_roots(Default::default());
         db.set_package_graph(Default::default());
         db
     }

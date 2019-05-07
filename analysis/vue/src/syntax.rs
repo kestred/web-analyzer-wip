@@ -118,7 +118,7 @@ mod tests {
     fn test_debug_syntax_tree_without_range() {
         let mut db = RootDatabase::default();
         let file_id = FileId(1);
-        db.set_file_text(file_id, "function foo() {}".to_string().into());
+        db.set_file_text(file_id, "function foo() {} /* a comment */".to_string().into());
         let syn = super::debug_syntax_tree(&db, file_id, Javascript, None);
         assert_diff!(
             syn.trim(),

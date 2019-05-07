@@ -11,7 +11,7 @@ use javascript_grammar::ast as javascript;
 use std::sync::Arc;
 
 use self::database::RootDatabase;
-use self::parse::{InputId, ParseDatabase, SourceLanguage};
+use self::parse::{ParseDatabase, SourceLanguage};
 
 #[derive(Debug)]
 pub struct Analysis {
@@ -20,16 +20,16 @@ pub struct Analysis {
 
 impl Analysis {
     // Creates an analysis instance for a single file, without any extenal dependencies.
-    pub fn from_single_file(text: String) -> (Analysis, FileId) {
-        let mut db = RootDatabase::default();
+    pub fn from_single_file(filename: String, text: String) -> (Analysis, FileId) {
+        let file_id = FileId(0);
         let source_root = SourceRootId(0);
+        let mut db = RootDatabase::default();
+        let mut packages = PackageGraph::default();
+        packages.add_package_root(file_id);
         let mut change = SourceChange::new();
         change.add_root(source_root, true);
-        let file_id = FileId(0);
-        let mut package_graph = PackageGraph::default();
-        package_graph.add_package_root(file_id);
-        change.add_file(source_root, file_id, "main.rs".into(), Arc::new(text));
-        change.set_package_graph(package_graph);
+        change.add_file(source_root, file_id, filename.into(), Arc::new(text));
+        change.set_package_graph(packages);
         change.apply_to(&mut db);
         (Analysis { db }, file_id)
     }
