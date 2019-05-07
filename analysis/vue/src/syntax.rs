@@ -1,12 +1,12 @@
 use crate::db::VueDatabase;
 use crate::parse::ParseDatabase;
+use analysis_utils::FileId;
+use grammar_utils::{ast, AstNode, LanguageKind, SyntaxNode, SyntaxToken, SyntaxElement, TextRange};
+use grammar_utils::syntax_kind::default as default_syntax;
 use html_grammar::ast as html;
 use html_grammar::syntax_kind::{self as html_syntax, HTML, SCRIPT};
 use javascript_grammar::ast as javascript;
 use javascript_grammar::syntax_kind::{self as javascript_syntax, JAVASCRIPT};
-use web_analysis_utils::FileId;
-use web_grammar_utils::{AstNode, LanguageKind, SyntaxNode, SyntaxToken, SyntaxElement, TextRange, WalkEvent};
-use web_grammar_utils::syntax_kind::default as default_syntax;
 
 pub(crate) fn syntax_tree(
     db: &VueDatabase,
@@ -85,89 +85,27 @@ fn syntax_tree_for_token(node: SyntaxToken, text_range: TextRange, text_lang: La
 }
 
 fn debug_dump(lang: LanguageKind, node: &SyntaxNode) -> String {
-    use std::fmt::Write;
-
     let as_debug_repr = match lang {
         k if k == HTML => html_syntax::as_debug_repr,
         k if k == JAVASCRIPT => javascript_syntax::as_debug_repr,
         _ => default_syntax::as_debug_repr,
     };
-    let as_str = |k| as_debug_repr(k).map(|k| k.name).unwrap_or("__");
-    let mut errors = match lang {
+    let errors = match lang {
         k if k == HTML => node.ancestors().find_map(html::Document::cast).map(|x| x.errors().to_vec()),
         k if k == JAVASCRIPT => node.ancestors().find_map(javascript::Program::cast).map(|x| x.errors().to_vec()),
         _ => None,
     }.unwrap_or_default();
-    errors.sort_by_key(|(_, loc)| loc.offset());
-    let mut err_pos = 0;
-    let mut level = 0;
-    let mut buf = String::new();
-    macro_rules! indent {
-        () => {
-            for _ in 0..level {
-                buf.push_str("  ");
-            }
-        };
-    }
-
-    for event in node.preorder_with_tokens() {
-        match event {
-            WalkEvent::Enter(element) => {
-                indent!();
-                match element {
-                    SyntaxElement::Node(node) => writeln!(buf, "{}@{:?}", as_str(node.kind()), node.range()).unwrap(),
-                    SyntaxElement::Token(token) => {
-                        writeln!(buf, "{}@{:?}", as_str(token.kind()), token.range()).unwrap();
-                        let off = token.range().end();
-                        while err_pos < errors.len() && errors[err_pos].1.offset() <= off {
-                            indent!();
-                            writeln!(buf, "err: `{:?}`", errors[err_pos].0).unwrap();
-                            err_pos += 1;
-                        }
-                    }
-                }
-                level += 1;
-            }
-            WalkEvent::Leave(_) => level -= 1,
-        }
-    }
-
-    assert_eq!(level, 0);
-    for (err, _) in errors[err_pos..].iter() {
-        writeln!(buf, "err: `{:?}`", err).unwrap();
-    }
-
-    buf
+    let formatter = |k| as_debug_repr(k).map(|k| k.name).unwrap_or("UNKNOWN_SYNTAX_KIND");
+    ast::debug_dump(node, errors, formatter)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::db::VueDatabase;
-    use crate::parse::ParseDatabase;
-    use difference::Changeset;
+    use analysis_utils::{FileId, SourceDatabase};
     use html_grammar::syntax_kind::HTML;
     use javascript_grammar::syntax_kind::JAVASCRIPT;
-    use web_analysis_utils::{FileId, SourceDatabase};
-
-    macro_rules! assert_diff {
-        ($left:expr, $right:expr) => {
-            assert_diff!($left, $right,)
-        };
-        ($left:expr, $right:expr, $($tt:tt)*) => {{
-            let left = $left;
-            let right = $right;
-            if left != right {
-                if left.trim() == right.trim() {
-                    eprintln!("Left:\n{:?}\n\nRight:\n{:?}\n\nWhitespace difference\n", left, right);
-                } else {
-                    let changeset = Changeset::new(right, left, "\n");
-                    eprintln!("Left:\n{}\n\nRight:\n{}\n\nDiff:\n{}\n", left, right, changeset);
-                }
-                eprintln!($($tt)*);
-                panic!("'assertion failed: `(left == right)`");
-            }
-        }};
-    }
+    use test_utils::assert_diff;
 
     #[test]
     fn test_syntax_tree_without_range() {

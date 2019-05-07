@@ -1,7 +1,7 @@
-use web_grammar_utils::{syntax_kinds, LanguageKind, SyntaxKind};
+use grammar_utils::{syntax_kinds, LanguageKind, SyntaxKind};
 
 pub use crate::generated::syntax_kind::*;
-pub use web_grammar_utils::syntax_kind::*;
+pub use grammar_utils::syntax_kind::*;
 
 pub const JAVASCRIPT: LanguageKind = LanguageKind(2);
 

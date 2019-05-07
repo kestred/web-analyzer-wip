@@ -1,8 +1,8 @@
 use crate::grammar;
 use crate::lexer::JavascriptLexer;
 use crate::syntax_kind::{self, PROGRAM};
-use web_grammar_utils::{AstNode, Lexer, Location, Parser, SyntaxNode, TreeArc};
-use web_grammar_utils::parser::ParseConfig;
+use grammar_utils::{AstNode, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
+use grammar_utils::parser::ParseConfig;
 
 // Re-export automatically generated nodes
 pub use crate::generated::ast::*;
@@ -24,7 +24,13 @@ impl Program {
         (Program::new(&root), remainder.text)
     }
 
-    pub fn errors(&self) -> &[(String, Location)] {
-        self.syntax.root_data().unwrap().downcast_ref::<Vec<(String, Location)>>().unwrap()
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        self.syntax
+            .root_data().unwrap()
+            .downcast_ref::<Vec<(String, Location)>>().unwrap()
+            .into_iter()
+            .cloned()
+            .map(|(msg, loc)| SyntaxError::new(msg, loc))
+            .collect()
     }
 }

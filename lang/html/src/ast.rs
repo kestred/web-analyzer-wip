@@ -1,8 +1,8 @@
 use crate::grammar;
 use crate::lexer::HtmlLexer;
 use crate::syntax_kind::{self, DOCUMENT, ELEMENT};
-use web_grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxNode, TreeArc};
-use web_grammar_utils::parser::ParseConfig;
+use grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
+use grammar_utils::parser::ParseConfig;
 
 ast_node!(Document, DOCUMENT);
 ast_node!(Element, ELEMENT);
@@ -25,7 +25,13 @@ impl Document {
         (node, remainder.text)
     }
 
-    pub fn errors(&self) -> &[(String, Location)] {
-        self.syntax.root_data().unwrap().downcast_ref::<Vec<(String, Location)>>().unwrap()
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        self.syntax
+            .root_data().unwrap()
+            .downcast_ref::<Vec<(String, Location)>>().unwrap()
+            .into_iter()
+            .cloned()
+            .map(|(msg, loc)| SyntaxError::new(msg, loc))
+            .collect()
     }
 }

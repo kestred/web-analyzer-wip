@@ -1,9 +1,9 @@
 //! An example of how to implement parsing using the utils.
 //!
 //! ```rust
-//! use web_grammar_utils::{LanguageKind, Lexer, Parser, Scanner, SyntaxKind, TreeNode};
-//! use web_grammar_utils::parser::Continue;
-//! use web_grammar_utils::syntax_kind::*;
+//! use grammar_utils::{LanguageKind, Lexer, Parser, Scanner, SyntaxKind, TreeNode};
+//! use grammar_utils::parser::Continue;
+//! use grammar_utils::syntax_kind::*;
 //!
 //! struct MyLexer;
 //!

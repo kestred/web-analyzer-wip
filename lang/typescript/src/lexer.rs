@@ -5,9 +5,9 @@ use javascript_grammar::scan::{
     scan_regexp_literal,
     scan_template_literal,
 };
-use web_grammar_utils::{Lexer, Scanner, SyntaxKind};
-use web_grammar_utils::lexer::ResetableLexer;
-use web_grammar_utils::scan::{
+use grammar_utils::{Lexer, Scanner, SyntaxKind};
+use grammar_utils::lexer::ResetableLexer;
+use grammar_utils::scan::{
     is_decimal,
     is_ascii_ident_prefix,
     is_ascii_ident_suffix,

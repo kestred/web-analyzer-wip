@@ -1,4 +1,4 @@
-use web_grammar_utils::LanguageKind;
+use grammar_utils::LanguageKind;
 
 pub use html_grammar::syntax_kind::*;
 

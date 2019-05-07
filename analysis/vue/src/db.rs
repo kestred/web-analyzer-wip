@@ -1,8 +1,8 @@
-use web_analysis_utils::SourceDatabase;
+use analysis_utils::SourceDatabase;
 
 #[salsa::database(
+    analysis_utils::SourceDatabaseStorage,
     crate::parse::ParseDatabaseStorage,
-    web_analysis_utils::SourceDatabaseStorage,
 )]
 #[derive(Debug)]
 pub(crate) struct VueDatabase {

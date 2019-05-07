@@ -1,5 +1,5 @@
 [package]
-name = "web_grammar_utils"
+name = "grammar_utils"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"

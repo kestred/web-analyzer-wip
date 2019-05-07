@@ -5,11 +5,12 @@ authors = ["Kevin Stenerson <kstenerson@developers.wyyerd.com>"]
 edition = "2018"
 
 [dependencies]
-html_grammar = { path = "../../lang/html" }
-javascript_grammar = { path = "../../lang/javascript" }
-web_analysis_utils = { path = "../../utils/analysis" }
-web_grammar_utils = { path = "../../utils/grammar" }
 salsa = "0.12.0"
 
+analysis_utils = { path = "../../utils/analysis" }
+grammar_utils = { path = "../../utils/grammar" }
+html_grammar = { path = "../../lang/html" }
+javascript_grammar = { path = "../../lang/javascript" }
+
 [dev-dependencies]
-difference = "2.0.0"
+test_utils = { path = "../../utils/test" }

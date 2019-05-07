@@ -1,7 +1,7 @@
+use analysis_utils::{FileId, SourceDatabase};
+use grammar_utils::TreeArc;
 use html_grammar::ast as html;
 use javascript_grammar::ast as javascript;
-use web_analysis_utils::{FileId, SourceDatabase};
-use web_grammar_utils::TreeArc;
 
 #[salsa::query_group(ParseDatabaseStorage)]
 pub(crate) trait ParseDatabase: SourceDatabase {

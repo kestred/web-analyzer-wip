@@ -6,7 +6,7 @@
 
 pub mod ast {
     use crate::syntax_kind::*;
-    use web_grammar_utils::ast_node;
+    use grammar_utils::ast_node;
 
     ast_node!(Node, enum NodeKind {
         Program = PROGRAM,
@@ -640,7 +640,7 @@ pub mod ast {
 
 pub mod syntax_kind {
     use crate::syntax_kind::JAVASCRIPT;
-    use web_grammar_utils::syntax_kinds;
+    use grammar_utils::syntax_kinds;
 
     syntax_kinds! {
         language JAVASCRIPT;

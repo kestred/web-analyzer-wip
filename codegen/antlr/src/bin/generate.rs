@@ -64,8 +64,8 @@ fn main() -> Result<(), std::io::Error> {
         }
         out.push_str(&r#"
 use crate::syntax_kind::*;
-use web_grammar_utils::{catch, tokenset, Parser, TokenSet};
-use web_grammar_utils::parser::Continue;
+use grammar_utils::{catch, tokenset, Parser, TokenSet};
+use grammar_utils::parser::Continue;
 "#[1..]);
         emit_grammar(&mut out, &db);
 

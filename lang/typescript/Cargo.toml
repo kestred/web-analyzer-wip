@@ -5,5 +5,5 @@ authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
 [dependencies]
-web_grammar_utils = { path = "../../utils/grammar" }
+grammar_utils = { path = "../../utils/grammar" }
 javascript_grammar = { path = "../javascript" }

@@ -9,4 +9,5 @@ members = [
   "lang/vue",
   "utils/analysis",
   "utils/grammar",
+  "utils/test",
 ]
