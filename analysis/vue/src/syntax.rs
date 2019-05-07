@@ -124,8 +124,9 @@ PROGRAM@[0; 17)
     L_PAREN@[12; 13)
     R_PAREN@[13; 14)
     WHITESPACE@[14; 15)
-    L_CURLY@[15; 16)
-    R_CURLY@[16; 17)
+    BLOCK_STATEMENT@[15; 17)
+      L_CURLY@[15; 16)
+      R_CURLY@[16; 17)
 "#
             .trim()
         );

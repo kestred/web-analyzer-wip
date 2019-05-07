@@ -256,6 +256,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
+        eos(p)?;
     } else if p.at(FUNCTION_KW) && {
         // try --> function_declaration
         let mut _checkpoint = p.checkpoint(true);
@@ -304,39 +305,47 @@ pub fn statement_list(p: &mut Parser) -> Option<Continue> {
 pub fn variable_declaration(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        var_modifier(p)?;
-        variable_declaration_list(p)?;
-        eos(p)?;
+        variable_declaration_kind(p)?;
+        variable_declarator_list(p)?;
         Some(Continue)
     });
     p.complete(_marker, VARIABLE_DECLARATION);
     _ok
 }
 
-pub fn variable_declaration_list(p: &mut Parser) -> Option<Continue> {
-    variable_declaration_atom(p)?;
+pub fn variable_declaration_kind(p: &mut Parser) -> Option<Continue> {
+    p.expect_ts(&tokenset![CONST_KW, LET_KW, VAR_KW])
+}
+
+pub fn variable_declarator_list(p: &mut Parser) -> Option<Continue> {
+    variable_declarator(p)?;
     while p.at(COMMA) {
         p.bump();
-        variable_declaration_atom(p)?;
+        variable_declarator(p)?;
     }
     Some(Continue)
 }
 
-pub fn variable_declaration_atom(p: &mut Parser) -> Option<Continue> {
-    if p.at(IDENTIFIER) {
-        p.bump();
-    } else if p.at(L_SQUARE) {
-        array_expression(p)?;
-    } else if p.at(L_CURLY) {
-        object_expression(p)?;
-    } else {
-        p.expected_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
-    }
-    if p.at(EQ) {
-        p.bump();
-        expression(p)?;
-    }
-    Some(Continue)
+pub fn variable_declarator(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        if p.at(IDENTIFIER) {
+            p.bump();
+        } else if p.at(L_SQUARE) {
+            array_expression(p)?;
+        } else if p.at(L_CURLY) {
+            object_expression(p)?;
+        } else {
+            p.expected_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
+        }
+        if p.at(EQ) {
+            p.bump();
+            expression(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, VARIABLE_DECLARATOR);
+    _ok
 }
 
 pub fn empty_statement(p: &mut Parser) -> Option<Continue> {
@@ -407,11 +416,10 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) && {
-        // try --> var_modifier variable_declaration_list ; (expression_sequence)? ; (expression_sequence)? ) statement #FOR_STATEMENT
+        // try --> variable_declaration ; (expression_sequence)? ; (expression_sequence)? ) statement #FOR_STATEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
-            var_modifier(p)?;
-            variable_declaration_list(p)?;
+            variable_declaration(p)?;
             p.expect(SEMICOLON)?;
             if p.at_ts(&AT_EXPRESSION) {
                 expression_sequence(p)?;
@@ -428,33 +436,50 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
+    } else if p.at_ts(&AT_EXPRESSION) && {
+        // try --> expression IN_KW expression ) statement_list #FOR_IN_STATEMENT
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            expression(p)?;
+            p.expect(IN_KW)?;
+            expression(p)?;
+            p.expect(R_PAREN)?;
+            statement_list(p)?;
+            p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
+            Some(Continue)
+        });
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) && {
+        // try --> variable_declaration IN_KW expression ) statement #FOR_IN_STATEMENT
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            variable_declaration(p)?;
+            p.expect(IN_KW)?;
+            expression(p)?;
+            p.expect(R_PAREN)?;
+            statement(p)?;
+            p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
+            Some(Continue)
+        });
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
     } else if p.at_ts(&AT_EXPRESSION) {
         expression(p)?;
-        if p.at(IN_KW) {
-            p.bump();
-        } else if p.at_keyword("of") && p.at(IDENTIFIER) {
-            of_kw(p)?;
-        } else {
-            p.expected_ts(&tokenset![IDENTIFIER, IN_KW])?;
-        }
-        expression_sequence(p)?;
+        of_kw(p)?;
+        expression(p)?;
         p.expect(R_PAREN)?;
         statement_list(p)?;
-        p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
+        p.complete(_checkpoint.branch(&_marker), FOR_OF_STATEMENT);
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
-        var_modifier(p)?;
-        variable_declaration_atom(p)?;
-        if p.at(IN_KW) {
-            p.bump();
-        } else if p.at_keyword("of") && p.at(IDENTIFIER) {
-            of_kw(p)?;
-        } else {
-            p.expected_ts(&tokenset![IDENTIFIER, IN_KW])?;
-        }
-        expression_sequence(p)?;
+        variable_declaration(p)?;
+        of_kw(p)?;
+        expression(p)?;
         p.expect(R_PAREN)?;
         statement(p)?;
-        p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
+        p.complete(_checkpoint.branch(&_marker), FOR_OF_STATEMENT);
     } else {
         // otherwise, emit an error
         p.expected_ts(&_TS5)?;
@@ -490,10 +515,6 @@ pub fn do_while_statement(p: &mut Parser) -> Option<Continue> {
     });
     p.complete(_marker, DO_WHILE_STATEMENT);
     _ok
-}
-
-pub fn var_modifier(p: &mut Parser) -> Option<Continue> {
-    p.expect_ts(&tokenset![CONST_KW, LET_KW, VAR_KW])
 }
 
 pub fn continue_statement(p: &mut Parser) -> Option<Continue> {
@@ -590,22 +611,32 @@ pub fn case_clauses(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn case_clause(p: &mut Parser) -> Option<Continue> {
-    p.expect(CASE_KW)?;
-    expression_sequence(p)?;
-    p.expect(COLON)?;
-    if p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
-        statement_list(p)?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(CASE_KW)?;
+        expression_sequence(p)?;
+        p.expect(COLON)?;
+        if p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
+            statement_list(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, SWITCH_CASE);
+    _ok
 }
 
 pub fn default_clause(p: &mut Parser) -> Option<Continue> {
-    p.expect(DEFAULT_KW)?;
-    p.expect(COLON)?;
-    if p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
-        statement_list(p)?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(DEFAULT_KW)?;
+        p.expect(COLON)?;
+        if p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
+            statement_list(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, SWITCH_CASE);
+    _ok
 }
 
 pub fn labeled_statement(p: &mut Parser) -> Option<Continue> {
@@ -641,12 +672,12 @@ pub fn try_statement(p: &mut Parser) -> Option<Continue> {
         p.expect(TRY_KW)?;
         block(p)?;
         if p.at(CATCH_KW) {
-            catch_production(p)?;
+            catch_clause(p)?;
             if p.at(FINALLY_KW) {
-                finally_production(p)?;
+                finally_clause(p)?;
             }
         } else if p.at(FINALLY_KW) {
-            finally_production(p)?;
+            finally_clause(p)?;
         } else {
             p.expected_ts(&tokenset![CATCH_KW, FINALLY_KW])?;
         }
@@ -656,16 +687,21 @@ pub fn try_statement(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
-pub fn catch_production(p: &mut Parser) -> Option<Continue> {
-    p.expect(CATCH_KW)?;
-    p.expect(L_PAREN)?;
-    p.expect(IDENTIFIER)?;
-    p.expect(R_PAREN)?;
-    block(p)?;
-    Some(Continue)
+pub fn catch_clause(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(CATCH_KW)?;
+        p.expect(L_PAREN)?;
+        p.expect(IDENTIFIER)?;
+        p.expect(R_PAREN)?;
+        block(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, CATCH_CLAUSE);
+    _ok
 }
 
-pub fn finally_production(p: &mut Parser) -> Option<Continue> {
+pub fn finally_clause(p: &mut Parser) -> Option<Continue> {
     p.expect(FINALLY_KW)?;
     block(p)?;
     Some(Continue)
@@ -693,9 +729,7 @@ pub fn function_declaration(p: &mut Parser) -> Option<Continue> {
             formal_parameter_list(p)?;
         }
         p.expect(R_PAREN)?;
-        p.expect(L_CURLY)?;
         function_body(p)?;
-        p.expect(R_CURLY)?;
         Some(Continue)
     });
     p.complete(_marker, FUNCTION_DECLARATION);
@@ -719,17 +753,26 @@ pub fn class_tail(p: &mut Parser) -> Option<Continue> {
         p.bump();
         expression(p)?;
     }
-    p.expect(L_CURLY)?;
-    while p.at_ts(&AT_CLASS_ELEMENT) {
-        class_element(p)?;
-    }
-    p.expect(R_CURLY)?;
+    class_body(p)?;
     Some(Continue)
+}
+
+pub fn class_body(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_CURLY)?;
+        while p.at_ts(&AT_CLASS_ELEMENT) {
+            class_element(p)?;
+        }
+        p.expect(R_CURLY)?;
+        Some(Continue)
+    });
+    p.complete(_marker, CLASS_BODY);
+    _ok
 }
 
 pub fn class_element(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_METHOD_DEFINITION) {
-        p.eat(STATIC_KW);
         method_definition(p)?;
     } else if p.at(SEMICOLON) {
         empty_statement(p)?;
@@ -740,52 +783,40 @@ pub fn class_element(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn method_definition(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
+    p.eat(STATIC_KW);
     if p.at_ts(&AT_PROPERTY_NAME) && {
-        // try --> property_name ( (formal_parameter_list)? ) { function_body }
+        // try --> property_name method_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             property_name(p)?;
-            p.expect(L_PAREN)?;
-            if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
-                formal_parameter_list(p)?;
-            }
-            p.expect(R_PAREN)?;
-            p.expect(L_CURLY)?;
-            function_body(p)?;
-            p.expect(R_CURLY)?;
+            method_tail(p)?;
+            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
-        // try --> getter ( ) { function_body }
+        // try --> getter getter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             getter(p)?;
-            p.expect(L_PAREN)?;
-            p.expect(R_PAREN)?;
-            p.expect(L_CURLY)?;
-            function_body(p)?;
-            p.expect(R_CURLY)?;
+            getter_tail(p)?;
+            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
-        // try --> setter ( (formal_parameter_list)? ) { function_body }
+        // try --> setter setter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             setter(p)?;
-            p.expect(L_PAREN)?;
-            if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
-                formal_parameter_list(p)?;
-            }
-            p.expect(R_PAREN)?;
-            p.expect(L_CURLY)?;
-            function_body(p)?;
-            p.expect(R_CURLY)?;
+            setter_tail(p)?;
+            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
@@ -793,6 +824,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at_ts(&AT_GENERATOR_METHOD) {
         generator_method(p)?;
+        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
     } else {
         // otherwise, emit an error
         p.expected_ts(&AT_METHOD_DEFINITION)?;
@@ -800,24 +832,42 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
     Some(Continue)
 }
 
-pub fn generator_method(p: &mut Parser) -> Option<Continue> {
-    if p.at(ASTERISK) || (p.at_keyword("async") && p.at(IDENTIFIER)) {
-        if p.at(ASTERISK) {
-            p.bump();
-        } else if p.at_keyword("async") && p.at(IDENTIFIER) {
-            async_kw(p)?;
+pub fn method_tail(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_PAREN)?;
+        if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
+            formal_parameter_list(p)?;
         }
-    }
-    identifier_name(p)?;
-    p.expect(L_PAREN)?;
-    if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
-        formal_parameter_list(p)?;
-    }
-    p.expect(R_PAREN)?;
-    p.expect(L_CURLY)?;
-    function_body(p)?;
-    p.expect(R_CURLY)?;
-    Some(Continue)
+        p.expect(R_PAREN)?;
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
+}
+
+pub fn generator_method(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        if p.at(ASTERISK) || (p.at_keyword("async") && p.at(IDENTIFIER)) {
+            if p.at(ASTERISK) {
+                p.bump();
+            } else if p.at_keyword("async") && p.at(IDENTIFIER) {
+                async_kw(p)?;
+            }
+        }
+        identifier_name(p)?;
+        p.expect(L_PAREN)?;
+        if p.at_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE]) {
+            formal_parameter_list(p)?;
+        }
+        p.expect(R_PAREN)?;
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
 }
 
 pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
@@ -859,10 +909,17 @@ pub fn last_formal_parameter_arg(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn function_body(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
-        source_elements(p)?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_CURLY)?;
+        if p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
+            source_elements(p)?;
+        }
+        p.expect(R_CURLY)?;
+        Some(Continue)
+    });
+    p.complete(_marker, BLOCK_STATEMENT);
+    _ok
 }
 
 pub fn source_elements(p: &mut Parser) -> Option<Continue> {
@@ -911,9 +968,14 @@ pub fn element_list(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn last_element(p: &mut Parser) -> Option<Continue> {
-    p.expect(DOTDOTDOT)?;
-    p.expect(IDENTIFIER)?;
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(DOTDOTDOT)?;
+        p.expect(IDENTIFIER)?;
+        Some(Continue)
+    });
+    p.complete(_marker, SPREAD_ELEMENT);
+    _ok
 }
 
 pub fn object_expression(p: &mut Parser) -> Option<Continue> {
@@ -937,63 +999,96 @@ pub fn object_expression(p: &mut Parser) -> Option<Continue> {
 
 pub fn property(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_PROPERTY_NAME) && {
-        // try --> property_name (: | =) expression
+        // try --> property_name (: | =) expression #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
-            property_name(p)?;
-            p.expect_ts(&tokenset![COLON, EQ])?;
-            expression(p)?;
+            let _marker = p.start();
+            let _ok = catch!({
+                property_name(p)?;
+                p.expect_ts(&tokenset![COLON, EQ])?;
+                expression(p)?;
+                Some(Continue)
+            });
+            p.complete(_marker, PROPERTY);
+            if _ok.is_none() {
+                return None;
+            }
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if p.at(L_SQUARE) {
-        p.bump();
-        expression(p)?;
-        p.expect(R_SQUARE)?;
-        p.expect(COLON)?;
-        expression(p)?;
+        let _marker = p.start();
+        let _ok = catch!({
+            p.bump();
+            expression(p)?;
+            p.expect(R_SQUARE)?;
+            p.expect(COLON)?;
+            expression(p)?;
+            Some(Continue)
+        });
+        p.complete(_marker, PROPERTY);
+        if _ok.is_none() {
+            return None;
+        }
     } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
-        // try --> getter ( ) { function_body }
+        // try --> getter getter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
-            getter(p)?;
-            p.expect(L_PAREN)?;
-            p.expect(R_PAREN)?;
-            p.expect(L_CURLY)?;
-            function_body(p)?;
-            p.expect(R_CURLY)?;
+            let _marker = p.start();
+            let _ok = catch!({
+                getter(p)?;
+                getter_tail(p)?;
+                Some(Continue)
+            });
+            p.complete(_marker, PROPERTY);
+            if _ok.is_none() {
+                return None;
+            }
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
-        // try --> setter ( IDENTIFIER ) { function_body }
+        // try --> setter setter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
-            setter(p)?;
-            p.expect(L_PAREN)?;
-            p.expect(IDENTIFIER)?;
-            p.expect(R_PAREN)?;
-            p.expect(L_CURLY)?;
-            function_body(p)?;
-            p.expect(R_CURLY)?;
+            let _marker = p.start();
+            let _ok = catch!({
+                setter(p)?;
+                setter_tail(p)?;
+                Some(Continue)
+            });
+            p.complete(_marker, PROPERTY);
+            if _ok.is_none() {
+                return None;
+            }
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if p.at_ts(&AT_GENERATOR_METHOD) && {
-        // try --> generator_method
+        // try --> generator_method #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
-        generator_method(p);
+        catch!({
+            let _marker = p.start();
+            let _ok = catch!({ generator_method(p) });
+            p.complete(_marker, PROPERTY);
+            if _ok.is_none() {
+                return None;
+            }
+            Some(Continue)
+        });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if p.at(IDENTIFIER) {
+        let _marker = p.start();
         p.bump();
+        p.complete(_marker, PROPERTY);
     } else {
         // otherwise, emit an error
         p.expected_ts(&AT_PROPERTY)?;
@@ -1012,6 +1107,31 @@ pub fn property_name(p: &mut Parser) -> Option<Continue> {
         p.expected_ts(&AT_PROPERTY_NAME)?;
     }
     Some(Continue)
+}
+
+pub fn getter_tail(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_PAREN)?;
+        p.expect(R_PAREN)?;
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
+}
+
+pub fn setter_tail(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_PAREN)?;
+        p.expect(IDENTIFIER)?;
+        p.expect(R_PAREN)?;
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
 }
 
 pub fn arguments(p: &mut Parser) -> Option<Continue> {
@@ -1081,9 +1201,7 @@ pub fn function_expression(p: &mut Parser) -> Option<Continue> {
             formal_parameter_list(p)?;
         }
         p.expect(R_PAREN)?;
-        p.expect(L_CURLY)?;
         function_body(p)?;
-        p.expect(R_CURLY)?;
         Some(Continue)
     });
     p.complete(_marker, FUNCTION_EXPRESSION);
@@ -1126,9 +1244,7 @@ pub fn arrow_function_body(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at(L_CURLY) {
-        p.bump();
         function_body(p)?;
-        p.expect(R_CURLY)?;
     } else {
         // otherwise, emit an error
         p.expected_ts(&AT_EXPRESSION)?;

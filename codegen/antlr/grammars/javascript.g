@@ -112,7 +112,7 @@ statement
     | try_statement
     | debugger_statement
     | class_declaration
-    | variable_declaration
+    | variable_declaration eos
     | function_declaration
     | expression_statement
     | labeled_statement
@@ -128,16 +128,23 @@ statement_list
     ;
 
 variable_declaration
-    : var_modifier variable_declaration_list eos
+    : variable_declaration_kind variable_declarator_list
     # VARIABLE_DECLARATION
     ;
 
-variable_declaration_list
-    : variable_declaration_atom (',' variable_declaration_atom)*
+variable_declaration_kind  // let, const - ES6
+    : VAR_KW
+    | LET_KW
+    | CONST_KW
     ;
 
-variable_declaration_atom
-    : (IDENTIFIER | array_expression | object_expression) ('=' expression)? // ES6: Array & Object Matching
+variable_declarator_list
+    : variable_declarator (',' variable_declarator)*
+    ;
+
+variable_declarator
+    : (IDENTIFIER | array_expression | object_expression) ('=' expression)?  // ES6: Array & Object Matching
+    # VARIABLE_DECLARATOR
     ;
 
 empty_statement
@@ -159,14 +166,20 @@ for_statement
     : FOR_KW '(' expression_sequence? ';' expression_sequence? ';' expression_sequence? ')' statement_list
     # FOR_STATEMENT
 
-    | FOR_KW '(' var_modifier variable_declaration_list ';' expression_sequence? ';' expression_sequence? ')' statement
+    | FOR_KW '(' variable_declaration ';' expression_sequence? ';' expression_sequence? ')' statement
     # FOR_STATEMENT
 
-    | FOR_KW '(' expression (IN_KW | of_kw) expression_sequence ')' statement_list
+    | FOR_KW '(' expression IN_KW expression ')' statement_list
     # FOR_IN_STATEMENT
 
-    | FOR_KW '(' var_modifier variable_declaration_atom (IN_KW | of_kw) expression_sequence ')' statement
+    | FOR_KW '(' variable_declaration IN_KW expression ')' statement
     # FOR_IN_STATEMENT
+
+    | FOR_KW '(' expression of_kw expression ')' statement_list
+    # FOR_OF_STATEMENT
+
+    | FOR_KW '(' variable_declaration of_kw expression ')' statement
+    # FOR_OF_STATEMENT
     ;
 
 while_statement
@@ -177,12 +190,6 @@ while_statement
 do_while_statement
     : DO_KW statement WHILE_KW '(' expression_sequence ')' eos
     # DO_WHILE_STATEMENT
-    ;
-
-var_modifier  // let, const - ES6
-    : VAR_KW
-    | LET_KW
-    | CONST_KW
     ;
 
 continue_statement
@@ -220,10 +227,12 @@ case_clauses
 
 case_clause
     : CASE_KW expression_sequence ':' statement_list?
+    # SWITCH_CASE
     ;
 
 default_clause
     : DEFAULT_KW ':' statement_list?
+    # SWITCH_CASE
     ;
 
 labeled_statement
@@ -237,15 +246,16 @@ throw_statement
     ;
 
 try_statement
-    : TRY_KW block (catch_production finally_production? | finally_production)
+    : TRY_KW block (catch_clause finally_clause? | finally_clause)
     # TRY_STATEMENT
     ;
 
-catch_production
+catch_clause
     : CATCH_KW '(' IDENTIFIER ')' block
+    # CATCH_CLAUSE
     ;
 
-finally_production
+finally_clause
     : FINALLY_KW block
     ;
 
@@ -255,7 +265,7 @@ debugger_statement
     ;
 
 function_declaration
-    : FUNCTION_KW '*'? IDENTIFIER '(' formal_parameter_list? ')' '{' function_body '}'
+    : FUNCTION_KW '*'? IDENTIFIER '(' formal_parameter_list? ')' function_body
     # FUNCTION_DECLARATION
     ;
 
@@ -265,23 +275,38 @@ class_declaration
     ;
 
 class_tail
-    : (EXTENDS_KW expression)? '{' class_element* '}'
+    : (EXTENDS_KW expression)? class_body
+    ;
+
+class_body
+    : '{' class_element* '}'
+    # CLASS_BODY
     ;
 
 class_element
-    : STATIC_KW? method_definition
+    : method_definition
     | empty_statement
     ;
 
 method_definition
-    : property_name '(' formal_parameter_list? ')' '{' function_body '}'
-    | getter '(' ')' '{' function_body '}'
-    | setter '(' formal_parameter_list? ')' '{' function_body '}'
-    | generator_method
+    : STATIC_KW? property_name method_tail
+    # METHOD_DEFINITION
+    | STATIC_KW? getter getter_tail
+    # METHOD_DEFINITION
+    | STATIC_KW? setter setter_tail
+    # METHOD_DEFINITION
+    | STATIC_KW? generator_method
+    # METHOD_DEFINITION
+    ;
+
+method_tail
+    : '(' formal_parameter_list? ')' function_body
+    # FUNCTION_EXPRESSION
     ;
 
 generator_method
-    : ('*' | async_kw)? identifier_name '(' formal_parameter_list? ')' '{' function_body '}'
+    : ('*' | async_kw)? identifier_name '(' formal_parameter_list? ')' function_body
+    # FUNCTION_EXPRESSION
     ;
 
 formal_parameter_list
@@ -300,7 +325,8 @@ last_formal_parameter_arg                      // ES6: Rest Parameter
     ;
 
 function_body
-    : source_elements?
+    : '{' source_elements? '}'
+    # BLOCK_STATEMENT
     ;
 
 source_elements
@@ -319,6 +345,7 @@ element_list
 
 last_element
     : '...' IDENTIFIER  // ES6: Spread Operator
+    # SPREAD_ELEMENT
     ;
 
 object_expression
@@ -328,17 +355,33 @@ object_expression
 
 property
     : property_name (':' |'=') expression
+    # PROPERTY
     | '[' expression ']' ':' expression
-    | getter '(' ')' '{' function_body '}'
-    | setter '(' IDENTIFIER ')' '{' function_body '}'
+    # PROPERTY
+    | getter getter_tail
+    # PROPERTY
+    | setter setter_tail
+    # PROPERTY
     | generator_method
+    # PROPERTY
     | IDENTIFIER
+    # PROPERTY
     ;
 
 property_name
     : identifier_name
     | STRING_LITERAL
     | NUMBER_LITERAL
+    ;
+
+getter_tail
+    : '(' ')' function_body
+    # FUNCTION_EXPRESSION
+    ;
+
+setter_tail
+    : '(' IDENTIFIER ')' function_body
+    # FUNCTION_EXPRESSION
     ;
 
 arguments
@@ -401,8 +444,8 @@ expression
     | literal
     | array_expression
     | object_expression
-    | '(' expression_sequence ')'
     | arrow_function_expression
+    | '(' expression_sequence ')'
     ;
 
 class_expression
@@ -411,7 +454,7 @@ class_expression
     ;
 
 function_expression
-    : FUNCTION_KW IDENTIFIER? '(' formal_parameter_list? ')' '{' function_body '}'
+    : FUNCTION_KW IDENTIFIER? '(' formal_parameter_list? ')' function_body
     # FUNCTION_EXPRESSION
     ;
 
@@ -427,7 +470,7 @@ arrow_function_parameters
 
 arrow_function_body
     : expression
-    | '{' function_body '}'
+    | function_body
     ;
 
 assignment_operator
