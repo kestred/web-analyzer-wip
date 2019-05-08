@@ -97,6 +97,6 @@ html_misc
     ;
 
 script
-    : SCRIPT_BODY
+    : SCRIPT_CONTENT
     # SCRIPT
     ;

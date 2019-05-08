@@ -717,6 +717,7 @@ dependencies = [
  "grammar_utils 0.1.0",
  "html_grammar 0.1.0",
  "javascript_grammar 0.1.0",
+ "rustc-hash 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "salsa 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "test_utils 0.1.0",
  "typescript_grammar 0.1.0",

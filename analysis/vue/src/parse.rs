@@ -6,6 +6,7 @@ use analysis_utils::{FileId, LineIndex, SourceDatabase};
 use grammar_utils::{AstNode, SyntaxKind, TreeArc};
 use html_grammar::ast as html;
 use javascript_grammar::ast as javascript;
+use vue_grammar::ast as vue;
 use std::{marker::PhantomData, sync::Arc};
 
 pub(crate) use self::input::{InputId, ScriptId, ScriptSource};
@@ -19,6 +20,7 @@ pub(crate) trait ParseDatabase: SourceDatabase {
     fn input_line_index(&self, input_id: InputId) -> Arc<LineIndex>;
     fn parse_html(&self, input_id: InputId) -> TreeArc<html::Document>;
     fn parse_javascript(&self, input_id: InputId) -> TreeArc<javascript::Program>;
+    fn parse_vue(&self, input_id: InputId) -> TreeArc<vue::Component>;
     fn source_map_html(&self, input_id: InputId) -> Arc<AstIdMap>;
 
     #[salsa::interned]
@@ -58,6 +60,11 @@ pub(crate) fn parse_html(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<h
 pub(crate) fn parse_javascript(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<javascript::Program> {
     let text = db.input_text(input_id);
     javascript::Program::parse(&*text).0
+}
+
+pub(crate) fn parse_vue(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<vue::Component> {
+    let text = db.input_text(input_id);
+    vue::Component::parse(&*text).0
 }
 
 pub(crate) fn source_map_html(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {

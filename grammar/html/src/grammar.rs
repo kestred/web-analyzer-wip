@@ -191,8 +191,8 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
                 html_chardata(p)?;
             }
         }
-    } else if p.at(SCRIPT_BODY) {
-        if p.at(SCRIPT_BODY) {
+    } else if p.at(SCRIPT_CONTENT) {
+        if p.at(SCRIPT_CONTENT) {
             script(p)?;
         }
     }
@@ -209,8 +209,7 @@ pub fn html_misc(p: &mut Parser) -> Option<Continue> {
 
 pub fn script(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ p.expect(SCRIPT_BODY) });
+    let _ok = catch!({ p.expect(SCRIPT_CONTENT) });
     p.complete(_marker, SCRIPT);
     _ok
 }
-

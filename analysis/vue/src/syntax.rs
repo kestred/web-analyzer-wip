@@ -6,6 +6,8 @@ use html_grammar::ast as html;
 use html_grammar::syntax_kind as html_syntax;
 use javascript_grammar::ast as javascript;
 use javascript_grammar::syntax_kind as javascript_syntax;
+use vue_grammar::ast as vue;
+use vue_grammar::syntax_kind as vue_syntax;
 
 pub(crate) fn debug_syntax_tree(
     db: &dyn ParseDatabase,
@@ -14,8 +16,9 @@ pub(crate) fn debug_syntax_tree(
 ) -> String {
     let file_lang = db.input_language(file_id.into()).unwrap(/* FIXME: don't unwrap */);
     let syntax = match file_lang {
-        SourceLanguage::Html => db.parse_html(InputId::File(file_id)).syntax.to_owned(),
-        SourceLanguage::Javascript => db.parse_javascript(InputId::File(file_id)).syntax.to_owned(),
+        SourceLanguage::Html => db.parse_html(file_id.into()).syntax.to_owned(),
+        SourceLanguage::Javascript => db.parse_javascript(file_id.into()).syntax.to_owned(),
+        SourceLanguage::Vue => db.parse_vue(file_id.into()).syntax.to_owned(),
         _ => panic!("unimplemented source language: {:?}", file_lang),
     };
     if let Some((text_range, text_lang)) = text_source {
@@ -40,7 +43,10 @@ pub(crate) fn debug_syntax_tree(
 /// Attempts parsing the script contents of a token as the given language.
 fn debug_syntax_tree_for_script(token: SyntaxToken, text_range: TextRange, text_lang: SourceLanguage) -> Option<String> {
     match token.kind() {
-        html_syntax::SCRIPT | html_syntax::SCRIPT_BODY =>
+        html_syntax::SCRIPT
+        | html_syntax::SCRIPT_CONTENT
+        | vue_syntax::COMPONENT_SCRIPT
+        | vue_syntax::COMPONENT_STYLE =>
             debug_syntax_tree_for_token(token, text_range, text_lang),
         _ => None,
     }

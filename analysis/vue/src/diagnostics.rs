@@ -1,5 +1,6 @@
 use crate::database::RootDatabase;
 use crate::parse::{InputId, ParseDatabase, SourceLanguage};
+use rustc_hash::FxHashSet;
 use analysis_utils::LineIndex;
 use grammar_utils::SyntaxError;
 
@@ -30,13 +31,26 @@ pub(crate) fn check(db: &RootDatabase, input_id: InputId) -> Vec<String> {
         }
     }
 
-    // TODO: Implement
+    // Parse the vue component
+    let line_index = db.input_line_index(input_id);
+    let program = db.parse_vue(input_id);
+    syntax_errors(&mut result, &line_index, program.errors());
+
     result
 }
 
 fn syntax_errors(results: &mut Vec<String>, index: &LineIndex, errors: Vec<SyntaxError>) {
-    results.extend(errors.into_iter().map(|err| {
-        let line_col = index.line_col(err.offset());
-        format!("(syntax error) {}:{}: {}", line_col.line, line_col.col_utf16, err.message)
+    let mut offset_set = FxHashSet::default();
+    results.extend(errors.into_iter().filter_map(|err| {
+        // Only display the first _syntax_ error for each line.
+        // TODO: Maybe the parser should just detect this case and handle it during `finalize`?
+        let offset = err.offset();
+        if !offset_set.contains(&offset) {
+            offset_set.insert(offset);
+            let line_col = index.line_col(offset);
+            Some(format!("(syntax error) {}:{}: {}", line_col.line, line_col.col_utf16, err.message))
+        } else {
+            None
+        }
     }));
 }

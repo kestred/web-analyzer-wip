@@ -54,7 +54,7 @@ impl Lexer for HtmlLexer {
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                SCRIPT_BODY
+                SCRIPT_CONTENT
             }
             HtmlLexerMode::Style => {
                 while let Some(c) = s.current() {
@@ -66,7 +66,7 @@ impl Lexer for HtmlLexer {
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                SCRIPT_BODY
+                SCRIPT_CONTENT
             }
             HtmlLexerMode::Text => {
                 s.bump_while(|c| c != '<');
@@ -210,7 +210,7 @@ mod test {
             L_ANGLE_SLASH, IDENT, R_ANGLE,
             L_ANGLE, IDENT, IDENT, EQ, QUOTED, R_ANGLE,
             L_ANGLE, IDENT, R_ANGLE, TEXT, L_ANGLE_SLASH, IDENT, R_ANGLE,
-            L_ANGLE, IDENT, R_ANGLE, SCRIPT_BODY, L_ANGLE_SLASH, IDENT, R_ANGLE,
+            L_ANGLE, IDENT, R_ANGLE, SCRIPT_CONTENT, L_ANGLE_SLASH, IDENT, R_ANGLE,
             L_ANGLE_SLASH, IDENT, R_ANGLE,
             L_ANGLE_SLASH, IDENT, R_ANGLE
         ];

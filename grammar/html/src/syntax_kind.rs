@@ -26,7 +26,7 @@ syntax_kinds! {
     text {
         TEXT 1    // any text in the middle of the document, excluding whitespace
         QUOTED 2  // a quoted string (e.g. in an attribute <input id="hello">)
-        SCRIPT_BODY 3  // non-plaintext inside a special tag (e.g. CSS or JS)
+        SCRIPT_CONTENT 3  // non-plaintext inside a special tag (e.g. CSS or JS)
     }
 
     symbols {

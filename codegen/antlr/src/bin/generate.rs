@@ -1,9 +1,7 @@
 use antlr_codegen::ast::*;
-use antlr_codegen::grammar;
+use antlr_codegen::import::ImportError;
 use antlr_codegen::queries::*;
 use antlr_codegen::transform;
-use combine::parser::Parser;
-use combine::stream::state::State;
 use std::collections::{BTreeMap as Map, BTreeSet as Set};
 use std::fs;
 
@@ -12,17 +10,17 @@ const MIN_CONST_TOKENSET: usize = 5;
 fn main() -> Result<(), std::io::Error> {
     let filepaths = &[
         ("codegen/antlr/grammars/html.g", "grammar/html/src/grammar.rs"),
-        ("codegen/antlr/grammars/javascript.g", "grammar/javascript/src/grammar.rs")
+        ("codegen/antlr/grammars/javascript.g", "grammar/javascript/src/grammar.rs"),
+        ("codegen/antlr/grammars/vue.g", "grammar/vue/src/grammar.rs"),
     ];
     for (input, output) in filepaths {
-        let content = fs::read_to_string(input)?;
-        let result = grammar::grammar().easy_parse(State::new(content.as_str()));
-        let (root, _) = match result {
-            Ok(ok) => ok,
-            Err(err) => {
-                eprintln!("while parsing file `{}`:\n{}", input, err);
+        let root = match Grammar::from_file(input) {
+            Err(ImportError::Io(err)) => return Err(err),
+            Err(ImportError::Parse(filename, err)) => {
+                eprintln!("while parsing file `{}`:\n{}", filename, err);
                 std::process::exit(1);
             }
+            Ok(ok) => ok,
         };
 
         let db = Database::from(root);
@@ -73,7 +71,10 @@ use grammar_utils::parser::Continue;
 "#[1..]);
         emit_grammar(&mut out, &db);
 
-        let mut tokensets = db.tokensets();
+        let mut tokensets = db.tokensets()
+            .into_iter()
+            .filter(|(_, _, used)| *used)
+            .collect::<Vec<_>>();
         tokensets.sort_by(|a, b| a.0.cmp(&b.0));
         if tokensets.len() > 1 {
             out.push('\n');
@@ -93,7 +94,15 @@ use grammar_utils::parser::Continue;
 }
 
 fn emit_grammar(out: &mut String, db: &Database) {
+    let root = match db.grammar().rules.iter().next() {
+        Some(rule) => rule,
+        None => return,
+    };
     for rule in &db.grammar().rules {
+        if !db.is_subgrammar(&root.name, &rule.name) {
+            continue;
+        }
+
         out.push('\n');
         if !rule.name.starts_with("_") {
             out.push_str("pub ");

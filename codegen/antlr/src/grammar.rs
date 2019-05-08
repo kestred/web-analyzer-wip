@@ -9,19 +9,34 @@ use combine::parser::repeat::{escaped, many, many1, sep_by, sep_by1, skip_many, 
 use std::rc::Rc;
 
 parser!(fn grammar() -> Grammar {
-    ( whitespace()
-    , string("grammar").skip(whitespace())
-    , ident().skip(whitespace())
-    , token(';').skip(whitespace())
-    , many1::<Vec<_>, _>(rule().skip(whitespace()))
-    ).map(|(_, _, name, _, rules)| Grammar { name, rules: rules.into_iter().map(Rc::new).collect() })
+    ( ws()
+    , string("grammar").skip(ws())
+    , ident().skip(ws())
+    , token(';').skip(ws())
+    , many(import().skip(ws()))
+    , many1::<Vec<_>, _>(rule().skip(ws()))
+    ).map(|(_, _, name, _, imports, rules)| {
+        Grammar {
+            name,
+            rules: rules.into_iter().map(Rc::new).collect(),
+            imports,
+        }
+    })
+});
+
+parser!(fn import() -> Import {
+    ( string("import").skip(ws())
+    , ident().skip(ws())
+    , optional((string("from").skip(ws()), string_literal()).map(|(_, path)| path))
+    , token(';')
+    ).map(|(_, name, path, _)| Import { name, path })
 });
 
 parser!(fn rule() -> Rule {
-    ( optional(many((token('#'), token('['), attribute(), token(']')).map(|(_, _, a, _)| a)).skip(whitespace()))
-    , ident().skip(whitespace())
-    , token(':').skip(whitespace())
-    , pattern().skip(whitespace())
+    ( optional(many((token('#'), token('['), attribute(), token(']')).map(|(_, _, a, _)| a)).skip(ws()))
+    , ident().skip(ws())
+    , token(':').skip(ws())
+    , pattern().skip(ws())
     , token(';')
     ).map(|(attrs, name, _, pattern, _)| {
         Rule {
@@ -38,7 +53,7 @@ parser!(fn attribute() -> Attribute {
 
 parser!(fn attribute_recursive(input: &mut Input) -> Attribute {
     ( ident()
-    , optional((token('('), sep_by1(attribute().skip(whitespace()), token(',').skip(whitespace())), token(')')))
+    , optional((token('('), sep_by1(attribute().skip(ws()), token(',').skip(ws())), token(')')))
     )
     .map(|(word, list)| match list {
         Some((_, attrs, _)) => Attribute::Group(word, attrs),
@@ -53,17 +68,17 @@ parser!(fn pattern() -> Pattern {
 
 parser!(fn pattern_recursive(input: &mut Input) -> Pattern {
     sep_by(
-        ( series().skip(whitespace())
+        ( series().skip(ws())
         , optional(
-            ( token('#').skip(whitespace())
-            , ident().skip(whitespace())
+            ( token('#').skip(ws())
+            , ident().skip(ws())
             ).map(|(_, name)| name))
         )
         .map(|(series, node)| match node {
             Some(kind) => Pattern::Node(kind, Box::new(series)),
             None => series,
         }),
-        token('|').skip(whitespace())
+        token('|').skip(ws())
     )
     .map(Pattern::Choice)
     .map(Pattern::flatten_once)
@@ -71,13 +86,13 @@ parser!(fn pattern_recursive(input: &mut Input) -> Pattern {
 });
 
 parser!(fn series() -> Pattern {
-    many1::<Vec<_>, _>(atom().skip(whitespace()))
+    many1::<Vec<_>, _>(atom().skip(ws()))
         .map(Pattern::Series)
         .map(Pattern::flatten_once)
 });
 
 parser!(fn atom() -> Pattern {
-    ( combine::parser(atom_recursive).skip(whitespace())
+    ( combine::parser(atom_recursive).skip(ws())
     , optional(repeat())
     ).map(|(atom, repeat)| {
         match repeat {
@@ -98,9 +113,9 @@ parser!(fn atom_recursive(input: &mut Input) -> Pattern {
 });
 
 parser!(fn group() -> Pattern {
-    ( token('(').skip(whitespace())
-    , pattern().skip(whitespace())
-    , token(')').skip(whitespace())
+    ( token('(').skip(ws())
+    , pattern().skip(ws())
+    , token(')').skip(ws())
     ).map(|(_, pattern, _)| pattern.flatten_once())
 });
 
@@ -113,10 +128,10 @@ parser!(fn repeat() -> Repeat {
 });
 
 parser!(fn predicate() -> Pattern {
-    ( token('{').skip(whitespace())
+    ( token('{').skip(ws())
     , predicate_expression()
     , token('}')
-    , token('?').skip(whitespace())
+    , token('?').skip(ws())
     , optional(series())
     ).map(|(_, expr, _, _, tail)| Pattern::Predicate(expr, Box::new(tail.unwrap_or(Pattern::Empty))))
 });
@@ -126,9 +141,9 @@ parser!(fn predicate_expression() -> PredicateExpression {
 });
 
 parser!(fn predicate_expression_recursive(input: &mut Input) -> PredicateExpression {
-    ( optional(token('!').skip(whitespace()))
-    , call_expression().skip(whitespace())
-    , optional((string("&&").skip(whitespace()), predicate_expression()))
+    ( optional(token('!').skip(ws()))
+    , call_expression().skip(ws())
+    , optional((string("&&").skip(ws()), predicate_expression()))
     )
     .map(|(unary, expr, binary)| {
         let left = if let Some(oper) = unary {
@@ -147,9 +162,9 @@ parser!(fn predicate_expression_recursive(input: &mut Input) -> PredicateExpress
 
 parser!(fn call_expression() -> PredicateExpression {
     ( ident()
-    , token('(').skip(whitespace())
-    , sep_by(call_argument().skip(whitespace()), token(',').skip(whitespace()))
-    , token(')').skip(whitespace())
+    , token('(').skip(ws())
+    , sep_by(call_argument().skip(ws()), token(',').skip(ws()))
+    , token(')').skip(ws())
     ).map(|(method, _, args, _)| PredicateExpression::Call { method, args })
 });
 
@@ -177,7 +192,7 @@ parser!(fn ident() -> String {
     recognize::<String, _>(skip_many1(alpha_num().or(token('_'))))
 });
 
-fn whitespace<I>() -> impl Parser<Input = I>
+fn ws<I>() -> impl Parser<Input = I>
 where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,

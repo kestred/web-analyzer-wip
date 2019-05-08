@@ -5,6 +5,13 @@ use std::rc::Rc;
 pub struct Grammar {
     pub name: String,
     pub rules: Vec<Rc<Rule>>,
+    pub imports: Vec<Import>,
+}
+
+#[derive(Debug)]
+pub struct Import {
+    pub name: String,
+    pub path: Option<String>,
 }
 
 #[derive(Debug)]

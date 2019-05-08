@@ -1,5 +1,5 @@
 use crate::ast::*;
-use petgraph::Graph;
+use petgraph::{algo, Graph};
 use petgraph::graph::NodeIndex;
 use smol_str::SmolStr;
 use std::cell::{Cell, RefCell};
@@ -62,6 +62,15 @@ impl Database {
             .entry(tokenset)
             .and_modify(|(orig, _)| *orig = name.clone())
             .or_insert((name, false));
+    }
+
+    pub fn is_subgrammar(&self, parent: &str, child: &str) -> bool {
+        algo::has_path_connecting(
+            &self.topology,
+            self.rule_index(parent),
+            self.rule_index(child),
+            None
+        )
     }
 
     pub fn is_left_recursive(&self, rule: &str) -> bool {
@@ -553,6 +562,7 @@ pub fn to_token_of_literal(lit: &str) -> &'static str {
         "|=" => "PIPE_EQ",
         "^" => "CARET",
         "^=" => "CARET_EQ",
+        "@" => "AT",
         "~" => "TILDE",
         "?" => "QUESTION",
         "->" => "THIN_ARROW",
