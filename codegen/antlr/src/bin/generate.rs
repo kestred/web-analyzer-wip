@@ -715,7 +715,18 @@ fn emit_choice_ll1(out: &mut String, db: &Database, rule: &str, pat: &Pattern, d
         _ => unreachable!(),
     }
     let must_be = precond.includes.unwrap_or_default();
-    if must_be.symmetric_difference(&is_not).count() > 0 {
+    let is_optional = match pat {
+        Pattern::Choice(choices) => choices.iter().all(|pat| {
+            if let Pattern::Predicate(_, pat) = pat {
+                if pat.is_empty() {
+                    return false;
+                }
+            }
+            db.is_possibly_empty(pat)
+        }),
+        _ => unreachable!(),
+    };
+    if !is_optional && must_be.symmetric_difference(&is_not).count() > 0 {
         emit_depth(out, dep);
         out.push_str("} else {\n");
         emit_expected(out, db, pat, dep + 1);

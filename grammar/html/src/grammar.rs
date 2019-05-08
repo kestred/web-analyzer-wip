@@ -195,8 +195,6 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
         if p.at(SCRIPT_BODY) {
             script(p)?;
         }
-    } else {
-        p.expected_ts(&AT_HTML_CONTENT)?;
     }
     Some(Continue)
 }
@@ -216,4 +214,3 @@ pub fn script(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
-const AT_HTML_CONTENT: TokenSet = tokenset![COMMENT, L_ANGLE, SCRIPT_BODY, TEXT, WHITESPACE];

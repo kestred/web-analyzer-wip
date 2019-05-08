@@ -44,11 +44,11 @@ elements
     ;
 
 element
-    : element_pattern
+    : element_pattern  // workaround: wrap a separate rule to improve parsing of partially-incorrect files
     # ELEMENT
     ;
 
-// N.B. make a separate rule for these to work around how limitation in how codegen can parse incorrect files
+
 element_pattern
     : '<' empty_element_tag_name WS? (attribute WS?)* ('>' | '/>')
     | '<' TAG_NAME WS? (attribute WS?)* ('/>' | '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>')

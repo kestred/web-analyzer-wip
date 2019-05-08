@@ -254,15 +254,11 @@ impl Database {
                 set
             }
 
-            Pattern::Repeat(pat, _) => self.next_symbols_of(pat),
-
-            // Verify pred and expr both have the same `next_tokenset`
-            Pattern::Precedence(_, _) => Set::new(),
-
-            // Verify pred and expr both have the same `next_tokenset`
-            Pattern::Predicate(_, pat) => self.next_symbols_of(pat),
+            Pattern::Precedence(_, _) => unimplemented!(/* TODO: Handle `next_symbols_of` with precedence */),
 
             // Simple recursion
+            Pattern::Repeat(pat, _) => self.next_symbols_of(pat),
+            Pattern::Predicate(_, pat) => self.next_symbols_of(pat),
             Pattern::Node(_, pat) => self.next_symbols_of(pat),
             Pattern::NodeStart(pat) => self.next_symbols_of(pat),
             Pattern::NodeComplete(_, pat) => self.next_symbols_of(pat),
