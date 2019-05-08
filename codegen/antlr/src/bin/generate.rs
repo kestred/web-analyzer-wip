@@ -193,17 +193,14 @@ fn emit_pattern<'a>(
                     out.push_str(" {\n");
 
                     // Handle ambiguity with following terms
-                    if db.is_possibly_empty(pat) && {
-                        let ts = ts.iter().cloned().map(|t| t.token.into()).collect::<Set<_>>();
-                        let mut next_ts = Set::new();
-                        for pat in next_patterns {
-                            next_ts.extend(db.next_terms_of(pat));
-                            if !db.is_possibly_empty(pat) {
-                                break;
-                            }
+                    let mut next_ts = Set::new();
+                    for pat in next_patterns {
+                        next_ts.extend(db.next_predicates_of(pat));
+                        if !db.is_possibly_empty(pat) {
+                            break;
                         }
-                        !ts.is_disjoint(&next_ts)
-                    } {
+                    }
+                    if !ts.is_disjoint(&next_ts) {
                         emit_let_checkpoint(out, true, dep + 1);
                         emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
                         emit_depth(out, dep + 1);
@@ -211,6 +208,7 @@ fn emit_pattern<'a>(
                     } else {
                         emit_pattern(out, db, rule, pat, dep + 1, Precond::one_of(ts), &[]);
                     }
+
                     emit_depth(out, dep);
                     out.push_str("}\n");
                 }
@@ -227,7 +225,28 @@ fn emit_pattern<'a>(
                         out.push_str("while ");
                         emit_lookahead(out, db, &ts, false);
                         out.push_str(" {\n");
-                        emit_pattern(out, db, rule, pat, dep + 1, Precond::one_of(ts), &[]);
+
+                        // Handle ambiguity with following terms
+                        let mut next_ts = Set::new();
+                        for pat in next_patterns {
+                            next_ts.extend(db.next_predicates_of(pat));
+                            if !db.is_possibly_empty(pat) {
+                                break;
+                            }
+                        }
+                        if !ts.is_disjoint(&next_ts) {
+                            emit_let_checkpoint(out, true, dep + 1);
+                            emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
+                            emit_depth(out, dep + 1);
+                            out.push_str("if !p.commit(_checkpoint)?.is_ok() {\n");
+                            emit_depth(out, dep + 2);
+                            out.push_str("break;\n");
+                            emit_depth(out, dep + 1);
+                            out.push_str("}\n");
+                        } else {
+                            emit_pattern(out, db, rule, pat, dep + 1, Precond::one_of(ts), &[]);
+                        }
+
                         emit_depth(out, dep);
                         out.push_str("}\n");
                     }
@@ -243,6 +262,7 @@ fn emit_pattern<'a>(
                         out.push_str(") {}\n");
                     } else {
                         emit_depth(out, dep);
+                        // TODO: Handle ambiguous patterns after expecting one to succeed
                         out.push_str("loop {\n");
                         emit_pattern(out, db, rule, pat, dep + 1, Precond::empty(), &[]);
                         emit_depth(out, dep + 1);

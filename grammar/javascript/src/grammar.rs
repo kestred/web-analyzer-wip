@@ -878,8 +878,15 @@ pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
     if p.at(IDENTIFIER) {
         formal_parameter_arg(p)?;
         while p.at(COMMA) {
-            p.bump();
-            formal_parameter_arg(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                p.bump();
+                formal_parameter_arg(p)?;
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         if p.at(COMMA) {
             p.bump();
@@ -954,9 +961,16 @@ pub fn element_list(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_EXPRESSION) {
         expression(p)?;
         while p.at(COMMA) {
-            p.bump();
-            while p.eat(COMMA) {}
-            expression(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                p.bump();
+                while p.eat(COMMA) {}
+                expression(p)?;
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         if p.at(COMMA) {
             p.bump();
@@ -1144,8 +1158,15 @@ pub fn arguments(p: &mut Parser) -> Option<Continue> {
         if p.at_ts(&AT_EXPRESSION) {
             expression(p)?;
             while p.at(COMMA) {
-                p.bump();
-                expression(p)?;
+                let mut _checkpoint = p.checkpoint(true);
+                catch!({
+                    p.bump();
+                    expression(p)?;
+                    Some(Continue)
+                });
+                if !p.commit(_checkpoint)?.is_ok() {
+                    break;
+                }
             }
             if p.at(COMMA) {
                 p.bump();

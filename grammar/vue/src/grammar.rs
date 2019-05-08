@@ -16,7 +16,11 @@ pub fn component(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-            root_misc(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            root_misc(p);
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         component_pattern(p)?;
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
@@ -35,7 +39,11 @@ pub fn component_pattern(p: &mut Parser) -> Option<Continue> {
         catch!({
             script_block(p)?;
             while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-                root_misc(p)?;
+                let mut _checkpoint = p.checkpoint(true);
+                root_misc(p);
+                if !p.commit(_checkpoint)?.is_ok() {
+                    break;
+                }
             }
             template_block(p)?;
             Some(Continue)
@@ -46,7 +54,11 @@ pub fn component_pattern(p: &mut Parser) -> Option<Continue> {
     } else if p.at(L_ANGLE) {
         template_block(p)?;
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-            root_misc(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            root_misc(p);
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         script_block(p)?;
     } else {
@@ -119,7 +131,7 @@ pub fn script_element(p: &mut Parser) -> Option<Continue> {
             p.eat(WS);
         }
         p.expect(R_ANGLE)?;
-        script(p)?;
+        p.expect(SCRIPT_CONTENT)?;
         if p.at(L_ANGLE) {
             p.bump();
             p.expect(SLASH)?;
