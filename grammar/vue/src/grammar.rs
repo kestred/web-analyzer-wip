@@ -15,16 +15,8 @@ use grammar_utils::parser::Continue;
 pub fn component(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-            let mut _checkpoint = p.checkpoint(true);
-            root_misc(p);
-            if !p.commit(_checkpoint)?.is_ok() {
-                break;
-            }
-        }
-        component_pattern(p)?;
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-            root_misc(p)?;
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE]) {
+            component_pattern(p)?;
         }
         Some(Continue)
     });
@@ -34,48 +26,31 @@ pub fn component(p: &mut Parser) -> Option<Continue> {
 
 pub fn component_pattern(p: &mut Parser) -> Option<Continue> {
     if p.at(L_ANGLE) && {
-        // try --> script_block (root_misc)* template_block
+        // try --> component_template
         let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            script_block(p)?;
-            while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-                let mut _checkpoint = p.checkpoint(true);
-                root_misc(p);
-                if !p.commit(_checkpoint)?.is_ok() {
-                    break;
-                }
-            }
-            template_block(p)?;
-            Some(Continue)
-        });
+        component_template(p);
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at(L_ANGLE) && {
+        // try --> component_script
+        let mut _checkpoint = p.checkpoint(true);
+        component_script(p);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
     } else if p.at(L_ANGLE) {
-        template_block(p)?;
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WS]) {
-            let mut _checkpoint = p.checkpoint(true);
-            root_misc(p);
-            if !p.commit(_checkpoint)?.is_ok() {
-                break;
-            }
-        }
-        script_block(p)?;
+        component_style(p)?;
+    } else if p.at_ts(&tokenset![COMMENT, WHITESPACE]) {
+        html_misc(p)?;
     } else {
         // otherwise, emit an error
-        p.expected(L_ANGLE)?;
+        p.expected_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE])?;
     }
     Some(Continue)
 }
 
-pub fn template_block(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({ template_element(p) });
-    p.complete(_marker, COMPONENT_TEMPLATE);
-    _ok
-}
-
-pub fn template_element(p: &mut Parser) -> Option<Continue> {
+pub fn component_template(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(L_ANGLE)?;
@@ -101,7 +76,67 @@ pub fn template_element(p: &mut Parser) -> Option<Continue> {
         p.expect(R_ANGLE)?;
         Some(Continue)
     });
-    p.complete(_marker, ELEMENT);
+    p.complete(_marker, COMPONENT_TEMPLATE);
+    _ok
+}
+
+pub fn component_script(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_ANGLE)?;
+        script_tag(p)?;
+        p.eat(WS);
+        while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
+            attribute(p)?;
+            p.eat(WS);
+        }
+        p.expect(R_ANGLE)?;
+        script_block(p)?;
+        if p.at(L_ANGLE) {
+            p.bump();
+            p.expect(SLASH)?;
+        } else if p.at(L_ANGLE_SLASH) {
+            p.bump();
+        } else {
+            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+        }
+        p.eat(WS);
+        script_tag(p)?;
+        p.eat(WS);
+        p.expect(R_ANGLE)?;
+        Some(Continue)
+    });
+    p.complete(_marker, COMPONENT_SCRIPT);
+    _ok
+}
+
+pub fn component_style(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_ANGLE)?;
+        style_tag(p)?;
+        p.eat(WS);
+        while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
+            attribute(p)?;
+            p.eat(WS);
+        }
+        p.expect(R_ANGLE)?;
+        style_block(p)?;
+        if p.at(L_ANGLE) {
+            p.bump();
+            p.expect(SLASH)?;
+        } else if p.at(L_ANGLE_SLASH) {
+            p.bump();
+        } else {
+            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+        }
+        p.eat(WS);
+        style_tag(p)?;
+        p.eat(WS);
+        p.expect(R_ANGLE)?;
+        Some(Continue)
+    });
+    p.complete(_marker, COMPONENT_STYLE);
     _ok
 }
 
@@ -113,86 +148,12 @@ pub fn template_tag(p: &mut Parser) -> Option<Continue> {
     Some(Continue)
 }
 
-pub fn script_block(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({ script_element(p) });
-    p.complete(_marker, COMPONENT_SCRIPT);
-    _ok
-}
-
-pub fn script_element(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        p.expect(L_ANGLE)?;
-        script_tag(p)?;
-        p.eat(WS);
-        while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
-        }
-        p.expect(R_ANGLE)?;
-        p.expect(SCRIPT_CONTENT)?;
-        if p.at(L_ANGLE) {
-            p.bump();
-            p.expect(SLASH)?;
-        } else if p.at(L_ANGLE_SLASH) {
-            p.bump();
-        } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
-        }
-        p.eat(WS);
-        script_tag(p)?;
-        p.eat(WS);
-        p.expect(R_ANGLE)?;
-        Some(Continue)
-    });
-    p.complete(_marker, ELEMENT);
-    _ok
-}
-
 pub fn script_tag(p: &mut Parser) -> Option<Continue> {
     if !(p.at_keyword("script")) {
         p.error("expected input to be at keyword 'script'")?;
     }
     p.expect(TAG_NAME)?;
     Some(Continue)
-}
-
-pub fn style_block(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({ style_element(p) });
-    p.complete(_marker, COMPONENT_STYLE);
-    _ok
-}
-
-pub fn style_element(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        p.expect(L_ANGLE)?;
-        style_tag(p)?;
-        p.eat(WS);
-        while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
-        }
-        p.expect(R_ANGLE)?;
-        script(p)?;
-        if p.at(L_ANGLE) {
-            p.bump();
-            p.expect(SLASH)?;
-        } else if p.at(L_ANGLE_SLASH) {
-            p.bump();
-        } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
-        }
-        p.eat(WS);
-        style_tag(p)?;
-        p.eat(WS);
-        p.expect(R_ANGLE)?;
-        Some(Continue)
-    });
-    p.complete(_marker, ELEMENT);
-    _ok
 }
 
 pub fn style_tag(p: &mut Parser) -> Option<Continue> {
@@ -203,15 +164,31 @@ pub fn style_tag(p: &mut Parser) -> Option<Continue> {
     Some(Continue)
 }
 
-pub fn root_misc(p: &mut Parser) -> Option<Continue> {
-    if p.at(L_ANGLE) {
-        style_block(p)?;
-    } else if p.at(COMMENT) {
-        p.bump();
-    } else if p.at(WS) {
-        p.bump();
-    } else {
-        p.expected_ts(&tokenset![COMMENT, L_ANGLE, WS])?;
+pub fn html_content(p: &mut Parser) -> Option<Continue> {
+    if p.at_ts(&_TS0) {
+        if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+            html_chardata(p)?;
+        }
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
+            if p.at(L_ANGLE) {
+                element(p)?;
+            } else if p.at(MUSTACHE) {
+                p.bump();
+            } else if p.at(COMMENT) {
+                p.bump();
+            }
+            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+                html_chardata(p)?;
+            }
+        }
+    } else if p.at(SCRIPT_CONTENT) {
+        if p.at(SCRIPT_CONTENT) {
+            script_block(p)?;
+        }
+    } else if p.at(STYLE_CONTENT) {
+        if p.at(STYLE_CONTENT) {
+            style_block(p)?;
+        }
     }
     Some(Continue)
 }
@@ -347,7 +324,7 @@ pub fn attribute_key(p: &mut Parser) -> Option<Continue> {
 
 pub fn element(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ element_pattern(p) });
+    let _ok = element_pattern(p);
     p.complete(_marker, ELEMENT);
     _ok
 }
@@ -444,36 +421,25 @@ pub fn attribute_value(p: &mut Parser) -> Option<Continue> {
     p.expect_ts(&tokenset![QUOTED, TAG_NAME])
 }
 
-pub fn html_content(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
-        if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-            html_chardata(p)?;
-        }
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE]) {
-            if p.at(L_ANGLE) {
-                element(p)?;
-            } else if p.at(COMMENT) {
-                p.bump();
-            }
-            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-                html_chardata(p)?;
-            }
-        }
-    } else if p.at(SCRIPT_CONTENT) {
-        if p.at(SCRIPT_CONTENT) {
-            script(p)?;
-        }
-    }
-    Some(Continue)
-}
-
 pub fn html_chardata(p: &mut Parser) -> Option<Continue> {
     p.expect_ts(&tokenset![TEXT, WHITESPACE])
 }
 
-pub fn script(p: &mut Parser) -> Option<Continue> {
+pub fn html_misc(p: &mut Parser) -> Option<Continue> {
+    p.expect_ts(&tokenset![COMMENT, WHITESPACE])
+}
+
+pub fn script_block(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ p.expect(SCRIPT_CONTENT) });
-    p.complete(_marker, SCRIPT);
+    let _ok = p.expect(SCRIPT_CONTENT);
+    p.complete(_marker, SCRIPT_BLOCK);
     _ok
 }
+
+pub fn style_block(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = p.expect(STYLE_CONTENT);
+    p.complete(_marker, STYLE_BLOCK);
+    _ok
+}
+const _TS0: TokenSet = tokenset![COMMENT, L_ANGLE, MUSTACHE, TEXT, WHITESPACE];

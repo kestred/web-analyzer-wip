@@ -2,61 +2,48 @@ grammar VUE;
 import HTML from "html.g";
 
 component
-    : root_misc* component_pattern root_misc*
+    : component_pattern*
     # COMPONENT
     ;
 
 component_pattern
-    : script_block root_misc* template_block
-    | template_block root_misc* script_block
+    : component_template
+    | component_script
+    | component_style
+    | html_misc
     ;
 
-template_block
-    : template_element
+component_template
+    : '<' template_tag WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? template_tag WS? '>'
     # COMPONENT_TEMPLATE
     ;
 
-template_element
-    : '<' template_tag WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? template_tag WS? '>'
-    # ELEMENT
+component_script
+    : '<' script_tag WS? (attribute WS?)* '>' script_block ('<' '/' | '</') WS? script_tag WS? '>'
+    # COMPONENT_SCRIPT
+    ;
+
+component_style
+    : '<' style_tag WS? (attribute WS?)* '>' style_block ('<' '/' | '</') WS? style_tag WS? '>'
+    # COMPONENT_STYLE
     ;
 
 template_tag
     : {at_keyword("template")}? TAG_NAME
     ;
 
-script_block
-    : script_element
-    # COMPONENT_SCRIPT
-    ;
-
-script_element
-    : '<' script_tag WS? (attribute WS?)* '>' SCRIPT_CONTENT ('<' '/' | '</') WS? script_tag WS? '>'
-    # ELEMENT
-    ;
-
 script_tag
     : {at_keyword("script")}? TAG_NAME
-    ;
-
-style_block
-    : style_element
-    # COMPONENT_STYLE
-    ;
-
-style_element
-    : '<' style_tag WS? (attribute WS?)* '>' script ('<' '/' | '</') WS? style_tag WS? '>'
-    # ELEMENT
     ;
 
 style_tag
     : {at_keyword("style")}? TAG_NAME
     ;
 
-root_misc
-    : style_block
-    | COMMENT
-    | WS
+html_content
+    : html_chardata? ((element | MUSTACHE | COMMENT) html_chardata?)*
+    | script_block?
+    | style_block?
     ;
 
 attribute

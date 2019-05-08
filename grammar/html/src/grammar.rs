@@ -63,7 +63,7 @@ pub fn elements(p: &mut Parser) -> Option<Continue> {
 
 pub fn element(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ element_pattern(p) });
+    let _ok = element_pattern(p);
     p.complete(_marker, ELEMENT);
     _ok
 }
@@ -193,7 +193,11 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
         }
     } else if p.at(SCRIPT_CONTENT) {
         if p.at(SCRIPT_CONTENT) {
-            script(p)?;
+            script_block(p)?;
+        }
+    } else if p.at(STYLE_CONTENT) {
+        if p.at(STYLE_CONTENT) {
+            style_block(p)?;
         }
     }
     Some(Continue)
@@ -207,9 +211,16 @@ pub fn html_misc(p: &mut Parser) -> Option<Continue> {
     p.expect_ts(&tokenset![COMMENT, WHITESPACE])
 }
 
-pub fn script(p: &mut Parser) -> Option<Continue> {
+pub fn script_block(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ p.expect(SCRIPT_CONTENT) });
-    p.complete(_marker, SCRIPT);
+    let _ok = p.expect(SCRIPT_CONTENT);
+    p.complete(_marker, SCRIPT_BLOCK);
+    _ok
+}
+
+pub fn style_block(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = p.expect(STYLE_CONTENT);
+    p.complete(_marker, STYLE_BLOCK);
     _ok
 }

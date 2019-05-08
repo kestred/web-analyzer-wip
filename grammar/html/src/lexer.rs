@@ -13,37 +13,85 @@ enum HtmlLexerMode {
     Text,
     Style,
     Script,
+    Template,
     Document,
 }
 
 pub struct HtmlLexer {
     mode: HtmlLexerMode,
-    tag: Option<SmolStr>,
+    current_tag: Option<SmolStr>,
+    template_pattern: Option<(&'static str, &'static str)>
 }
 
 impl HtmlLexer {
     pub fn new() -> HtmlLexer {
         HtmlLexer {
             mode: HtmlLexerMode::Document,
-            tag: None,
+            current_tag: None,
+            template_pattern: None,
         }
+    }
+
+    /// Set an open and close delimiter for interpolated sections or
+    /// other "template directives" in an HTML document.  This allows
+    /// the HtmlLexer to be used by a variety of markup formats.
+    pub fn set_template_pattern(&mut self, open: &'static str, close: &'static str) {
+        assert!(!open.is_empty() && !close.is_empty());
+        self.template_pattern = Some((open, close));
     }
 }
 
 impl Lexer for HtmlLexer {
     fn scan(&mut self, c: char, s: &mut Scanner) -> SyntaxKind {
         match self.mode {
+            // The initial state of parsing.
             HtmlLexerMode::Document => {
                 if is_whitespace(c) {
                     s.bump_while(is_whitespace);
                     return WHITESPACE;
                 }
-                self.mode = match c {
-                    '<' => HtmlLexerMode::Tag,
-                    _ => HtmlLexerMode::Text,
-                };
+
+                let open = &self.template_pattern.map(|(x, _)| x).unwrap_or("\0");
+                let start = open.chars().next().unwrap();
+                if c == start && s.at_str(open) {
+                    self.mode = HtmlLexerMode::Template;
+                } else if c == '<' {
+                    self.mode = HtmlLexerMode::Tag;
+                } else {
+                    self.mode = HtmlLexerMode::Text;
+                }
                 self.scan(c, s)
             }
+            // Either interpolation or a directive in an html template
+            HtmlLexerMode::Template => {
+                let (open, close) = &self.template_pattern.unwrap();
+                debug_assert!(s.at_str(open), "expected to be at beginning of template during template lexer mode");
+                for _ in 0..open.len() {
+                    s.bump();
+                }
+
+                let close_like = close.chars().next().unwrap();
+                loop {
+                    s.bump_while(|c| c != close_like);
+                    if !s.at(close_like) {
+                        break; // e.g. we are at EOF
+                    } else if s.at_str(close) {
+                        for _ in 0..close.len() {
+                            s.bump();
+                        }
+                        if s.at_str(open) {
+                            // no-op; e.g. stay in template mode
+                        } else if s.at('<') {
+                            self.mode = HtmlLexerMode::Tag;
+                        } else {
+                            self.mode = HtmlLexerMode::Text;
+                        }
+                        break;
+                    }
+                }
+                DELIMITED
+            }
+            // The contents of either a script tag.
             HtmlLexerMode::Script => {
                 while let Some(c) = s.current() {
                     if c == '<' && s.at_str("</script>") {
@@ -56,6 +104,7 @@ impl Lexer for HtmlLexer {
                 }
                 SCRIPT_CONTENT
             }
+            // The contents of either a style tag.
             HtmlLexerMode::Style => {
                 while let Some(c) = s.current() {
                     if c == '<' && s.at_str("</style>") {
@@ -66,14 +115,29 @@ impl Lexer for HtmlLexer {
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                SCRIPT_CONTENT
+                STYLE_CONTENT
             }
             HtmlLexerMode::Text => {
-                s.bump_while(|c| c != '<');
+                if let Some((open, _)) = &self.template_pattern {
+                    let start = open.chars().next().unwrap_or('\0');
+                    loop {
+                        s.bump_while(|c| c != '<' && c != start);
+                        if !s.at(start) {
+                            break;
+                        } else if s.at_str(open) {
+                            self.mode = HtmlLexerMode::Template;
+                            break;
+                        } else if s.at('<') {
+                            break; // opener could be like `<{`; so double check this to avoid infinite loop
+                        }
+                    }
+                } else {
+                    s.bump_while(|c| c != '<');
+                }
                 if s.at('<') {
                     self.mode = HtmlLexerMode::Tag;
                 }
-                return TEXT;
+                TEXT
             }
             HtmlLexerMode::Tag => {
                 if is_whitespace(c) {
@@ -91,8 +155,8 @@ impl Lexer for HtmlLexer {
 
                 if is_html_tag_prefix(c) {
                     s.bump_while(is_html_tag_suffix);
-                    if self.tag.is_none() {
-                        self.tag = Some(s.current_text().into());
+                    if self.current_tag.is_none() {
+                        self.current_tag = Some(s.current_text().into());
                     }
                     return IDENTIFIER;
                 }
@@ -107,19 +171,19 @@ impl Lexer for HtmlLexer {
                         match s.current() {
                             Some('!') => {
                                 s.bump();
-                                self.tag = Some("".into());
+                                self.current_tag = Some("".into());
                                 L_ANGLE_BANG
                             }
                             Some('/') => {
                                 s.bump();
-                                self.tag = Some("".into());
+                                self.current_tag = Some("".into());
                                 L_ANGLE_SLASH
                             }
                             _ => L_ANGLE,
                         }
                     }
                     '>' => {
-                        self.mode = match self.tag.take() {
+                        self.mode = match self.current_tag.take() {
                             Some(ref tag) if tag == "script" => HtmlLexerMode::Script,
                             Some(ref tag) if tag == "style" => HtmlLexerMode::Style,
                             _ => HtmlLexerMode::Document,
@@ -130,7 +194,7 @@ impl Lexer for HtmlLexer {
                         match s.current() {
                             Some('>') => {
                                 s.bump();
-                                self.mode = match self.tag.take() {
+                                self.mode = match self.current_tag.take() {
                                     Some(ref tag) if tag == "script" => HtmlLexerMode::Script,
                                     Some(ref tag) if tag == "style" => HtmlLexerMode::Style,
                                     _ => HtmlLexerMode::Document,

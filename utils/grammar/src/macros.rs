@@ -108,19 +108,24 @@ macro_rules! syntax_kinds {
         language $lang:ident;
 
         $(
-            $(#[doc($hidden:tt)])?
+            $(#[$label_meta:meta])*
             $label:ident {
-                $($kind:ident $num:tt $(($raw:tt))? $( [ $($alias:ident),+ ] )? )*
+                $(
+                    $(#[$kind_meta:meta])*
+                    $kind:ident $num:tt $(($raw:tt))? $( [ $($alias:ident),+ ] )?
+                )*
             }
         )*
     } => {
         $(
-            $(#[doc($hidden)])*
+            $(#[$label_meta])*
             pub mod $label {
                 use super::$lang;
 
                 $(
-                    #[doc(hidden)] pub const $kind: $crate::SyntaxKind = $lang.syntax_kind($num);
+                    #[doc(hidden)]
+                    $(#[$kind_meta])*
+                    pub const $kind: $crate::SyntaxKind = $lang.syntax_kind($num);
                     $($(#[doc(hidden)] pub const $alias: $crate::SyntaxKind = $kind;)*)*
                 )*
 

@@ -358,9 +358,9 @@ fn emit_catch(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u
             out.push_str("let ");
             out.push_str(label);
             out.push_str(" = ");
-            out.push_str("catch!({ p.expect(");
+            out.push_str("p.expect(");
             out.push_str(&term.token);
-            out.push_str(") });\n");
+            out.push_str(");\n");
         } else {
             emit_depth(out, dep);
             out.push_str("p.expect(");
@@ -378,9 +378,8 @@ fn emit_catch(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u
             out.push_str("let ");
             out.push_str(label);
             out.push_str(" = ");
-            out.push_str("catch!({ ");
             out.push_str(&nonterm);
-            out.push_str("(p) });\n");
+            out.push_str("(p);\n");
         } else {
             emit_depth(out, dep);
             out.push_str(nonterm);
@@ -403,9 +402,9 @@ fn emit_catch(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u
             out.push_str("let ");
             out.push_str(label);
             out.push_str(" = ");
-            out.push_str("catch!({ p.expect_ts(&");
+            out.push_str("p.expect_ts(&");
             emit_tokenset(out, db, ts.into_iter().map(|t| t.token.into()).collect());
-            out.push_str(") });\n");
+            out.push_str(");\n");
         } else {
             emit_depth(out, dep);
             out.push_str("p.expect_ts(&");

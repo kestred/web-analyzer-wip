@@ -1,12 +1,13 @@
 use crate::grammar;
 use crate::lexer::HtmlLexer;
-use crate::syntax_kind::{self, DOCUMENT, ELEMENT, SCRIPT};
+use crate::syntax_kind::{self, DOCUMENT, ELEMENT, SCRIPT_BLOCK, STYLE_BLOCK};
 use grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
 use grammar_utils::parser::ParseConfig;
 
 ast_node!(Document, DOCUMENT);
 ast_node!(Element, ELEMENT);
-ast_node!(Script, SCRIPT);
+ast_node!(Script, SCRIPT_BLOCK);
+ast_node!(Style, STYLE_BLOCK);
 
 impl Document {
     fn new(root: TreeArc<SyntaxNode>) -> TreeArc<Document> {

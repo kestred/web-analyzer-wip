@@ -43,10 +43,10 @@ pub(crate) fn debug_syntax_tree(
 /// Attempts parsing the script contents of a token as the given language.
 fn debug_syntax_tree_for_script(token: SyntaxToken, text_range: TextRange, text_lang: SourceLanguage) -> Option<String> {
     match token.kind() {
-        html_syntax::SCRIPT
+        html_syntax::SCRIPT_BLOCK
         | html_syntax::SCRIPT_CONTENT
-        | vue_syntax::COMPONENT_SCRIPT
-        | vue_syntax::COMPONENT_STYLE =>
+        | html_syntax::STYLE_BLOCK
+        | html_syntax::STYLE_CONTENT =>
             debug_syntax_tree_for_token(token, text_range, text_lang),
         _ => None,
     }
@@ -100,12 +100,14 @@ fn debug_dump(lang: SourceLanguage, node: &SyntaxNode) -> String {
     let as_debug_repr = match lang {
         SourceLanguage::Html => html_syntax::as_debug_repr,
         SourceLanguage::Javascript => javascript_syntax::as_debug_repr,
-        _ => default_syntax::as_debug_repr,
+        SourceLanguage::Typescript => unimplemented!(),
+        SourceLanguage::Vue => vue_syntax::as_debug_repr,
     };
     let errors = match lang {
         SourceLanguage::Html => node.ancestors().find_map(html::Document::cast).map(|x| x.errors().to_vec()),
         SourceLanguage::Javascript => node.ancestors().find_map(javascript::Program::cast).map(|x| x.errors().to_vec()),
-        _ => None,
+        SourceLanguage::Typescript => unimplemented!(),
+        SourceLanguage::Vue => node.ancestors().find_map(javascript::Program::cast).map(|x| x.errors().to_vec()),
     }.unwrap_or_default();
     let formatter = |k| as_debug_repr(k).map(|k| k.name).unwrap_or("UNKNOWN_SYNTAX_KIND");
     ast::debug_dump(node, errors, formatter)

@@ -3,6 +3,7 @@ use crate::parse::{InputId, ParseDatabase, SourceLanguage};
 use rustc_hash::FxHashSet;
 use analysis_utils::LineIndex;
 use grammar_utils::SyntaxError;
+use vue_grammar::ast as vue;
 
 pub(crate) fn check(db: &RootDatabase, input_id: InputId) -> Vec<String> {
     let mut result = Vec::new();
@@ -33,10 +34,20 @@ pub(crate) fn check(db: &RootDatabase, input_id: InputId) -> Vec<String> {
 
     // Parse the vue component
     let line_index = db.input_line_index(input_id);
-    let program = db.parse_vue(input_id);
-    syntax_errors(&mut result, &line_index, program.errors());
+    let component = db.parse_vue(input_id);
+    syntax_errors(&mut result, &line_index, component.errors());
+
+    // Check interesting things (sometimes that are otherwise hard to catch)
+    let errors = check_template(db, &component);
+    result.extend(errors);
 
     result
+}
+
+fn check_template(db: &RootDatabase, component: &vue::Component) -> Vec<String> {
+    // let template_expressions = db.;
+
+    vec![]
 }
 
 fn syntax_errors(results: &mut Vec<String>, index: &LineIndex, errors: Vec<SyntaxError>) {

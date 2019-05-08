@@ -354,7 +354,7 @@ pub fn variable_declarator(p: &mut Parser) -> Option<Continue> {
 
 pub fn empty_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ p.expect(SEMICOLON) });
+    let _ok = p.expect(SEMICOLON);
     p.complete(_marker, EMPTY_STATEMENT);
     _ok
 }
@@ -1093,7 +1093,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
-            let _ok = catch!({ generator_method(p) });
+            let _ok = generator_method(p);
             p.complete(_marker, PROPERTY);
             if _ok.is_none() {
                 return None;
@@ -1283,7 +1283,7 @@ pub fn assignment_operator(p: &mut Parser) -> Option<Continue> {
 
 pub fn literal(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
-    let _ok = catch!({ p.expect_ts(&AT_LITERAL) });
+    let _ok = p.expect_ts(&AT_LITERAL);
     p.complete(_marker, LITERAL);
     _ok
 }

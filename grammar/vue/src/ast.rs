@@ -22,7 +22,9 @@ impl Component {
     }
 
     pub fn parse(text: &str) -> (TreeArc<Component>, &str) {
-        let tokens = HtmlLexer::new().tokenize(text);
+        let mut lexer = HtmlLexer::new();
+        lexer.set_template_pattern("{{", "}}");
+        let tokens = lexer.tokenize(text);
         let parser = Parser::new((text, &tokens).into(), ParseConfig {
             debug_repr: syntax_kind::as_debug_repr,
             max_rollback_size: 4,

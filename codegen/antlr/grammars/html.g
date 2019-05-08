@@ -83,7 +83,8 @@ attribute_value
 
 html_content
     : html_chardata? ((element | COMMENT) html_chardata?)*
-    | script?
+    | script_block?
+    | style_block?
     ;
 
 html_chardata
@@ -96,7 +97,12 @@ html_misc
     | WHITESPACE
     ;
 
-script
+script_block
     : SCRIPT_CONTENT
-    # SCRIPT
+    # SCRIPT_BLOCK
+    ;
+
+style_block
+    : STYLE_CONTENT
+    # STYLE_BLOCK
     ;

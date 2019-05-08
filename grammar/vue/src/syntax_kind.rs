@@ -5,11 +5,11 @@ pub use html_grammar::syntax_kind::{self as html, *};
 pub const VUE: SyntaxLanguage = SyntaxLanguage(4);
 
 pub fn as_str(k: SyntaxKind) -> Option<&'static str> {
-    html::as_str(k).or(self::nodes::as_str(k))
+    html::as_str(k).or_else(|| self::nodes::as_str(k))
 }
 
 pub fn as_debug_repr(k: SyntaxKind) -> Option<SyntaxKindMeta> {
-    html::as_debug_repr(k).or(self::nodes::as_debug_repr(k))
+    html::as_debug_repr(k).or_else(|| self::nodes::as_debug_repr(k))
 }
 
 syntax_kinds! {
