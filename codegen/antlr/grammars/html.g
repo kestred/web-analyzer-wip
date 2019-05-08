@@ -51,8 +51,7 @@ element
 // N.B. make a separate rule for these to work around how limitation in how codegen can parse incorrect files
 element_pattern
     : '<' empty_element_tag_name WS? (attribute WS?)* ('>' | '/>')
-    | '<' TAG_NAME WS? (attribute WS?)* '/>'
-    | '<' TAG_NAME WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+    | '<' TAG_NAME WS? (attribute WS?)* ('/>' | '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>')
     ;
 
 empty_element_tag_name

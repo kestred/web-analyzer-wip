@@ -86,22 +86,6 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if p.at(TAG_NAME) && {
-        // try --> TAG_NAME (WS)? (attribute (WS)?)* />
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            p.bump();
-            p.eat(WS);
-            while p.at(TAG_NAME) {
-                attribute(p)?;
-                p.eat(WS);
-            }
-            p.expect(SLASH_R_ANGLE)?;
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
     } else if p.at(TAG_NAME) {
         p.bump();
         p.eat(WS);
@@ -109,20 +93,26 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
             attribute(p)?;
             p.eat(WS);
         }
-        p.expect(R_ANGLE)?;
-        html_content(p)?;
-        if p.at(L_ANGLE) {
+        if p.at(SLASH_R_ANGLE) {
             p.bump();
-            p.expect(SLASH)?;
-        } else if p.at(L_ANGLE_SLASH) {
+        } else if p.at(R_ANGLE) {
             p.bump();
+            html_content(p)?;
+            if p.at(L_ANGLE) {
+                p.bump();
+                p.expect(SLASH)?;
+            } else if p.at(L_ANGLE_SLASH) {
+                p.bump();
+            } else {
+                p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            }
+            p.eat(WS);
+            p.expect(TAG_NAME)?;
+            p.eat(WS);
+            p.expect(R_ANGLE)?;
         } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            p.expected_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
         }
-        p.eat(WS);
-        p.expect(TAG_NAME)?;
-        p.eat(WS);
-        p.expect(R_ANGLE)?;
     } else {
         // otherwise, emit an error
         p.expected(TAG_NAME)?;
