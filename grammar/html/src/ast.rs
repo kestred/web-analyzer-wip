@@ -22,7 +22,7 @@ impl Document {
             preserve_comments: true,
             preserve_whitespace: true,
         });
-        let (root, remainder) = parser.parse(grammar::html_document);
+        let (root, remainder) = parser.parse(grammar::document);
         let node = Document::new(root.to_owned());
         (node, remainder.text)
     }

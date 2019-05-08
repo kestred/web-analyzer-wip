@@ -1,4 +1,3 @@
-use crate::database::RootDatabase;
 use crate::parse::{InputId, ParseDatabase, SourceLanguage};
 use analysis_utils::FileId;
 use grammar_utils::{ast, AstNode, SyntaxNode, SyntaxToken, SyntaxElement, TextRange};
@@ -9,11 +8,11 @@ use javascript_grammar::ast as javascript;
 use javascript_grammar::syntax_kind as javascript_syntax;
 
 pub(crate) fn debug_syntax_tree(
-    db: &RootDatabase,
+    db: &dyn ParseDatabase,
     file_id: FileId,
-    file_lang: SourceLanguage,
     text_source: Option<(TextRange, SourceLanguage)>,
 ) -> String {
+    let file_lang = db.input_language(file_id.into()).unwrap(/* FIXME: don't unwrap */);
     let syntax = match file_lang {
         SourceLanguage::Html => db.parse_html(InputId::File(file_id)).syntax.to_owned(),
         SourceLanguage::Javascript => db.parse_javascript(InputId::File(file_id)).syntax.to_owned(),
@@ -110,6 +109,7 @@ fn debug_dump(lang: SourceLanguage, node: &SyntaxNode) -> String {
 mod tests {
     use crate::database::RootDatabase;
     use crate::parse::SourceLanguage::{Html, Javascript};
+    use super::*;
     use analysis_utils::{FileId, SourceDatabase};
     use grammar_utils::TextRange;
     use test_utils::assert_diff;
@@ -119,7 +119,8 @@ mod tests {
         let mut db = RootDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "function foo() {} /* a comment */".to_string().into());
-        let syn = super::debug_syntax_tree(&db, file_id, Javascript, None);
+        db.set_file_relative_path(file_id, "example.js".into());
+        let syn = debug_syntax_tree(&db, file_id, None);
         assert_diff!(
             syn.trim(),
             r#"
@@ -141,7 +142,8 @@ PROGRAM@[0; 17)
         let mut db = RootDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "<template><img alt='Hello World' /></template>".to_string().into());
-        let syn = super::debug_syntax_tree(&db, file_id, Html, None);
+        db.set_file_relative_path(file_id, "example.html".into());
+        let syn = debug_syntax_tree(&db, file_id, None);
         assert_diff!(
             syn.trim(),
             r#"
@@ -174,10 +176,11 @@ DOCUMENT@[0; 46)
         let file_id = FileId(1);
         let file_text = "<script>function foo() {}</script>";
         db.set_file_text(file_id, file_text.to_string().into());
+        db.set_file_relative_path(file_id, "example.html".into());
         let start = file_text.chars().position(|c| c == 'f').unwrap() as u32;
         let end = file_text.chars().position(|c| c == '}').unwrap() as u32 + 1;
         let range = TextRange::from_to(start.into(), end.into());
-        let syn = super::debug_syntax_tree(&db, file_id, Html, Some((range, Javascript)));
+        let syn = debug_syntax_tree(&db, file_id, Some((range, Javascript)));
         assert_diff!(
             syn.trim(),
             r#"

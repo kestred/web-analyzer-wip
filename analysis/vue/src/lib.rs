@@ -44,6 +44,11 @@ impl Analysis {
         self.db.input_language(file_id.into())
     }
 
+    /// Computes the set of diagnostics for the given file.
+    pub fn debug_syntax_tree(&self, file_id: FileId) -> String {
+        syntax::debug_syntax_tree(&self.db, file_id.into(), None)
+    }
+
     /// Gets the file's `LineIndex`: data structure to convert between absolute
     /// offsets and line/column representation.
     pub fn file_line_index(&self, file_id: FileId) -> Arc<LineIndex> {

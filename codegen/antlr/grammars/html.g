@@ -29,42 +29,45 @@
 
 grammar HTML;
 
-html_document
-    : WS? doctype? WS? html_elements*
+document
+    : WS? doctype? WS? elements*
     # DOCUMENT
     ;
 
-html_elements
-    : html_misc* html_element html_misc*
+doctype
+    : '<!' {at_keyword("DOCTYPE")}? IDENT WS? ((IDENT | QUOTED) WS?)+ '>'
+    # DOCUMENT_TYPE
     ;
 
-html_element
-    : '<' TAG_NAME WS? (html_attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+elements
+    : html_misc* element html_misc*
+    ;
+
+element
+    : element_pattern
     # ELEMENT
-    | '<' TAG_NAME WS? (html_attribute WS?)* '/>'
-    # ELEMENT
-    | '<' TAG_NAME WS? (html_attribute WS?)* '>'
-    # ELEMENT
     ;
 
-html_content
-    : html_chardata? ((html_element | COMMENT) html_chardata?)*
-    | script?
+// N.B. make a separate rule for these to work around how limitation in how codegen can parse incorrect files
+element_pattern
+    : '<' TAG_NAME WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+    | '<' TAG_NAME WS? (attribute WS?)* '>'
+    | '<' TAG_NAME WS? (attribute WS?)* '/>'
     ;
 
-script
-    : SCRIPT_BODY
-    # SCRIPT
-    ;
-
-html_attribute
-    : TAG_NAME (WS? '=' WS? html_attribute_value)?
+attribute
+    : TAG_NAME (WS? '=' WS? attribute_value)?
     # ATTRIBUTE
     ;
 
-html_attribute_value
+attribute_value
     : QUOTED
     | TAG_NAME
+    ;
+
+html_content
+    : html_chardata? ((element | COMMENT) html_chardata?)*
+    | script?
     ;
 
 html_chardata
@@ -77,7 +80,7 @@ html_misc
     | WHITESPACE
     ;
 
-doctype
-    : '<!' {at_keyword("DOCTYPE")}? IDENT WS? ((IDENT | QUOTED) WS?)+ '>'
-    # DOCUMENT_TYPE
+script
+    : SCRIPT_BODY
+    # SCRIPT
     ;

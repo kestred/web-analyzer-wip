@@ -9,10 +9,14 @@ fn main() -> Result<(), io::Error> {
             SubCommand::with_name("lint")
                 .arg(Arg::with_name("file").required(true))
         )
+        .subcommand(
+            SubCommand::with_name("parse")
+                .arg(Arg::with_name("file").required(true))
+        )
         .get_matches();
     match args.subcommand() {
-        ("lint", Some(lint_args)) => {
-            let filename = lint_args.value_of("file").unwrap();
+        ("lint", Some(args)) => {
+            let filename = args.value_of("file").unwrap();
             let filetext = fs::read_to_string(filename)?;
             let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
             let diagnostics = analysis.diagnostics(file_id.into());
@@ -27,6 +31,12 @@ fn main() -> Result<(), io::Error> {
             }
             eprintln!("(total: {})", total);
             std::process::exit(1);
+        }
+        ("parse", Some(args)) => {
+            let filename = args.value_of("file").unwrap();
+            let filetext = fs::read_to_string(filename)?;
+            let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
+            println!("{}", analysis.debug_syntax_tree(file_id.into()))
         }
         _ => (),
     }
