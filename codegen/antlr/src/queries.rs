@@ -358,14 +358,14 @@ impl QualifiedTerm {
     pub fn new(token: &str) -> QualifiedTerm {
         QualifiedTerm {
             token: token.into(),
-            predicate: PredicateExpression::True,
+            predicate: PredicateExpression::Empty,
         }
     }
 
     pub fn unqualified(self) -> QualifiedTerm {
         QualifiedTerm {
             token: self.token,
-            predicate: PredicateExpression::True,
+            predicate: PredicateExpression::Empty,
         }
     }
 
@@ -373,7 +373,7 @@ impl QualifiedTerm {
         QualifiedTerm {
             token: self.token,
             predicate: match self.predicate {
-                PredicateExpression::True => pred,
+                PredicateExpression::Empty => pred,
                 _ => PredicateExpression::Binary {
                     left: Box::new(self.predicate),
                     oper: "&&",
@@ -385,7 +385,7 @@ impl QualifiedTerm {
 
     pub fn is_unqualified(&self) -> bool {
         match self.predicate {
-            PredicateExpression::True => true,
+            PredicateExpression::Empty => true,
             _ => false,
         }
     }

@@ -50,9 +50,26 @@ element
 
 // N.B. make a separate rule for these to work around how limitation in how codegen can parse incorrect files
 element_pattern
-    : '<' TAG_NAME WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
-    | '<' TAG_NAME WS? (attribute WS?)* '>'
+    : '<' empty_element_tag_name WS? (attribute WS?)* ('>' | '/>')
     | '<' TAG_NAME WS? (attribute WS?)* '/>'
+    | '<' TAG_NAME WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? TAG_NAME WS? '>'
+    ;
+
+empty_element_tag_name
+    : {at_keyword("area")}? TAG_NAME
+    | {at_keyword("base")}? TAG_NAME
+    | {at_keyword("br")}? TAG_NAME
+    | {at_keyword("col")}? TAG_NAME
+    | {at_keyword("embed")}? TAG_NAME
+    | {at_keyword("hr")}? TAG_NAME
+    | {at_keyword("img")}? TAG_NAME
+    | {at_keyword("input")}? TAG_NAME
+    | {at_keyword("link")}? TAG_NAME
+    | {at_keyword("meta")}? TAG_NAME
+    | {at_keyword("param")}? TAG_NAME
+    | {at_keyword("source")}? TAG_NAME
+    | {at_keyword("track")}? TAG_NAME
+    | {at_keyword("wbr")}? TAG_NAME
     ;
 
 attribute

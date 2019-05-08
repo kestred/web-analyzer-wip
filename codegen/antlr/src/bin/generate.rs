@@ -494,7 +494,16 @@ fn emit_choice_ambiguous(out: &mut String, db: &Database, rule: &str, pat: &Patt
                 for t in &ts {
                     ts_count.entry(t.clone().unqualified()).and_modify(|count| *count -= 1).or_insert(0);
                 }
-                let is_ambigous_choice = ts.iter().any(|t| ts_count[&t.clone().unqualified()] > 0);
+                let is_trivial_predicate = match pat {
+                    Pattern::Predicate(_, tail) => match tail.as_ref() {
+                        Pattern::Ident(_) | Pattern::Literal(_) => true,
+                        _ => false,
+                    }
+                    _ => false,
+                };
+                let is_ambigous_choice =
+                    !is_trivial_predicate &&
+                        ts.iter().any(|t| ts_count[&t.clone().unqualified()] > 0);
                 if ts.len() > 0 {
                     emit_if(out, i);
                     emit_lookahead(out, db, &ts, is_ambigous_choice);
@@ -504,9 +513,6 @@ fn emit_choice_ambiguous(out: &mut String, db: &Database, rule: &str, pat: &Patt
                     } else {
                         panic!("unsupported! choice starts with empty pattern in rule `{}`", rule);
                     }
-                } else if let Pattern::Predicate(expr, _) = pat {
-                    emit_if(out, i);
-                    emit_predicate_expr(out, expr);
                 } else {
                     panic!("unreachable pattern for choice in rule `{}`: {}", rule, pat);
                 }
@@ -666,6 +672,10 @@ fn emit_choice_lr_precedence_climbing(out: &mut String, db: &Database, rule: &st
 }
 
 fn emit_choice_ll1(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u8, precond: Precond) {
+    if db.next_predicates_of(pat).is_empty() {
+        panic!("unsupported! choice consists only of predicates and/or empty patterns");
+    }
+
     let mut is_not = precond.excludes.unwrap_or_default();
     match pat {
         Pattern::Choice(choice) => {
@@ -744,7 +754,7 @@ fn emit_tokenset(out: &mut String, db: &Database, tokens: Set<String>) {
 
 fn emit_predicate_expr(out: &mut String, expr: &PredicateExpression) {
     match expr {
-        PredicateExpression::True => out.push_str("true"),
+        PredicateExpression::Empty => out.push_str("true"),
         PredicateExpression::Call { method, args } => {
             out.push_str("p.");
             out.push_str(&method);
@@ -773,7 +783,7 @@ fn emit_predicate_expr(out: &mut String, expr: &PredicateExpression) {
 
 fn emit_predicate_description(out: &mut String, expr: &PredicateExpression) {
     match expr {
-        PredicateExpression::True => out.push_str("true"),
+        PredicateExpression::Empty => out.push_str("true"),
         PredicateExpression::Call { method, args } => {
             out.push_str(&method.replace("_", " "));
             for (i, arg) in args.iter().enumerate() {
@@ -851,36 +861,72 @@ fn emit_lookahead<'a, Iter>(out: &mut String, db: &Database, iter: Iter, subexpr
 where
     Iter: IntoIterator<Item = &'a QualifiedTerm>,
 {
-    let mut groups: Map<_, Set<_>> = Map::new();
+    // First we want to group terms by predicate (so that we only check each predicate once)
+    let mut pred_groups: Map<_, Set<_>> = Map::new();
     for term in iter {
-        groups.entry(&term.predicate).or_default().insert(term.token.as_str());
+        pred_groups.entry(&term.predicate).or_default().insert(term.token.as_str());
     }
-    let unqualifed = groups.get(&PredicateExpression::True).cloned().unwrap_or_default();
-    for (pred, tokens) in &mut groups {
-        let has_predicate = match pred { PredicateExpression::True => false, _ => true };
+
+    // Then for each predicate, filter out the terms which are also checked with no predicate
+    let unqualifed = pred_groups.get(&PredicateExpression::Empty).cloned().unwrap_or_default();
+    for (pred, tokens) in &mut pred_groups {
+        let has_predicate = match pred { PredicateExpression::Empty => false, _ => true };
         if has_predicate {
             for tok in &unqualifed {
                 tokens.remove(tok);
             }
         }
     }
-    let groups = groups.into_iter().filter(|(_, ts)| !ts.is_empty()).collect::<Vec<_>>();
+
+    // Group the remaining non-empty `(predicate, tokenset)` pairs by tokenset,
+    // preparing predicates to be combined with `||` (logical or) such that the
+    // tokenset only needs to be tested once if any of the predicates match.
+    //
+    // Don't insert the null predicate such that the universal tokenset will have
+    // an empty predicate list; because we filter out tokensets where all tokens
+    // match with the null predicate this operation should never cause a universal
+    // tokenset to be mixed with a conditional tokenset.
+    let mut ts_groups: Map<Set<_>, Vec<_>> = Map::new();
+    for (pred, ts) in pred_groups {
+        if !ts.is_empty() {
+            let list = ts_groups.entry(ts).or_default();
+            match pred {
+                PredicateExpression::Empty => (),
+                _ => list.push(pred),
+            };
+        }
+    }
+
+    let mut groups = ts_groups.into_iter().collect::<Vec<_>>();
+    groups.sort_by(|a, b| a.1.cmp(&b.1)); // sort by predicates (e.g. expect "Empty" first)
     if subexpr && groups.len() > 1 {
         out.push('(');
     }
-    for (i, (pred, tokens)) in groups.iter().enumerate() {
+    for (i, (tokens, preds)) in groups.iter().enumerate() {
         if i > 0 {
             out.push_str(" || ");
         }
-        let has_predicate = match pred { PredicateExpression::True => false, _ => true };
-        if has_predicate {
+        if !preds.is_empty() {
             if subexpr || groups.len() > 1 {
                 out.push('(');
             }
-            emit_predicate_expr(out, pred);
+
+            // N.B. join any predicates with LOGICAL_OR, while minimizing grouping operators
+            if preds.len() > 1 {
+                out.push('(');
+                for (j, pred) in preds.iter().enumerate() {
+                    if j > 0 {
+                        out.push_str(" || ");
+                    }
+                    emit_predicate_expr(out, pred);
+                }
+                out.push(')');
+            } else {
+                emit_predicate_expr(out, &preds[0]);
+            }
+
             out.push_str(" && ");
         }
-
         if tokens.len() > 1 {
             out.push_str("p.at_ts(&");
             emit_tokenset(out, db, tokens.iter().map(|x| x.to_string()).collect());
@@ -890,7 +936,7 @@ where
             emit_tokenset_list(out, tokens);
             out.push_str(")");
         }
-        if has_predicate && (subexpr || groups.len() > 1) {
+        if !preds.is_empty() && (subexpr || groups.len() > 1) {
             out.push(')');
         }
     }

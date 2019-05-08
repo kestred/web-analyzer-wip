@@ -70,42 +70,98 @@ pub fn element(p: &mut Parser) -> Option<Continue> {
 
 pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
     p.expect(L_ANGLE)?;
-    p.expect(TAG_NAME)?;
-    p.eat(WS);
-    while p.at(TAG_NAME) {
-        attribute(p)?;
-        p.eat(WS);
-    }
-    if p.at(R_ANGLE) && {
-        // try --> > html_content (< / | </) (WS)? TAG_NAME (WS)? >
+    if ((p.at_keyword("area") || p.at_keyword("base") || p.at_keyword("br") || p.at_keyword("col") || p.at_keyword("embed") || p.at_keyword("hr") || p.at_keyword("img") || p.at_keyword("input") || p.at_keyword("link") || p.at_keyword("meta") || p.at_keyword("param") || p.at_keyword("source") || p.at_keyword("track") || p.at_keyword("wbr")) && p.at(TAG_NAME)) && {
+        // try --> empty_element_tag_name (WS)? (attribute (WS)?)* (> | />)
         let mut _checkpoint = p.checkpoint(true);
         catch!({
-            p.bump();
-            html_content(p)?;
-            if p.at(L_ANGLE) {
-                p.bump();
-                p.expect(SLASH)?;
-            } else if p.at(L_ANGLE_SLASH) {
-                p.bump();
-            } else {
-                p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            empty_element_tag_name(p)?;
+            p.eat(WS);
+            while p.at(TAG_NAME) {
+                attribute(p)?;
+                p.eat(WS);
             }
-            p.eat(WS);
-            p.expect(TAG_NAME)?;
-            p.eat(WS);
-            p.expect(R_ANGLE)?;
+            p.expect_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if p.at(R_ANGLE) {
+    } else if p.at(TAG_NAME) && {
+        // try --> TAG_NAME (WS)? (attribute (WS)?)* />
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            p.bump();
+            p.eat(WS);
+            while p.at(TAG_NAME) {
+                attribute(p)?;
+                p.eat(WS);
+            }
+            p.expect(SLASH_R_ANGLE)?;
+            Some(Continue)
+        });
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at(TAG_NAME) {
         p.bump();
-    } else if p.at(SLASH_R_ANGLE) {
+        p.eat(WS);
+        while p.at(TAG_NAME) {
+            attribute(p)?;
+            p.eat(WS);
+        }
+        p.expect(R_ANGLE)?;
+        html_content(p)?;
+        if p.at(L_ANGLE) {
+            p.bump();
+            p.expect(SLASH)?;
+        } else if p.at(L_ANGLE_SLASH) {
+            p.bump();
+        } else {
+            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+        }
+        p.eat(WS);
+        p.expect(TAG_NAME)?;
+        p.eat(WS);
+        p.expect(R_ANGLE)?;
+    } else {
+        // otherwise, emit an error
+        p.expected(TAG_NAME)?;
+    }
+    Some(Continue)
+}
+
+pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
+    if p.at_keyword("area") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("base") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("br") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("col") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("embed") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("hr") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("img") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("input") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("link") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("meta") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("param") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("source") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("track") && p.at(TAG_NAME) {
+        p.bump();
+    } else if p.at_keyword("wbr") && p.at(TAG_NAME) {
         p.bump();
     } else {
         // otherwise, emit an error
-        p.expected_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
+        p.expected(TAG_NAME)?;
     }
     Some(Continue)
 }

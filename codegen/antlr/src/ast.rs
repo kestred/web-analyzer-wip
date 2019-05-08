@@ -132,7 +132,7 @@ pub enum Repeat {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum PredicateExpression {
-    True,
+    Empty,
     Call { method: String, args: Vec<String> },
     Unary { oper: char, expr: Box<PredicateExpression> },
     Binary { left: Box<PredicateExpression>, oper: &'static str, right: Box<PredicateExpression> },
