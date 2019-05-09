@@ -20,10 +20,9 @@ fn main() -> Result<(), io::Error> {
             let filetext = fs::read_to_string(filename)?;
             let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
             let diagnostics = analysis.diagnostics(file_id.into());
-            let total = diagnostics.len();
             let mut total_errors = 0;
             for line in diagnostics {
-                if line.starts_with("error:") {
+                if line.starts_with("error") {
                     total_errors += 1;
                 }
                 eprintln!("{}", line);

@@ -120,63 +120,52 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         let marker = p.start();
         _expression_head(p)?;
 
-        // member_expression[p ≤ 19]
-        //     : expression '[' expression_sequence ']'
-        //     # MEMBER_EXPRESSION
-        //     ;
-        // member_expression[p ≤ 18]
-        //     : expression '.' identifier_name
-        //     # MEMBER_EXPRESSION
-        //
-        while prec <= 19 && (p.at(L_SQUARE) || p.at(DOT)) {
-            if prec < 19 && p.at(L_SQUARE) {
-                p.bump();
-                expression_sequence(p)?;
-                p.expect(R_SQUARE)?;
-                p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
-            } else if  prec < 18 && p.at(DOT) {
-                p.bump();
-                identifier_name(p)?;
-                p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
-            } else {
-                break;
+
+        // Handle postfix expressions
+        {
+            // member_expression[p ≤ 19]
+            //     : expression '[' expression_sequence ']'
+            //     # MEMBER_EXPRESSION
+            //     ;
+            // member_expression[p ≤ 18]
+            //     : expression '.' identifier_name
+            //     # MEMBER_EXPRESSION
+            //     ;
+            // call_expression[p ≤ 17]
+            //     : expression arguments
+            //     # CALL_EXPRESSION
+            //     ;
+            // update_expression[p ≤ 16]
+            //     : expression {!at_line_terminator()}? '++'
+            //     # UPDATE_EXPRESSION
+            //     ;
+            // update_expression[p ≤ 15]
+            //     : expression {!at_line_terminator()}? '--'
+            //     # UPDATE_EXPRESSION
+            //     ;
+            while prec <= 19 && p.at_ts(&tokenset![L_SQUARE, DOT, L_PAREN, INCREMENT, DECREMENT]) {
+                if prec < 19 && p.at(L_SQUARE) {
+                    p.bump();
+                    expression_sequence(p)?;
+                    p.expect(R_SQUARE)?;
+                    p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
+                } else if  prec < 18 && p.at(DOT) {
+                    p.bump();
+                    identifier_name(p)?;
+                    p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
+                } else if prec <= 17 && p.at(L_PAREN) {
+                    arguments(p)?;
+                    p.complete_and_wrap(&marker, CALL_EXPRESSION);
+                } else if prec <= 16 && p.at(INCREMENT) {
+                    p.bump();
+                    p.complete_and_wrap(&marker, UPDATE_EXPRESSION);
+                } else if prec <= 15 && p.at(DECREMENT) {
+                    p.bump();
+                    p.complete_and_wrap(&marker, UPDATE_EXPRESSION);
+                } else {
+                    break;
+                }
             }
-        }
-        if prec > 17 {
-            return Some(Continue);
-        }
-
-        // call_expression[p ≤ 17]
-        //     : expression arguments
-        //     # CALL_EXPRESSION
-        //     ;
-        while prec <= 17 && p.at(L_PAREN) {
-            arguments(p)?;
-            p.complete_and_wrap(&marker, CALL_EXPRESSION);
-        }
-        if prec > 16 {
-            return Some(Continue);
-        }
-
-        // update_expression[p ≤ 16]
-        //     : expression {!at_line_terminator()}? '++'
-        //     # UPDATE_EXPRESSION
-        //     ;
-        while prec <= 16 && !p.at_line_terminator() && p.at(INCREMENT) {
-            p.bump();
-            p.complete_and_wrap(&marker, UPDATE_EXPRESSION);
-        }
-        if prec > 15 {
-            return Some(Continue);
-        }
-
-        // update_expression[p ≤ 15]
-        //     : expression {!at_line_terminator()}? '--'
-        //     # UPDATE_EXPRESSION
-        //     ;
-        while prec <= 15 && !p.at_line_terminator() && p.at(DECREMENT) {
-            p.bump();
-            p.complete_and_wrap(&marker, UPDATE_EXPRESSION);
         }
         if prec > 14 {
             return Some(Continue);

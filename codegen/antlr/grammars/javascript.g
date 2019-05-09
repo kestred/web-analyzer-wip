@@ -65,7 +65,7 @@ export_specifier_list
     ;
 
 export_specifier_atom
-    : IDENTIFIER (as_kw IDENTIFIER)
+    : IDENTIFIER (as_kw IDENTIFIER)?
     # EXPORT_SPECIFIER
     ;
 
@@ -75,8 +75,7 @@ import_declaration
     ;
 
 import_declaration_list
-    : import_specifier_special
-    | import_specifier_special ',' '{' import_specifier_list '}'
+    : import_specifier_special (',' '{' import_specifier_list '}')?
     | '{' import_specifier_list '}'
     ;
 
@@ -85,7 +84,7 @@ import_specifier_list
     ;
 
 import_specifier_atom
-    : IDENTIFIER (as_kw IDENTIFIER)
+    : IDENTIFIER (as_kw IDENTIFIER)?
     # IMPORT_SPECIFIER
     ;
 

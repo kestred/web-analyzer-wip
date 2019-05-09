@@ -124,8 +124,10 @@ pub fn export_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(IDENTIFIER)?;
-        as_kw(p)?;
-        p.expect(IDENTIFIER)?;
+        if p.at_keyword("as") && p.at(IDENTIFIER) {
+            as_kw(p)?;
+            p.expect(IDENTIFIER)?;
+        }
         Some(Continue)
     });
     p.complete(_marker, EXPORT_SPECIFIER);
@@ -149,25 +151,19 @@ pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn import_declaration_list(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&tokenset![ASTERISK, IDENTIFIER]) && {
-        // try --> import_specifier_special
-        let mut _checkpoint = p.checkpoint(true);
-        import_specifier_special(p);
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if p.at_ts(&tokenset![ASTERISK, IDENTIFIER]) {
+    if p.at_ts(&tokenset![ASTERISK, IDENTIFIER]) {
         import_specifier_special(p)?;
-        p.expect(COMMA)?;
-        p.expect(L_CURLY)?;
-        import_specifier_list(p)?;
-        p.expect(R_CURLY)?;
+        if p.at(COMMA) {
+            p.bump();
+            p.expect(L_CURLY)?;
+            import_specifier_list(p)?;
+            p.expect(R_CURLY)?;
+        }
     } else if p.at(L_CURLY) {
         p.bump();
         import_specifier_list(p)?;
         p.expect(R_CURLY)?;
     } else {
-        // otherwise, emit an error
         p.expected_ts_in("import_declaration_list", &tokenset![ASTERISK, IDENTIFIER, L_CURLY])?;
     }
     Some(Continue)
@@ -186,8 +182,10 @@ pub fn import_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(IDENTIFIER)?;
-        as_kw(p)?;
-        p.expect(IDENTIFIER)?;
+        if p.at_keyword("as") && p.at(IDENTIFIER) {
+            as_kw(p)?;
+            p.expect(IDENTIFIER)?;
+        }
         Some(Continue)
     });
     p.complete(_marker, IMPORT_SPECIFIER);
