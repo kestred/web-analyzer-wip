@@ -1,6 +1,6 @@
 use crate::grammar;
 use crate::lexer::JavascriptLexer;
-use crate::syntax_kind::{self, PROGRAM};
+use crate::syntax_kind::{self, *};
 use grammar_utils::{AstNode, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
 use grammar_utils::parser::ParseConfig;
 
@@ -62,5 +62,35 @@ impl Expression {
             .cloned()
             .map(|(msg, loc)| SyntaxError::new(msg, loc))
             .collect()
+    }
+}
+
+impl ArrayExpression {
+    pub fn elements(&self) -> impl Iterator<Item = &Expression> {
+        self.syntax.children().filter_map(Expression::cast)
+    }
+}
+
+impl ObjectExpression {
+    pub fn properties(&self) -> impl Iterator<Item = &Property> {
+        self.syntax.children().filter_map(Property::cast)
+    }
+}
+
+impl Property {
+    pub fn key(&self) -> Option<&Expression> {
+        self.syntax.first_child().and_then(Expression::cast)
+    }
+
+    pub fn value(&self) -> Option<&Expression> {
+        self.syntax.last_child().and_then(Expression::cast)
+    }
+
+    pub fn computed(&self) -> bool {
+        self.syntax.first_child_or_token().map(|t| t.kind()) == Some(L_SQUARE)
+    }
+
+    pub fn shorthand(&self) -> bool {
+        self.syntax.children().count() == 0
     }
 }

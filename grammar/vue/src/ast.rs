@@ -1,6 +1,6 @@
 use crate::grammar;
 use crate::syntax_kind::{self, *};
-use grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
+use grammar_utils::{ast_node, AstNode, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
 use grammar_utils::parser::ParseConfig;
 use html_grammar::lexer::HtmlLexer;
 
@@ -44,5 +44,17 @@ impl Component {
             .cloned()
             .map(|(msg, loc)| SyntaxError::new(msg, loc))
             .collect()
+    }
+
+    pub fn root_templates(&self) -> impl Iterator<Item = &ComponentTemplate> {
+        self.syntax.children().filter_map(ComponentTemplate::cast)
+    }
+
+    pub fn root_scripts(&self) -> impl Iterator<Item = &ComponentScript> {
+        self.syntax.children().filter_map(ComponentScript::cast)
+    }
+
+    pub fn root_styles(&self) -> impl Iterator<Item = &ComponentStyle> {
+        self.syntax.children().filter_map(ComponentStyle::cast)
     }
 }

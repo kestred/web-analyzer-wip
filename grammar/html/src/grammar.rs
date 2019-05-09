@@ -34,7 +34,7 @@ pub fn doctype(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(L_ANGLE_BANG)?;
         if !(p.at_keyword("DOCTYPE")) {
-            p.error("expected input to be at keyword 'DOCTYPE'")?;
+            p.error("expected to be at keyword 'DOCTYPE'")?;
         }
         p.expect(IDENT)?;
         p.eat(WS);

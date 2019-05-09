@@ -1,12 +1,11 @@
-use crate::parse::{InputId, ParseDatabase, SourceLanguage};
+use crate::parse::{ParseDatabase, SourceLanguage};
 use analysis_utils::FileId;
 use grammar_utils::{ast, AstNode, SyntaxNode, SyntaxToken, SyntaxElement, TextRange};
-use grammar_utils::syntax_kind::default as default_syntax;
 use html_grammar::ast as html;
 use html_grammar::syntax_kind as html_syntax;
 use javascript_grammar::ast as javascript;
 use javascript_grammar::syntax_kind as javascript_syntax;
-use vue_grammar::ast as vue;
+// use vue_grammar::ast as vue;
 use vue_grammar::syntax_kind as vue_syntax;
 
 pub(crate) fn debug_syntax_tree(

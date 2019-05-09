@@ -284,7 +284,7 @@ fn emit_pattern<'a>(
                 emit_predicate_expr(out, expr);
                 out.push_str(") {\n");
                 emit_depth(out, dep + 1);
-                out.push_str("p.error(\"expected input to be ");
+                out.push_str("p.error(\"expected to be ");
                 emit_predicate_description(out, expr);
                 out.push_str("\")?;\n");
                 emit_depth(out, dep);

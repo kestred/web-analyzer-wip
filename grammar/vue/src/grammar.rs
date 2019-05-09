@@ -142,7 +142,7 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
 
 pub fn template_tag(p: &mut Parser) -> Option<Continue> {
     if !(p.at_keyword("template")) {
-        p.error("expected input to be at keyword 'template'")?;
+        p.error("expected to be at keyword 'template'")?;
     }
     p.expect(TAG_NAME)?;
     Some(Continue)
@@ -150,7 +150,7 @@ pub fn template_tag(p: &mut Parser) -> Option<Continue> {
 
 pub fn script_tag(p: &mut Parser) -> Option<Continue> {
     if !(p.at_keyword("script")) {
-        p.error("expected input to be at keyword 'script'")?;
+        p.error("expected to be at keyword 'script'")?;
     }
     p.expect(TAG_NAME)?;
     Some(Continue)
@@ -158,7 +158,7 @@ pub fn script_tag(p: &mut Parser) -> Option<Continue> {
 
 pub fn style_tag(p: &mut Parser) -> Option<Continue> {
     if !(p.at_keyword("style")) {
-        p.error("expected input to be at keyword 'style'")?;
+        p.error("expected to be at keyword 'style'")?;
     }
     p.expect(TAG_NAME)?;
     Some(Continue)

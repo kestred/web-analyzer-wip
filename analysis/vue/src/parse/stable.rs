@@ -1,6 +1,6 @@
-use crate::parse::InputId;
+use crate::parse::FileLikeId;
 use analysis_utils::{Arena, impl_arena_id};
-use grammar_utils::{AstNode, SyntaxKind, SyntaxNode, TextRange, TreeArc};
+use grammar_utils::{AstNode, SyntaxKind, SyntaxNode, TextRange};
 use std::{marker::PhantomData, hash::{Hash, Hasher}};
 
 /// `AstId` points to an AST node in any file.
@@ -8,7 +8,7 @@ use std::{marker::PhantomData, hash::{Hash, Hasher}};
 /// It is stable across reparses, and can be used as salsa key/value.
 #[derive(Debug)]
 pub(crate) struct AstId<N: AstNode> {
-    input_id: InputId,
+    file_id: FileLikeId,
     input_ast_id: InputAstId<N>,
 }
 
@@ -21,19 +21,19 @@ impl<N: AstNode> Copy for AstId<N> {}
 
 impl<N: AstNode> PartialEq for AstId<N> {
     fn eq(&self, other: &Self) -> bool {
-        (self.input_id, self.input_ast_id) == (other.input_id, other.input_ast_id)
+        (self.file_id, self.input_ast_id) == (other.file_id, other.input_ast_id)
     }
 }
 impl<N: AstNode> Eq for AstId<N> {}
 impl<N: AstNode> Hash for AstId<N> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        (self.input_id, self.input_ast_id).hash(hasher);
+        (self.file_id, self.input_ast_id).hash(hasher);
     }
 }
 
 impl<N: AstNode> AstId<N> {
-    pub(crate) fn input_id(&self) -> InputId {
-        self.input_id
+    pub(crate) fn file_id(&self) -> FileLikeId {
+        self.file_id
     }
 }
 
@@ -64,8 +64,8 @@ impl<N: AstNode> Hash for InputAstId<N> {
 }
 
 impl<N: AstNode> InputAstId<N> {
-    pub(crate) fn with_input_id(self, input_id: InputId) -> AstId<N> {
-        AstId { input_id, input_ast_id: self }
+    pub(crate) fn with_file_id(self, file_id: FileLikeId) -> AstId<N> {
+        AstId { file_id, input_ast_id: self }
     }
 }
 

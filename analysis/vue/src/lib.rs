@@ -1,6 +1,5 @@
 mod database;
 mod diagnostics;
-mod model;
 mod parse;
 mod syntax;
 

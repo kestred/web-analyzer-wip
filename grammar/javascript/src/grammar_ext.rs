@@ -64,7 +64,9 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
             } else {
+                let marker = p.start();
                 p.bump(); // just `IDENTIFIER`
+                p.complete(marker, IDENTIFIER);
             }
         } else if p.at(THIS_KW) {
             let marker = p.start();

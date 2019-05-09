@@ -59,7 +59,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         if p.at_keyword("from") && p.at(IDENTIFIER) {
             from_kw(p)?;
             if !(p.at(STRING_LITERAL)) {
-                p.error("expected input to be at STRING_LITERAL")?;
+                p.error("expected to be at STRING_LITERAL")?;
             }
             literal(p)?;
         }
@@ -100,7 +100,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.bump();
         from_kw(p)?;
         if !(p.at(STRING_LITERAL)) {
-            p.error("expected input to be at STRING_LITERAL")?;
+            p.error("expected to be at STRING_LITERAL")?;
         }
         literal(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
@@ -139,7 +139,7 @@ pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
         import_declaration_list(p)?;
         from_kw(p)?;
         if !(p.at(STRING_LITERAL)) {
-            p.error("expected input to be at STRING_LITERAL")?;
+            p.error("expected to be at STRING_LITERAL")?;
         }
         literal(p)?;
         Some(Continue)
@@ -363,7 +363,7 @@ pub fn expression_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(!p.at(L_CURLY) && !p.at(FUNCTION_KW)) {
-            p.error("expected input to be not at L_CURLY and not at FUNCTION_KW")?;
+            p.error("expected to be not at L_CURLY and not at FUNCTION_KW")?;
         }
         expression_sequence(p)?;
         eos(p)?;
@@ -660,7 +660,7 @@ pub fn throw_statement(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(THROW_KW)?;
         if !(!p.at_line_terminator()) {
-            p.error("expected input to be not at line terminator")?;
+            p.error("expected to be not at line terminator")?;
         }
         expression_sequence(p)?;
         eos(p)?;
@@ -1015,15 +1015,22 @@ pub fn object_expression(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
+pub fn identifier_expression(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = p.expect(IDENTIFIER);
+    p.complete(_marker, IDENTIFIER);
+    _ok
+}
+
 pub fn property(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_PROPERTY_NAME) && {
-        // try --> property_name (: | =) expression #PROPERTY
+        // try --> property_name : expression #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
                 property_name(p)?;
-                p.expect_ts(&tokenset![COLON, EQ])?;
+                p.expect(COLON)?;
                 expression(p)?;
                 Some(Continue)
             });
@@ -1105,8 +1112,11 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at(IDENTIFIER) {
         let _marker = p.start();
-        p.bump();
+        let _ok = identifier_expression(p);
         p.complete(_marker, PROPERTY);
+        if _ok.is_none() {
+            return None;
+        }
     } else {
         // otherwise, emit an error
         p.expected_ts_in("property", &AT_PROPERTY)?;
@@ -1118,9 +1128,13 @@ pub fn property_name(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_IDENTIFIER_NAME) {
         identifier_name(p)?;
     } else if p.at(STRING_LITERAL) {
+        let _marker = p.start();
         p.bump();
+        p.complete(_marker, LITERAL);
     } else if p.at(NUMBER_LITERAL) {
+        let _marker = p.start();
         p.bump();
+        p.complete(_marker, LITERAL);
     } else {
         p.expected_ts_in("property_name", &AT_PROPERTY_NAME)?;
     }
@@ -1289,14 +1303,19 @@ pub fn literal(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn identifier_name(p: &mut Parser) -> Option<Continue> {
-    if p.at(IDENTIFIER) {
-        p.bump();
-    } else if p.at_ts(&AT_RESERVED_WORD) {
-        reserved_word(p)?;
-    } else {
-        p.expected_ts_in("identifier_name", &AT_IDENTIFIER_NAME)?;
-    }
-    Some(Continue)
+    let _marker = p.start();
+    let _ok = catch!({
+        if p.at(IDENTIFIER) {
+            p.bump();
+        } else if p.at_ts(&AT_RESERVED_WORD) {
+            reserved_word(p)?;
+        } else {
+            p.expected_ts_in("identifier_name", &AT_IDENTIFIER_NAME)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, IDENTIFIER);
+    _ok
 }
 
 pub fn reserved_word(p: &mut Parser) -> Option<Continue> {
@@ -1334,7 +1353,7 @@ pub fn as_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("as")) {
-            p.error("expected input to be at keyword 'as'")?;
+            p.error("expected to be at keyword 'as'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1347,7 +1366,7 @@ pub fn from_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("from")) {
-            p.error("expected input to be at keyword 'from'")?;
+            p.error("expected to be at keyword 'from'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1360,7 +1379,7 @@ pub fn get_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("get")) {
-            p.error("expected input to be at keyword 'get'")?;
+            p.error("expected to be at keyword 'get'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1373,7 +1392,7 @@ pub fn set_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("set")) {
-            p.error("expected input to be at keyword 'set'")?;
+            p.error("expected to be at keyword 'set'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1386,7 +1405,7 @@ pub fn of_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("of")) {
-            p.error("expected input to be at keyword 'of'")?;
+            p.error("expected to be at keyword 'of'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)
@@ -1399,7 +1418,7 @@ pub fn async_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         if !(p.at_keyword("async")) {
-            p.error("expected input to be at keyword 'async'")?;
+            p.error("expected to be at keyword 'async'")?;
         }
         p.expect(IDENTIFIER)?;
         Some(Continue)

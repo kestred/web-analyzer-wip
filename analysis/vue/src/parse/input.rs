@@ -4,14 +4,14 @@ use html_grammar::ast as html;
 use salsa;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub(crate) enum InputId {
+pub(crate) enum FileLikeId {
     File(FileId),
     Script(ScriptId),
 }
 
-impl From<FileId> for InputId {
-    fn from(id: FileId) -> InputId {
-        InputId::File(id)
+impl From<FileId> for FileLikeId {
+    fn from(id: FileId) -> FileLikeId {
+        FileLikeId::File(id)
     }
 }
 

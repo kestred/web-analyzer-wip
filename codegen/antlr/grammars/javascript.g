@@ -353,8 +353,13 @@ object_expression
     # OBJECT_EXPRESSION
     ;
 
+identifier_expression
+    : IDENTIFIER
+    # IDENTIFIER // convert to node
+    ;
+
 property
-    : property_name (':' |'=') expression
+    : property_name ':' expression
     # PROPERTY
     | '[' expression ']' ':' expression
     # PROPERTY
@@ -364,14 +369,14 @@ property
     # PROPERTY
     | generator_method
     # PROPERTY
-    | IDENTIFIER
+    | identifier_expression
     # PROPERTY
     ;
 
 property_name
     : identifier_name
-    | STRING_LITERAL
-    | NUMBER_LITERAL
+    | STRING_LITERAL   # LITERAL
+    | NUMBER_LITERAL   # LITERAL
     ;
 
 getter_tail
@@ -436,7 +441,7 @@ expression
     | expression assignment_operator expression            # ASSIGNMENT_EXPRESSION
     | expression TEMPLATE_LITERAL                          # TAGGED_TEMPLATE_EXPRESSION
     | TEMPLATE_LITERAL                                     # TEMPLATE_EXPRESSION
-    | IDENTIFIER
+    | IDENTIFIER                                           # IDENTIFIER  // convert to node
     | THIS_KW                                              # THIS_EXPRESSION
     | SUPER_KW                                             # SUPER_EXPRESSION
     | AWAIT_KW expression                                  # AWAIT_EXPRESSION
@@ -509,8 +514,8 @@ literal
 //     ;
 
 identifier_name
-    : IDENTIFIER
-    | reserved_word
+    : ( IDENTIFIER | reserved_word )
+    # IDENTIFIER
     ;
 
 reserved_word
