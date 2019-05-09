@@ -23,7 +23,7 @@ syntax_kinds! {
     language HTML;
 
     text {
-        /// Any text in the middle of the document, excluding whitespace
+        /// Any text in the middle of the document
         TEXT 1
         /// A quoted string (e.g. in an attribute `<input id="hello">`)
         QUOTED 2
@@ -46,7 +46,7 @@ syntax_kinds! {
         DOCUMENT_TYPE 101
         ELEMENT 102
         ATTRIBUTE 103
-        STYLE_BLOCK 104
-        SCRIPT_BLOCK 105
+        STYLE_BLOCK 105
+        SCRIPT_BLOCK 106
     }
 }

@@ -20,17 +20,16 @@ fn main() -> Result<(), io::Error> {
             let filetext = fs::read_to_string(filename)?;
             let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
             let diagnostics = analysis.diagnostics(file_id.into());
-            if diagnostics.is_empty() {
-                println!("Nothing to report!");
-                std::process::exit(0);
-            }
-
             let total = diagnostics.len();
+            let mut total_errors = 0;
             for line in diagnostics {
+                if line.starts_with("error:") {
+                    total_errors += 1;
+                }
                 eprintln!("{}", line);
             }
-            eprintln!("(total: {})", total);
-            std::process::exit(1);
+            eprintln!("info: found {} error(s)", total_errors);
+            std::process::exit(if total_errors > 0 { 1 } else { 0 });
         }
         ("parse", Some(args)) => {
             let filename = args.value_of("file").unwrap();

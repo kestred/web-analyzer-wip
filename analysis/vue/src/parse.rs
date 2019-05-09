@@ -21,7 +21,8 @@ pub(crate) trait ParseDatabase: SourceDatabase {
     fn parse_html(&self, input_id: InputId) -> TreeArc<html::Document>;
     fn parse_javascript(&self, input_id: InputId) -> TreeArc<javascript::Program>;
     fn parse_vue(&self, input_id: InputId) -> TreeArc<vue::Component>;
-    fn source_map_html(&self, input_id: InputId) -> Arc<AstIdMap>;
+    // fn source_map_html(&self, input_id: InputId) -> Arc<AstIdMap>;
+    // fn source_map_vue(&self, input_id: InputId) -> Arc<AstIdMap>;
 
     #[salsa::interned]
     fn script_id(&self, script: ScriptSource) -> ScriptId;
@@ -70,13 +71,28 @@ pub(crate) fn parse_vue(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<vu
     ast
 }
 
-pub(crate) fn source_map_html(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {
-    let document = db.parse_html(input_id);
-    Arc::new(AstIdMap::from_root(&document.syntax, |node| {
-        if let Some(node) = html::Script::cast(node) {
-            Some(&node.syntax)
-        } else {
-            None
-        }
-    }))
-}
+// pub(crate) fn source_map_html(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {
+//     let document = db.parse_html(input_id);
+//     Arc::new(AstIdMap::from_root(&document.syntax, |node| {
+//         if let Some(node) = html::Script::cast(node) {
+//             Some(&node.syntax)
+//         } else if let Some(node) = html::Style::cast(node) {
+//             Some(&node.style)
+//         } else {
+//             None
+//         }
+//     }))
+// }
+
+// pub(crate) fn source_map_vue(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {
+//     let document = db.parse_html(input_id);
+//     Arc::new(AstIdMap::from_root(&document.syntax, |node| {
+//         if let Some(node) = vue::ComponentScript::cast(node) {
+//             Some(&node.syntax)
+//         } else if let Some(node) = vue::ComponentStyle::cast(node) {
+//             Some(&node.style)
+//         } else {
+//             None
+//         }
+//     }))
+// }

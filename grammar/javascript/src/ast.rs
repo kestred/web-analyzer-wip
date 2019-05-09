@@ -35,3 +35,32 @@ impl Program {
             .collect()
     }
 }
+
+impl Expression {
+    fn new(root: &SyntaxNode) -> TreeArc<Expression> {
+        // N.B. an `Expression` can be one of many different syntax kinds
+        Expression::cast(root).unwrap().to_owned()
+    }
+
+    pub fn parse(text: &str) -> (TreeArc<Expression>, &str) {
+        let tokens = JavascriptLexer::new().tokenize(text);
+        let parser = Parser::new((text, &tokens).into(), ParseConfig {
+            debug_repr: syntax_kind::as_debug_repr,
+            max_rollback_size: 4,
+            preserve_comments: false,
+            preserve_whitespace: false,
+        });
+        let (root, remainder) = parser.parse(grammar::expression);
+        (Expression::new(&root), remainder.text)
+    }
+
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        self.syntax
+            .root_data().unwrap()
+            .downcast_ref::<Vec<(String, Location)>>().unwrap()
+            .into_iter()
+            .cloned()
+            .map(|(msg, loc)| SyntaxError::new(msg, loc))
+            .collect()
+    }
+}
