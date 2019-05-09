@@ -273,10 +273,16 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
         }
     }
 
-    /// Emit an `unexpected` error message, with a single expected kind
+    /// Emit an `unexpected` error message, with a single expected kind.
     pub fn expected(&mut self, kind: SyntaxKind) -> Option<Continue> {
         let unexpected: &str = self.as_str(self.current());
         self.error(format!("unexpected '{}', expected '{}'", unexpected, self.as_str(kind)))
+    }
+
+    /// The same as `expected` but with a contextual description of what syntax is being parsed.
+    pub fn expected_in(&mut self, rule: &str, kind: SyntaxKind) -> Option<Continue> {
+        let unexpected: &str = self.as_str(self.current());
+        self.error(format!("unexpected '{}' in '{}', expected '{}'", unexpected, rule, self.as_str(kind)))
     }
 
     /// Consume the next token if it is one of `kinds` or emit an error otherwise.
@@ -289,11 +295,18 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
         }
     }
 
-    /// Emit an `unexpected` error message, with an expected set of syntax kinds
+    /// Emit an `unexpected` error message, with an expected set of syntax kinds.
     pub fn expected_ts(&mut self, expected: &TokenSet) -> Option<Continue> {
         let unexpected: &str = self.as_str(self.current());
         let expected: Vec<&str> = expected.tokens().map(|k| self.as_str(*k)).collect();
-        self.error(format!("unexpected \"{}\", expected one of: {:?}", unexpected, expected))
+        self.error(format!("unexpected '{}', expected one of: {:?}", unexpected, expected))
+    }
+
+    /// The same as `expected_ts` but with a contextual description of what syntax is being parsed.
+    pub fn expected_ts_in(&mut self, rule: &str, expected: &TokenSet) -> Option<Continue> {
+        let unexpected: &str = self.as_str(self.current());
+        let expected: Vec<&str> = expected.tokens().map(|k| self.as_str(*k)).collect();
+        self.error(format!("unexpected '{}' in '{}', expected one of: {:?}", unexpected, rule, expected))
     }
 
     /// Consume the next token if `kind` matches.

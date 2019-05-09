@@ -32,7 +32,7 @@ pub fn source_element(p: &mut Parser) -> Option<Continue> {
     } else if p.at_ts(&tokenset![EXPORT_KW, IMPORT_KW]) {
         module_declaration(p)?;
     } else {
-        p.expected_ts(&AT_SOURCE_ELEMENT)?;
+        p.expected_ts_in("source_element", &AT_SOURCE_ELEMENT)?;
     }
     Some(Continue)
 }
@@ -43,7 +43,7 @@ pub fn module_declaration(p: &mut Parser) -> Option<Continue> {
     } else if p.at(EXPORT_KW) {
         export_declaration(p)?;
     } else {
-        p.expected_ts(&tokenset![EXPORT_KW, IMPORT_KW])?;
+        p.expected_ts_in("module_declaration", &tokenset![EXPORT_KW, IMPORT_KW])?;
     }
     Some(Continue)
 }
@@ -106,7 +106,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
     } else {
         // otherwise, emit an error
-        p.expected_ts(&_TS3)?;
+        p.expected_ts_in("export_declaration", &_TS3)?;
     }
     Some(Continue)
 }
@@ -168,7 +168,7 @@ pub fn import_declaration_list(p: &mut Parser) -> Option<Continue> {
         p.expect(R_CURLY)?;
     } else {
         // otherwise, emit an error
-        p.expected_ts(&tokenset![ASTERISK, IDENTIFIER, L_CURLY])?;
+        p.expected_ts_in("import_declaration_list", &tokenset![ASTERISK, IDENTIFIER, L_CURLY])?;
     }
     Some(Continue)
 }
@@ -212,7 +212,7 @@ pub fn import_specifier_special(p: &mut Parser) -> Option<Continue> {
             return None;
         }
     } else {
-        p.expected_ts(&tokenset![ASTERISK, IDENTIFIER])?;
+        p.expected_ts_in("import_specifier_special", &tokenset![ASTERISK, IDENTIFIER])?;
     }
     Some(Continue)
 }
@@ -279,7 +279,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
         labeled_statement(p)?;
     } else {
         // otherwise, emit an error
-        p.expected_ts(&AT_STATEMENT)?;
+        p.expected_ts_in("statement", &AT_STATEMENT)?;
     }
     Some(Continue)
 }
@@ -340,7 +340,7 @@ pub fn variable_declarator(p: &mut Parser) -> Option<Continue> {
         } else if p.at(L_CURLY) {
             object_expression(p)?;
         } else {
-            p.expected_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
+            p.expected_ts_in("variable_declarator", &tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
         }
         if p.at(EQ) {
             p.bump();
@@ -486,7 +486,7 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
         p.complete(_checkpoint.branch(&_marker), FOR_OF_STATEMENT);
     } else {
         // otherwise, emit an error
-        p.expected_ts(&_TS5)?;
+        p.expected_ts_in("for_statement", &_TS5)?;
     }
     Some(Continue)
 }
@@ -683,7 +683,7 @@ pub fn try_statement(p: &mut Parser) -> Option<Continue> {
         } else if p.at(FINALLY_KW) {
             finally_clause(p)?;
         } else {
-            p.expected_ts(&tokenset![CATCH_KW, FINALLY_KW])?;
+            p.expected_ts_in("try_statement", &tokenset![CATCH_KW, FINALLY_KW])?;
         }
         Some(Continue)
     });
@@ -781,7 +781,7 @@ pub fn class_element(p: &mut Parser) -> Option<Continue> {
     } else if p.at(SEMICOLON) {
         empty_statement(p)?;
     } else {
-        p.expected_ts(&AT_CLASS_ELEMENT)?;
+        p.expected_ts_in("class_element", &AT_CLASS_ELEMENT)?;
     }
     Some(Continue)
 }
@@ -831,7 +831,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
     } else {
         // otherwise, emit an error
-        p.expected_ts(&AT_METHOD_DEFINITION)?;
+        p.expected_ts_in("method_definition", &AT_METHOD_DEFINITION)?;
     }
     Some(Continue)
 }
@@ -899,7 +899,7 @@ pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
     } else if p.at(L_CURLY) {
         object_expression(p)?;
     } else {
-        p.expected_ts(&tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
+        p.expected_ts_in("formal_parameter_list", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
     Some(Continue)
 }
@@ -980,7 +980,7 @@ pub fn element_list(p: &mut Parser) -> Option<Continue> {
     } else if p.at(DOTDOTDOT) {
         last_element(p)?;
     } else {
-        p.expected_ts(&AT_ELEMENT_LIST)?;
+        p.expected_ts_in("element_list", &AT_ELEMENT_LIST)?;
     }
     Some(Continue)
 }
@@ -1109,7 +1109,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         p.complete(_marker, PROPERTY);
     } else {
         // otherwise, emit an error
-        p.expected_ts(&AT_PROPERTY)?;
+        p.expected_ts_in("property", &AT_PROPERTY)?;
     }
     Some(Continue)
 }
@@ -1122,7 +1122,7 @@ pub fn property_name(p: &mut Parser) -> Option<Continue> {
     } else if p.at(NUMBER_LITERAL) {
         p.bump();
     } else {
-        p.expected_ts(&AT_PROPERTY_NAME)?;
+        p.expected_ts_in("property_name", &AT_PROPERTY_NAME)?;
     }
     Some(Continue)
 }
@@ -1255,7 +1255,7 @@ pub fn arrow_function_parameters(p: &mut Parser) -> Option<Continue> {
         }
         p.expect(R_PAREN)?;
     } else {
-        p.expected_ts(&tokenset![IDENTIFIER, L_PAREN])?;
+        p.expected_ts_in("arrow_function_parameters", &tokenset![IDENTIFIER, L_PAREN])?;
     }
     Some(Continue)
 }
@@ -1272,7 +1272,7 @@ pub fn arrow_function_body(p: &mut Parser) -> Option<Continue> {
         function_body(p)?;
     } else {
         // otherwise, emit an error
-        p.expected_ts(&AT_EXPRESSION)?;
+        p.expected_ts_in("arrow_function_body", &AT_EXPRESSION)?;
     }
     Some(Continue)
 }
@@ -1294,7 +1294,7 @@ pub fn identifier_name(p: &mut Parser) -> Option<Continue> {
     } else if p.at_ts(&AT_RESERVED_WORD) {
         reserved_word(p)?;
     } else {
-        p.expected_ts(&AT_IDENTIFIER_NAME)?;
+        p.expected_ts_in("identifier_name", &AT_IDENTIFIER_NAME)?;
     }
     Some(Continue)
 }
@@ -1309,7 +1309,7 @@ pub fn reserved_word(p: &mut Parser) -> Option<Continue> {
     } else if p.at(FALSE_KW) {
         p.bump();
     } else {
-        p.expected_ts(&AT_RESERVED_WORD)?;
+        p.expected_ts_in("reserved_word", &AT_RESERVED_WORD)?;
     }
     Some(Continue)
 }
@@ -1416,7 +1416,7 @@ pub fn eos(p: &mut Parser) -> Option<Continue> {
     } else if p.at_line_terminator() {
     } else if p.at(R_CURLY) {
     } else {
-        p.expected_ts(&tokenset![EOF, SEMICOLON])?;
+        p.expected_ts_in("eos", &tokenset![EOF, SEMICOLON])?;
     }
     Some(Continue)
 }

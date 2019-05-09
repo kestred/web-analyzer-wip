@@ -54,17 +54,20 @@ pub(crate) fn input_language(db: &dyn ParseDatabase, input_id: InputId) -> Optio
 
 pub(crate) fn parse_html(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<html::Document> {
     let text = db.input_text(input_id);
-    html::Document::parse(&*text).0
+    let (ast, _) = html::Document::parse(&*text);
+    ast
 }
 
 pub(crate) fn parse_javascript(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<javascript::Program> {
     let text = db.input_text(input_id);
-    javascript::Program::parse(&*text).0
+    let (ast, _) = javascript::Program::parse(&*text);
+    ast
 }
 
 pub(crate) fn parse_vue(db: &dyn ParseDatabase, input_id: InputId) -> TreeArc<vue::Component> {
     let text = db.input_text(input_id);
-    vue::Component::parse(&*text).0
+    let (ast, _) = vue::Component::parse(&*text);
+    ast
 }
 
 pub(crate) fn source_map_html(db: &dyn ParseDatabase, input_id: InputId) -> Arc<AstIdMap> {

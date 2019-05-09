@@ -93,7 +93,8 @@ html_chardata
     ;
 
 html_misc
-    : COMMENT
+    : TEXT
+    | COMMENT
     | WHITESPACE
     ;
 

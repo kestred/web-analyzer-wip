@@ -15,7 +15,7 @@ use grammar_utils::parser::Continue;
 pub fn component(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE]) {
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
             component_pattern(p)?;
         }
         Some(Continue)
@@ -41,11 +41,11 @@ pub fn component_pattern(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at(L_ANGLE) {
         component_style(p)?;
-    } else if p.at_ts(&tokenset![COMMENT, WHITESPACE]) {
+    } else if p.at_ts(&tokenset![COMMENT, TEXT, WHITESPACE]) {
         html_misc(p)?;
     } else {
         // otherwise, emit an error
-        p.expected_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE])?;
+        p.expected_ts_in("component_pattern", &tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE])?;
     }
     Some(Continue)
 }
@@ -68,7 +68,7 @@ pub fn component_template(p: &mut Parser) -> Option<Continue> {
         } else if p.at(L_ANGLE_SLASH) {
             p.bump();
         } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            p.expected_ts_in("component_template", &tokenset![L_ANGLE, L_ANGLE_SLASH])?;
         }
         p.eat(WS);
         template_tag(p)?;
@@ -98,7 +98,7 @@ pub fn component_script(p: &mut Parser) -> Option<Continue> {
         } else if p.at(L_ANGLE_SLASH) {
             p.bump();
         } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            p.expected_ts_in("component_script", &tokenset![L_ANGLE, L_ANGLE_SLASH])?;
         }
         p.eat(WS);
         script_tag(p)?;
@@ -128,7 +128,7 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
         } else if p.at(L_ANGLE_SLASH) {
             p.bump();
         } else {
-            p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+            p.expected_ts_in("component_style", &tokenset![L_ANGLE, L_ANGLE_SLASH])?;
         }
         p.eat(WS);
         style_tag(p)?;
@@ -165,7 +165,7 @@ pub fn style_tag(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn html_content(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&_TS0) {
+    if p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE, TEXT, WHITESPACE]) {
         if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
             html_chardata(p)?;
         }
@@ -281,7 +281,7 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
         p.complete(_marker, ATTRIBUTE);
     } else {
         // otherwise, emit an error
-        p.expected_ts(&tokenset![AT, COLON, TAG_NAME])?;
+        p.expected_ts_in("attribute", &tokenset![AT, COLON, TAG_NAME])?;
     }
     Some(Continue)
 }
@@ -317,7 +317,7 @@ pub fn attribute_key(p: &mut Parser) -> Option<Continue> {
         p.bump();
         p.complete(_marker, ATTRIBUTE_KEY);
     } else {
-        p.expected_ts(&tokenset![L_SQUARE, TAG_NAME])?;
+        p.expected_ts_in("attribute_key", &tokenset![L_SQUARE, TAG_NAME])?;
     }
     Some(Continue)
 }
@@ -365,18 +365,18 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
             } else if p.at(L_ANGLE_SLASH) {
                 p.bump();
             } else {
-                p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+                p.expected_ts_in("element_pattern", &tokenset![L_ANGLE, L_ANGLE_SLASH])?;
             }
             p.eat(WS);
             p.expect(TAG_NAME)?;
             p.eat(WS);
             p.expect(R_ANGLE)?;
         } else {
-            p.expected_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
+            p.expected_ts_in("element_pattern", &tokenset![R_ANGLE, SLASH_R_ANGLE])?;
         }
     } else {
         // otherwise, emit an error
-        p.expected(TAG_NAME)?;
+        p.expected_in("element_pattern", TAG_NAME)?;
     }
     Some(Continue)
 }
@@ -412,7 +412,7 @@ pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
         p.bump();
     } else {
         // otherwise, emit an error
-        p.expected(TAG_NAME)?;
+        p.expected_in("empty_element_tag_name", TAG_NAME)?;
     }
     Some(Continue)
 }
@@ -426,7 +426,7 @@ pub fn html_chardata(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn html_misc(p: &mut Parser) -> Option<Continue> {
-    p.expect_ts(&tokenset![COMMENT, WHITESPACE])
+    p.expect_ts(&tokenset![COMMENT, TEXT, WHITESPACE])
 }
 
 pub fn script_block(p: &mut Parser) -> Option<Continue> {
@@ -442,4 +442,3 @@ pub fn style_block(p: &mut Parser) -> Option<Continue> {
     p.complete(_marker, STYLE_BLOCK);
     _ok
 }
-const _TS0: TokenSet = tokenset![COMMENT, L_ANGLE, MUSTACHE, TEXT, WHITESPACE];

@@ -5,7 +5,7 @@ use antlr_codegen::transform;
 use std::collections::{BTreeMap as Map, BTreeSet as Set};
 use std::fs;
 
-const MIN_CONST_TOKENSET: usize = 5;
+const MIN_CONST_TOKENSET: usize = 6;
 
 fn main() -> Result<(), std::io::Error> {
     let filepaths = &[
@@ -575,7 +575,7 @@ fn emit_choice_ambiguous(out: &mut String, db: &Database, rule: &str, pat: &Patt
     out.push_str(" else {\n");
     emit_depth(out, dep + 1);
     out.push_str("// otherwise, emit an error\n");
-    emit_expected(out, db, pat, dep + 1);
+    emit_expected(out, db, rule, pat, dep + 1);
     emit_depth(out, dep);
     out.push_str("}\n");
 }
@@ -757,7 +757,7 @@ fn emit_choice_ll1(out: &mut String, db: &Database, rule: &str, pat: &Pattern, d
     if !is_optional && must_be.symmetric_difference(&is_not).count() > 0 {
         emit_depth(out, dep);
         out.push_str("} else {\n");
-        emit_expected(out, db, pat, dep + 1);
+        emit_expected(out, db, rule, pat, dep + 1);
         emit_depth(out, dep);
         out.push_str("}\n");
     } else {
@@ -766,14 +766,18 @@ fn emit_choice_ll1(out: &mut String, db: &Database, rule: &str, pat: &Pattern, d
     }
 }
 
-fn emit_expected(out: &mut String, db: &Database, pat: &Pattern, dep: u8) {
+fn emit_expected(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u8) {
     let tokens = db.next_terms_of(pat);
     emit_depth(out, dep);
     if tokens.len() > 1 {
-        out.push_str("p.expected_ts(&");
+        out.push_str("p.expected_ts_in(\"");
+        out.push_str(rule);
+        out.push_str("\", &");
         emit_tokenset(out, db, tokens);
     } else {
-        out.push_str("p.expected(");
+        out.push_str("p.expected_in(\"");
+        out.push_str(rule);
+        out.push_str("\", ");
         out.push_str(&tokens.into_iter().next().unwrap());
     }
     out.push_str(")?;\n");

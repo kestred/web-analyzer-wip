@@ -20,7 +20,7 @@ pub fn document(p: &mut Parser) -> Option<Continue> {
             doctype(p)?;
         }
         p.eat(WS);
-        while p.at_ts(&tokenset![COMMENT, L_ANGLE, WHITESPACE]) {
+        while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
             elements(p)?;
         }
         Some(Continue)
@@ -51,11 +51,11 @@ pub fn doctype(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn elements(p: &mut Parser) -> Option<Continue> {
-    while p.at_ts(&tokenset![COMMENT, WHITESPACE]) {
+    while p.at_ts(&tokenset![COMMENT, TEXT, WHITESPACE]) {
         html_misc(p)?;
     }
     element(p)?;
-    while p.at_ts(&tokenset![COMMENT, WHITESPACE]) {
+    while p.at_ts(&tokenset![COMMENT, TEXT, WHITESPACE]) {
         html_misc(p)?;
     }
     Some(Continue)
@@ -104,18 +104,18 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
             } else if p.at(L_ANGLE_SLASH) {
                 p.bump();
             } else {
-                p.expected_ts(&tokenset![L_ANGLE, L_ANGLE_SLASH])?;
+                p.expected_ts_in("element_pattern", &tokenset![L_ANGLE, L_ANGLE_SLASH])?;
             }
             p.eat(WS);
             p.expect(TAG_NAME)?;
             p.eat(WS);
             p.expect(R_ANGLE)?;
         } else {
-            p.expected_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
+            p.expected_ts_in("element_pattern", &tokenset![R_ANGLE, SLASH_R_ANGLE])?;
         }
     } else {
         // otherwise, emit an error
-        p.expected(TAG_NAME)?;
+        p.expected_in("element_pattern", TAG_NAME)?;
     }
     Some(Continue)
 }
@@ -151,7 +151,7 @@ pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
         p.bump();
     } else {
         // otherwise, emit an error
-        p.expected(TAG_NAME)?;
+        p.expected_in("empty_element_tag_name", TAG_NAME)?;
     }
     Some(Continue)
 }
@@ -208,7 +208,7 @@ pub fn html_chardata(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn html_misc(p: &mut Parser) -> Option<Continue> {
-    p.expect_ts(&tokenset![COMMENT, WHITESPACE])
+    p.expect_ts(&tokenset![COMMENT, TEXT, WHITESPACE])
 }
 
 pub fn script_block(p: &mut Parser) -> Option<Continue> {
