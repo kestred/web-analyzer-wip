@@ -68,7 +68,7 @@ impl ParseConfig {
         fn skip_comments(k: SyntaxKind) -> bool {
             k == COMMENT
         }
-        fn skip_none(k: SyntaxKind) -> bool {
+        fn skip_none(_: SyntaxKind) -> bool {
             false
         }
 

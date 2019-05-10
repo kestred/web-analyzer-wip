@@ -1,7 +1,9 @@
-mod database;
+mod db;
+mod definitions;
 mod diagnostics;
 mod parse;
 mod syntax;
+mod types;
 
 use analysis_utils::{FileId, LineIndex, PackageGraph, SourceChange, SourceDatabase, SourceRootId};
 use grammar_utils::TreeArc;
@@ -9,7 +11,7 @@ use html_grammar::ast as html;
 use javascript_grammar::ast as javascript;
 use std::sync::Arc;
 
-use self::database::RootDatabase;
+use self::db::RootDatabase;
 use self::parse::{ParseDatabase, SourceLanguage};
 
 #[derive(Debug)]

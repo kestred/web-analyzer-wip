@@ -1,5 +1,5 @@
-use crate::database::RootDatabase;
-use crate::parse::{FileLikeId, ParseDatabase, SourceLanguage};
+use crate::db::RootDatabase;
+use crate::parse::{FileLikeId, ParseDatabase, ScriptSource, SourceLanguage};
 use rustc_hash::FxHashSet;
 use grammar_utils::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
 use html_grammar::ast as html;
@@ -63,24 +63,34 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         }
     }
 
-    // Find the component options
-    let maybe_script = scripts.into_iter().next()
-        .and_then(|n| n.syntax.children().find_map(html::Script::cast))
-        .and_then(|n| n.syntax.first_token())
-        .and_then(|content| {
-            assert_eq!(content.kind(), SCRIPT_CONTENT);
-            let (script, _) = js::Program::parse(content.text().as_str());
-            let errors = script.errors();
-            if !errors.is_empty() {
-                syntax_errors(&mut results, &db, file_id, content.range().start(), errors);
-                return None;
-            }
-            Some(script)
-        });
-    let maybe_default_export = maybe_script.as_ref()
-        .and_then(|n| n.syntax.children().find_map(js::ExportDefaultDeclaration::cast))
-        .and_then(|n| n.syntax.children().find_map(js::Expression::cast));
-    let maybe_options = maybe_default_export.and_then(|expr| match expr.kind() {
+    // Find the component script
+    let source_map = db.source_map_vue(file_id);
+    let script_node = match scripts.into_iter().next() {
+        Some(node) => node,
+        None => return results,
+    };
+    let script_block = script_node.syntax
+        .children()
+        .find_map(html::Script::cast)
+        .unwrap();
+
+    // TODO: Detect source language (e.g. handle `lang="ts"` attribute)
+    let script_id = db.script_id(ScriptSource {
+        ast_id: source_map.ast_id(script_block).with_file_id(file_id),
+        language: SourceLanguage::Javascript,
+    });
+    let script = db.parse_javascript(script_id.into());
+    {
+        let errors = script.errors();
+        if !errors.is_empty() {
+            syntax_errors(&mut results, &db, file_id, script_block.syntax.range().start(), errors);
+            return results
+        }
+    }
+
+    let maybe_default_export = script.syntax.children().find_map(js::ExportDefaultDeclaration::cast);
+    let maybe_default_expr = maybe_default_export.and_then(|n| n.syntax.children().find_map(js::Expression::cast));
+    let maybe_options = maybe_default_expr.and_then(|expr| match expr.kind() {
         js::ExpressionKind::CallExpression(call) => {
             let maybe_vue_extend = call.syntax.first_child().and_then(js::MemberExpression::cast)?;
             let maybe_vue = maybe_vue_extend.syntax.first_token()?;
@@ -141,6 +151,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         .and_then(|prop| prop.value()).map(AstNode::syntax)
         .and_then(js::ObjectExpression::cast);
 
+    // Compute "partial" type for rpops
     if let Some(vue_props) = vue_props.map(AstNode::syntax) {
         if let Some(arr) = js::ArrayExpression::cast(vue_props) {
             for el in arr.elements() {
@@ -225,6 +236,9 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     }
 
     // Check that all expressions in the template reference known vm properties
+
+    // TODO: Implement this
+    //results.push("info: checking template vm properties".into());
     for expression in expressions {
 
     }

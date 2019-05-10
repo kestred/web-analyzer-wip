@@ -2,7 +2,9 @@ use analysis_utils::SourceDatabase;
 
 #[salsa::database(
     analysis_utils::SourceDatabaseStorage,
+    crate::definitions::DefinitionDatabaseStorage,
     crate::parse::ParseDatabaseStorage,
+    crate::types::TypeDatabaseStorage,
 )]
 #[derive(Debug)]
 pub(crate) struct RootDatabase {

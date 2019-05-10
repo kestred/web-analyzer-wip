@@ -1,6 +1,6 @@
 use crate::parse::FileLikeId;
 use analysis_utils::{Arena, impl_arena_id};
-use grammar_utils::{AstNode, SyntaxKind, SyntaxNode, TextRange};
+use grammar_utils::{AstNode, SyntaxElement, SyntaxKind, SyntaxNode, TextRange};
 use std::{marker::PhantomData, hash::{Hash, Hasher}};
 
 /// `AstId` points to an AST node in any file.
@@ -9,7 +9,7 @@ use std::{marker::PhantomData, hash::{Hash, Hasher}};
 #[derive(Debug)]
 pub(crate) struct AstId<N: AstNode> {
     file_id: FileLikeId,
-    input_ast_id: InputAstId<N>,
+    local_ast_id: LocalAstId<N>,
 }
 
 impl<N: AstNode> Clone for AstId<N> {
@@ -21,13 +21,13 @@ impl<N: AstNode> Copy for AstId<N> {}
 
 impl<N: AstNode> PartialEq for AstId<N> {
     fn eq(&self, other: &Self) -> bool {
-        (self.file_id, self.input_ast_id) == (other.file_id, other.input_ast_id)
+        (self.file_id, self.local_ast_id) == (other.file_id, other.local_ast_id)
     }
 }
 impl<N: AstNode> Eq for AstId<N> {}
 impl<N: AstNode> Hash for AstId<N> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        (self.file_id, self.input_ast_id).hash(hasher);
+        (self.file_id, self.local_ast_id).hash(hasher);
     }
 }
 
@@ -39,33 +39,33 @@ impl<N: AstNode> AstId<N> {
 
 /// `AstId` points to an AST node in a specific file.
 #[derive(Debug)]
-pub(crate) struct InputAstId<N: AstNode> {
+pub(crate) struct LocalAstId<N: AstNode> {
     raw: AnonymousAstId,
     _ty: PhantomData<N>,
 }
 
-impl<N: AstNode> Clone for InputAstId<N> {
-    fn clone(&self) -> InputAstId<N> {
+impl<N: AstNode> Clone for LocalAstId<N> {
+    fn clone(&self) -> LocalAstId<N> {
         *self
     }
 }
-impl<N: AstNode> Copy for InputAstId<N> {}
+impl<N: AstNode> Copy for LocalAstId<N> {}
 
-impl<N: AstNode> PartialEq for InputAstId<N> {
+impl<N: AstNode> PartialEq for LocalAstId<N> {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
-impl<N: AstNode> Eq for InputAstId<N> {}
-impl<N: AstNode> Hash for InputAstId<N> {
+impl<N: AstNode> Eq for LocalAstId<N> {}
+impl<N: AstNode> Hash for LocalAstId<N> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         self.raw.hash(hasher);
     }
 }
 
-impl<N: AstNode> InputAstId<N> {
+impl<N: AstNode> LocalAstId<N> {
     pub(crate) fn with_file_id(self, file_id: FileLikeId) -> AstId<N> {
-        AstId { file_id, input_ast_id: self }
+        AstId { file_id, local_ast_id: self }
     }
 }
 
@@ -80,20 +80,6 @@ pub(crate) struct AstIdMap {
 }
 
 impl AstIdMap {
-    pub(crate) fn ast_id<N: AstNode>(&self, item: &N) -> InputAstId<N> {
-        let ptr = SyntaxNodePtr::new(item.syntax());
-        let raw = match self.arena.iter().find(|(_id, i)| **i == ptr) {
-            Some((it, _)) => it,
-            None => panic!(
-                "Can't find {:?} in AstIdMap:\n{:?}",
-                item.syntax(),
-                self.arena.iter().map(|(_id, i)| i).collect::<Vec<_>>(),
-            ),
-        };
-
-        InputAstId { raw, _ty: PhantomData }
-    }
-
     pub(crate) fn from_root<V>(root: &SyntaxNode, visit: V) -> AstIdMap
     where
         V: Fn(&SyntaxNode) -> Option<&SyntaxNode>
@@ -109,6 +95,30 @@ impl AstIdMap {
             }
         });
         map
+    }
+
+    pub(crate) fn ast_id<N: AstNode>(&self, item: &N) -> LocalAstId<N> {
+        let ptr = SyntaxNodePtr::new(item.syntax());
+        let raw = match self.arena.iter().find(|(_id, i)| **i == ptr) {
+            Some((it, _)) => it,
+            None => panic!(
+                "Can't find {:?} in AstIdMap:\n{:?}",
+                item.syntax(),
+                self.arena.iter().map(|(_id, i)| i).collect::<Vec<_>>(),
+            ),
+        };
+
+        LocalAstId { raw, _ty: PhantomData }
+    }
+
+    pub(crate) fn find_in_root<'r, T: AstNode>(&self, root: &'r SyntaxNode, id: AstId<T>) -> &'r T {
+        let ptr = self.arena[id.local_ast_id.raw];
+        let node = match root.covering_node(ptr.range) {
+            SyntaxElement::Node(node) => node,
+            SyntaxElement::Token(token) => token.parent(),
+        };
+        assert_eq!(node.kind(), ptr.kind);
+        T::cast(node).unwrap()
     }
 
     fn alloc(&mut self, item: &SyntaxNode) -> AnonymousAstId {

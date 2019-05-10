@@ -114,7 +114,7 @@ fn debug_dump(lang: SourceLanguage, node: &SyntaxNode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::database::RootDatabase;
+    use crate::db::RootDatabase;
     use crate::parse::SourceLanguage::{Html, Javascript};
     use super::*;
     use analysis_utils::{FileId, SourceDatabase};

@@ -15,6 +15,12 @@ impl From<FileId> for FileLikeId {
     }
 }
 
+impl From<ScriptId> for FileLikeId {
+    fn from(id: ScriptId) -> FileLikeId {
+        FileLikeId::Script(id)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct ScriptId(salsa::InternId);
 impl_intern_key!(ScriptId);
