@@ -34,7 +34,11 @@ where
                 match element {
                     SyntaxElement::Node(node) => writeln!(buf, "{}@{:?}", fmt_debug(node.kind()), node.range()).unwrap(),
                     SyntaxElement::Token(token) => {
-                        writeln!(buf, "{}@{:?}", fmt_debug(token.kind()), token.range()).unwrap();
+                        if token.text().is_heap_allocated() || token.text().trim().is_empty() {
+                            writeln!(buf, "{}@{:?}", fmt_debug(token.kind()), token.range()).unwrap();
+                        } else {
+                            writeln!(buf, "{}@{:?}  {:?}", fmt_debug(token.kind()), token.range(), token.text().as_str()).unwrap();
+                        }
                         let off = token.range().end();
                         while err_pos < errors.len() && errors[err_pos].offset() <= off {
                             indent!();

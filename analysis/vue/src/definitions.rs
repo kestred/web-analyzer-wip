@@ -31,7 +31,6 @@ pub(crate) fn decl_map_javascript(db: &dyn ParseDatabase, file_id: FileLikeId) -
     }))
 }
 
-
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) struct ItemLoc<N: AstNode> {
     pub(crate) ast_id: AstId<N>,

@@ -1,12 +1,13 @@
 use crate::db::RootDatabase;
 use crate::parse::{FileLikeId, ParseDatabase, ScriptSource, SourceLanguage};
-use rustc_hash::FxHashSet;
+use crate::types::{infer_property_name, infer_object_expression_type, InterfaceTy, PropertyTy, Ty, TypeOf};
 use grammar_utils::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
 use html_grammar::ast as html;
 use javascript_grammar::ast as js;
 use javascript_grammar::syntax_kind::*;
 use vue_grammar::ast as vue;
 use vue_grammar::syntax_kind::*;
+use rustc_hash::FxHashSet;
 
 pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     let mut results = Vec::new();
@@ -115,125 +116,81 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     };
 
     // Compute the `vm` (ViewModel) properties/accessors.
-    let mut vm_properties = Vec::new();
-    // TODO: Build proper type inference to replace this spaghetti
-    // TODO: Also probably just build proper AST accessors like `Property::key`
-    let vue_options = vue_options.properties().collect::<Vec<_>>();
-    let vue_props = vue_options.iter()
-        .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("props"))
-        .and_then(|prop| prop.value());
-    let vue_data = vue_options.iter()
-        .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("data"))
-        .and_then(|prop| prop.value())
-        .and_then(|expr| match expr.kind() {
-            js::ExpressionKind::ObjectExpression(object) => Some(object),
-            js::ExpressionKind::FunctionExpression(func) => Some(func)
-                .and_then(|f| f.syntax.last_child())
-                .and_then(js::BlockStatement::cast)
-                .and_then(|f| f.syntax.last_child())
-                .and_then(js::ReturnStatement::cast)
-                .and_then(|f| f.syntax.last_child())
-                .and_then(js::ObjectExpression::cast),
-            _ => None,
-        });
-    let vue_computed = vue_options.iter()
-        .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("computed"))
-        .and_then(|prop| prop.value()).map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast);
-    let vue_methods = vue_options.iter()
-        .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("methods"))
-        .and_then(|prop| prop.value()).map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast);
+    let mut vm = InterfaceTy::default();
+    vm.typeof_ = Some(vec![TypeOf::Object].into());
+    match get_object_property(vue_options, "props") {
+        Some(options) => match infer_props_types(options) {
+            Ok((partial, warnings)) => {
+                results.extend(warnings);
+                vm.merge(&partial);
+            }
+            Err(errors) => {
+                results.extend(errors);
+                return results;
+            }
+        },
+        None => (),
+    };
+    let vue_data = get_object_property(vue_options, "data")
+        .and_then(|expr| {
+            match expr.kind() {
+                js::ExpressionKind::ObjectExpression(object) => Some(object),
+                js::ExpressionKind::FunctionExpression(func) => Some(func)
+                    .and_then(|f| f.syntax.last_child())
+                    .and_then(js::BlockStatement::cast)
+                    .and_then(|f| f.syntax.last_child())
+                    .and_then(js::ReturnStatement::cast)
+                    .and_then(|f| f.syntax.last_child())
+                    .and_then(js::SequenceExpression::cast)
+                    .and_then(|f| f.syntax.last_child())
+                    .and_then(js::ObjectExpression::cast),
+                _ => None,
+            }
+        })
+        .map(infer_object_expression_type);
+    if let Some(partial) = vue_data.as_ref().and_then(Ty::as_interface) {
+        vm.merge(partial);
+    }
+    let vue_computed = get_object_property(vue_options, "computed")
+        .map(AstNode::syntax)
+        .and_then(js::ObjectExpression::cast)
+        .map(infer_object_expression_type);
+    if let Some(partial) = vue_computed.as_ref().and_then(Ty::as_interface) {
+        let mut tmp = partial.clone();
+        tmp.properties = tmp.properties.into_iter().map(|prop| {
+            // N.B. Since we don't infer function return types yet,
+            //      convert computed properties to the _any_ type.
+            PropertyTy { ident: prop.ident, type_: Ty::Any.into() }
+        }).collect();
+        vm.merge(&partial);
+    }
+    let vue_methods = get_object_property(vue_options, "methods")
+        .map(AstNode::syntax)
+        .and_then(js::ObjectExpression::cast)
+        .map(infer_object_expression_type);
+    if let Some(partial) = vue_methods.as_ref().and_then(Ty::as_interface) {
+        vm.merge(partial);
+    }
 
     // TODO: Move `vue_apollo` into some sort of `extensions` or `contrib` module
-    let vue_apollo = vue_options.iter()
-        .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("apollo"))
-        .and_then(|prop| prop.value()).map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast);
+    let vue_apollo = get_object_property(vue_options, "apollo")
+        .map(AstNode::syntax)
+        .and_then(js::ObjectExpression::cast)
+        .map(infer_object_expression_type);
+    if let Some(partial) = vue_apollo.as_ref().and_then(Ty::as_interface) {
+        let mut tmp = partial.clone();
+        tmp.properties = tmp.properties.into_iter().map(|prop| {
+            // N.B. Since we don't infer function return types yet,
+            //      convert computed properties to the _any_ type.
+            PropertyTy { ident: prop.ident, type_: Ty::Any.into() }
+        }).collect();
 
-    // Compute "partial" type for rpops
-    if let Some(vue_props) = vue_props.map(AstNode::syntax) {
-        if let Some(arr) = js::ArrayExpression::cast(vue_props) {
-            for el in arr.elements() {
-                match el.kind() {
-                    js::ExpressionKind::Literal(lit) => {
-                        if let Some(str_lit) = lit.syntax.first_token() {
-                            if str_lit.kind() == STRING_LITERAL {
-                                let raw = str_lit.text();
-                                let text = &raw[1 .. raw.len() - 1];
-                                if text.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                                    vm_properties.push((text.to_string(), ("any", true)));
-                                } else {
-                                    results.push(format!("warn(style): vue `props` names should be valid identifiers, but found \"{}\"", text));
-                                }
-                                continue;
-                            }
-                        }
-                    }
-                    _ => (),
-                }
-                results.push("error(correctness): vue `props` array must be an array of strings".into());
-                return results; // quit immediately; we probably can't figure out the vm type correctly
-            }
-        } else if let Some(obj) = js::ObjectExpression::cast(vue_props) {
-            for prop in obj.properties() {
-                if prop.computed() {
-                    results.push("error(pedantic): vue `props` keys should not be computed, but got `[...]: ...`".into());
-                    continue;
-                }
-
-                let type_ = match prop.value().unwrap().kind() {
-                    js::ExpressionKind::Identifier(ident) => {
-                        match ident.syntax.first_token().map(|t| t.text().as_str()) {
-                            Some("Array") => ("array", true /* or_undefined: true */), // TODO: Build a proper type structure
-                            Some("String") => ("string", true),
-                            Some("Object") => ("object", true),
-                            Some("Boolean") => ("bool", true),
-                            _ => ("any", false),
-                        }
-                    }
-                    js::ExpressionKind::ObjectExpression(prop_obj) => {
-                        let maybe_required = prop_obj.properties()
-                            .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("required"))
-                            .and_then(|prop| prop.value());
-                        let mut is_required = false;
-                        if let Some(required) = maybe_required {
-                            let required_raw = js::Literal::cast(&required.syntax)
-                                .and_then(|l| l.syntax.first_token())
-                                .map(|t| t.text().as_str())
-                                .unwrap();
-                            match required_raw {
-                                "true" => is_required = true,
-                                "false" => is_required = false,
-                                text =>  {
-                                    results.push(format!("error(pedantic): vue `prop.required` should be `true` or `false`, but got `{}`", text));
-                                }
-                            }
-                        }
-                        let maybe_type = prop_obj.properties()
-                            .find(|prop| property_name(prop).as_ref().map(|x| x.as_str()) == Some("type"))
-                            .and_then(js::Property::value).map(AstNode::syntax)
-                            .and_then(js::Identifier::cast).map(AstNode::syntax)
-                            .and_then(|x| x.first_token())
-                            .map(|x| x.text().as_str());
-                        let type_ = match maybe_type {
-                            Some("Array") => "array",
-                            Some("String") => "string",
-                            Some("Object") => "object",
-                            Some("Boolean") => "bool",
-                            _ => "any"
-                        };
-                        (type_, !is_required)
-                    }
-                    _ => ("any", false),
-                };
-                vm_properties.push((property_name(prop).unwrap(), type_));
-            }
-        } else {
-            results.push("error(pedantic): vue `props` must be an object or an array".into());
-            return results;
-        }
+        // Other properties (notably `data`) take precedence over apollo props
+        tmp.merge(&vm);
+        vm = tmp;
     }
+
+    eprintln!("Found: {:#?}", vm);
 
     // Check that all expressions in the template reference known vm properties
 
@@ -327,44 +284,105 @@ fn collect_expressions(template: &vue::ComponentTemplate) -> Vec<TextRange> {
     expressions
 }
 
-/// The string value of the key, if it not computed and is an identifier or literal
-///
-/// These example would return a value:
-///
-///     `0`, `hello`, `"goodbye"`, `false`
-///
-/// But these examples would not:
-///
-///     `0x55`, `["evaluated_literal"]`, `[1 + 2]`, `['Hello ${name}']`,
-///
-fn property_name(prop: &js::Property) -> Option<String> {
-    if prop.computed() {
-        return None;
-    }
+fn get_object_property<'a>(obj: &'a js::ObjectExpression, key: &str) -> Option<&'a js::Expression> {
+    obj.properties()
+        .find(|prop| infer_property_name(prop).as_ref().map(|x| x.as_str()) == Some(key))
+        .and_then(|prop| prop.value())
+}
 
-    let key = prop.key()?;
-    match key.kind() {
-        js::ExpressionKind::Identifier(ident) => {
-            let token = ident.syntax.first_token()?;
-            Some(token.text().to_string())
-        }
-        js::ExpressionKind::Literal(lit) => {
-            let lit = lit.syntax.first_token()?;
-            if lit.kind() == STRING_LITERAL {
-                let raw = lit.text();
-                unescape::unescape(&raw[1 .. raw.len() - 1])
-            } else if lit.kind() == NUMBER_LITERAL {
-                let num: f64 = lit.text().parse().ok()?;
-                Some(num.to_string())
-            } else {
-                Some(lit.text().to_string())
+fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>), Vec<String>> {
+    let mut object = InterfaceTy::default();
+    let mut messages = Vec::new();
+    match props.kind() {
+        js::ExpressionKind::ArrayExpression(arr) => {
+            for el in arr.elements() {
+                match el.kind() {
+                    js::ExpressionKind::Literal(lit) => {
+                        if let Some(str_lit) = lit.syntax.first_token() {
+                            if str_lit.kind() == STRING_LITERAL {
+                                let text = str_lit.text();
+                                let ident = &text[1 .. text.len() - 1];
+                                if ident.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                                    object.properties.push(PropertyTy { ident: ident.into(), type_: Ty::Any.into() });
+                                } else {
+                                    messages.push(format!("warn(style): vue `props` names should be valid identifiers, but found \"{}\"", text));
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+                messages.push("error(correctness): vue `props` array must be an array of strings".into());
+                return Err(messages);
             }
         }
-        js::ExpressionKind::FunctionExpression(func) => {
-            let ident = func.syntax.children().find_map(js::Identifier::cast)?;
-            let token = ident.syntax.first_token()?;
-            Some(token.text().to_string())
+        js::ExpressionKind::ObjectExpression(obj) => {
+            for prop in obj.properties() {
+                if prop.computed() {
+                    messages.push("error(pedantic): vue `props` keys should not be computed, but got `[...]: ...`".into());
+                    continue;
+                }
+                let ident = match infer_property_name(prop) {
+                    Some(name) => name,
+                    None => continue,
+                };
+                let type_ = match prop.value().unwrap().kind() {
+                    js::ExpressionKind::Identifier(ident) => {
+                        match ident.syntax.first_token().map(|t| t.text().as_str()) {
+                            Some("Array") => Ty::Union(vec![Ty::Array(Ty::Any.into()), Ty::Null, Ty::Undefined].into()),
+                            Some("String") => Ty::Union(vec![Ty::String, Ty::Null, Ty::Undefined].into()),
+                            Some("Object") => Ty::Union(vec![Ty::Object, Ty::Null, Ty::Undefined].into()),
+                            Some("Boolean") => Ty::Union(vec![Ty::Boolean, Ty::Null, Ty::Undefined].into()),
+                            _ => Ty::Hint(TypeOf::Null),
+                        }
+                    }
+                    js::ExpressionKind::ObjectExpression(prop_options) => {
+                        let mut is_required = false;
+                        if let Some(required) = get_object_property(prop_options, "required") {
+                            let required_raw = js::Literal::cast(&required.syntax)
+                                .and_then(|l| l.syntax.first_token())
+                                .map(|t| t.text().as_str())
+                                .unwrap();
+                            match required_raw {
+                                "true" => is_required = true,
+                                "false" => is_required = false,
+                                text =>  {
+                                    messages.push(format!("error(pedantic): vue `prop.required` should be `true` or `false`, but got `{}`", text));
+                                }
+                            }
+                        }
+                        // NOTE: incorrect but convenient to assume a default implies non-null
+                        let has_default = get_object_property(prop_options, "default").is_some();
+                        let maybe_type = get_object_property(prop_options, "type")
+                            .map(AstNode::syntax)
+                            .and_then(js::Identifier::cast)
+                            .map(AstNode::syntax)
+                            .and_then(|x| x.first_token())
+                            .map(|x| x.text().as_str());
+                        let type_ = match maybe_type {
+                            Some("Array") => Ty::Array(Ty::Any.into()),
+                            Some("String") => Ty::String,
+                            Some("Object") => Ty::Object,
+                            Some("Boolean") => Ty::Boolean,
+                            _ => Ty::Any,
+                        };
+                        if is_required || has_default {
+                            type_
+                        } else {
+                            Ty::Union(vec![type_, Ty::Null, Ty::Undefined].into())
+                        }
+                    }
+                    _ => Ty::Any,
+                };
+                object.properties.push(PropertyTy { ident: ident.into(), type_: type_.into() });
+            }
         }
-        _ => None,
+        _ => {
+            messages.push("error(pedantic): vue `props` must be an object or an array".into());
+            return Err(messages);
+        }
     }
+    object.typeof_ = Some(vec![TypeOf::Object].into());
+    Ok((object, messages))
 }

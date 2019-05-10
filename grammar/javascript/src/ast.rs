@@ -77,6 +77,12 @@ impl ObjectExpression {
     }
 }
 
+impl SequenceExpression {
+    pub fn expressions(&self) -> impl Iterator<Item = &Expression> {
+        self.syntax.children().filter_map(Expression::cast)
+    }
+}
+
 impl Property {
     pub fn key(&self) -> Option<&Expression> {
         self.syntax.first_child().and_then(Expression::cast)
