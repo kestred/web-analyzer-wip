@@ -1,4 +1,4 @@
-use crate::types::{InterfaceTy, PropertyTy, Ty, TypeOf};
+use crate::types::{InterfaceTy, PropertyDef, Ty, TypeOf};
 use grammar_utils::{AstNode, SmolStr};
 use javascript_grammar::ast;
 use javascript_grammar::syntax_kind::*;
@@ -73,7 +73,7 @@ pub(crate) fn infer_object_expression_type(expr: &ast::ObjectExpression) -> Ty {
             None => continue,
         };
         let type_ = infer_expression_type(value).into();
-        object.properties.push(PropertyTy { ident, type_ });
+        object.properties.push(PropertyDef { ident, type_ });
     }
     Ty::from(object)
 }

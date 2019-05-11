@@ -1,6 +1,6 @@
 use crate::db::RootDatabase;
 use crate::parse::{FileLikeId, ParseDatabase, ScriptSource, SourceLanguage};
-use crate::types::{infer_property_name, infer_object_expression_type, InterfaceTy, PropertyTy, Ty, TypeOf};
+use crate::types::{infer_property_name, infer_object_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
 use grammar_utils::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
 use html_grammar::ast as html;
 use javascript_grammar::ast as js;
@@ -160,7 +160,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         tmp.properties = tmp.properties.into_iter().map(|prop| {
             // N.B. Since we don't infer function return types yet,
             //      convert computed properties to the _any_ type.
-            PropertyTy { ident: prop.ident, type_: Ty::Any.into() }
+            PropertyDef { ident: prop.ident, type_: Ty::Any.into() }
         }).collect();
         vm.merge(&partial);
     }
@@ -182,7 +182,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         tmp.properties = tmp.properties.into_iter().map(|prop| {
             // N.B. Since we don't infer function return types yet,
             //      convert computed properties to the _any_ type.
-            PropertyTy { ident: prop.ident, type_: Ty::Any.into() }
+            PropertyDef { ident: prop.ident, type_: Ty::Any.into() }
         }).collect();
 
         // Other properties (notably `data`) take precedence over apollo props
@@ -190,14 +190,22 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         vm = tmp;
     }
 
-    eprintln!("Found: {:#?}", vm);
+    // eprintln!("Found: {:#?}", vm);
 
     // Check that all expressions in the template reference known vm properties
 
     // TODO: Implement this
     //results.push("info: checking template vm properties".into());
-    for expression in expressions {
-
+    eprintln!("with expressions: {}", expressions.len());
+    for expr in expressions {
+        match expr.kind() {
+            js::ExpressionKind::Identifier(ident) => {
+                let ident = ident.syntax.first_token().unwrap().text();
+                let exists_on_vm = vm.properties.iter().any(|p| &p.ident == ident);
+                eprintln!("for {}: exists? {}", ident, exists_on_vm);
+            }
+            k => eprintln!("FOUND KIND: {:?}", k),
+        }
     }
 
     // ==== TODOs =====
@@ -234,6 +242,16 @@ fn error_line_col(db: &RootDatabase, file_id: FileLikeId, pos: TextUnit) -> Stri
     format!("line {}, col {}", line_col.line + 1, line_col.col_utf16 + 1)
 }
 
+/// Find all of the variables captured by a closure (or other expression),
+/// returning a reference to each site that a captured variable is referenced.
+///
+/// This works by finding all "global" or undeclared variables in an expression,
+/// including references to `this`; which has uses in other contexts outside
+/// of closure expressions.
+fn find_captured_environment() -> Vec<&Identifier> {
+
+}
+
 fn collect_expressions(template: &vue::ComponentTemplate) -> Vec<TextRange> {
     let mut expressions = Vec::new();
     for visit in template.syntax.preorder_with_tokens() {
@@ -241,33 +259,38 @@ fn collect_expressions(template: &vue::ComponentTemplate) -> Vec<TextRange> {
             WalkEvent::Enter(syntax) => syntax,
             _ => continue,
         };
-
         match (syn_elem.kind(), syn_elem) {
+            (ATTRIBUTE, SyntaxElement::Node(node)) => {
+                // TODO: Capture `v-model`, `v-for`, `v-if` and `v-else-if` attributes
+            }
             (ATTRIBUTE_KEY, SyntaxElement::Node(node)) => {
-                if node.first_token().map(|tok| tok.kind()) == Some(L_SQUARE) {
-                    if let Some(ident) = node.first_child() {
-                        if ident.kind() != ERROR {
-                            assert_eq!(ident.kind(), IDENTIFIER);
-                            expressions.push(ident.range());
-                        }
+                let computed_key = node.children_with_tokens()
+                    .skip_while(|syn| syn.kind() != L_SQUARE)
+                    .skip(1) // eat `L_SQUARE`
+                    .skip_while(|syn| syn.kind() == WS)
+                    .next();
+                if let Some(ident) = computed_key {
+                    if ident.kind() != ERROR {
+                        assert_eq!(ident.kind(), IDENTIFIER);
+                        expressions.push(ident.range());
                     }
                 }
             }
-            (ATTRIBUTE_BINDING, SyntaxElement::Node(node)) => {
-                if let Some(value) = node.last_child() {
-                    if let Some(prev) = value.prev_sibling_or_token() {
-                        if prev.kind() == EQ && value.kind() != ERROR {
-                            expressions.push(value.range());
-                        }
-                    }
-                }
-            }
+            (ATTRIBUTE_BINDING, SyntaxElement::Node(node)) |
             (ATTRIBUTE_LISTENER, SyntaxElement::Node(node)) => {
-                if let Some(value) = node.last_child() {
-                    if let Some(prev) = value.prev_sibling_or_token() {
-                        if prev.kind() == EQ && value.kind() != ERROR {
-                            expressions.push(value.range());
-                        }
+                let value = node.children_with_tokens()
+                    .skip_while(|syn| syn.kind() != EQ)
+                    .skip(1) // eat `EQ`
+                    .skip_while(|syn| syn.kind() == WS)
+                    .next();
+                if let Some(value) = value {
+                    if value.kind() == QUOTED {
+                        let range = value.range();
+                        let start = TextUnit::from_usize(range.start().to_usize() + 1);
+                        let end = TextUnit::from_usize(range.end().to_usize() - 1);
+                        expressions.push(TextRange::from_to(start, end));
+                    } else if value.kind() == IDENT {
+                        expressions.push(value.range());
                     }
                 }
             }
@@ -303,7 +326,7 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                                 let text = str_lit.text();
                                 let ident = &text[1 .. text.len() - 1];
                                 if ident.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                                    object.properties.push(PropertyTy { ident: ident.into(), type_: Ty::Any.into() });
+                                    object.properties.push(PropertyDef { ident: ident.into(), type_: Ty::Any.into() });
                                 } else {
                                     messages.push(format!("warn(style): vue `props` names should be valid identifiers, but found \"{}\"", text));
                                 }
@@ -375,7 +398,7 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                     }
                     _ => Ty::Any,
                 };
-                object.properties.push(PropertyTy { ident: ident.into(), type_: type_.into() });
+                object.properties.push(PropertyDef { ident: ident.into(), type_: type_.into() });
             }
         }
         _ => {

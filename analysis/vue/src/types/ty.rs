@@ -75,7 +75,7 @@ impl Ty {
 ///
 #[derive(Clone, Debug, Default)]
 pub struct InterfaceTy {
-    pub properties: Vec<PropertyTy>,
+    pub properties: Vec<PropertyDef>,
     /// The signature the `value[index]` operator on this type.
     pub indexable: Option<(Arc<Ty>, Arc<Ty>)>,
     /// The signature of the value when called as a function
@@ -124,7 +124,7 @@ impl From<InterfaceTy> for Ty {
 
 /// A property name + type pair.
 #[derive(Clone, Debug)]
-pub struct PropertyTy {
+pub struct PropertyDef {
     pub ident: SmolStr,
     pub type_: Ty,
 }
