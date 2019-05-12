@@ -133,15 +133,16 @@ mod tests {
             r#"
 PROGRAM@[0; 17)
   FUNCTION_DECLARATION@[0; 17)
-    FUNCTION_KW@[0; 8)
+    FUNCTION_KW@[0; 8)  "function"
     WHITESPACE@[8; 9)
     IDENTIFIER@[9; 12)
-    L_PAREN@[12; 13)
-    R_PAREN@[13; 14)
+      IDENTIFIER@[9; 12)  "foo"
+    L_PAREN@[12; 13)  "("
+    R_PAREN@[13; 14)  ")"
     WHITESPACE@[14; 15)
     BLOCK_STATEMENT@[15; 17)
-      L_CURLY@[15; 16)
-      R_CURLY@[16; 17)
+      L_CURLY@[15; 16)  "{"
+      R_CURLY@[16; 17)  "}"
 "#
             .trim()
         );
@@ -156,22 +157,22 @@ PROGRAM@[0; 17)
             r#"
 DOCUMENT@[0; 46)
   ELEMENT@[0; 46)
-    L_ANGLE@[0; 1)
-    IDENTIFIER@[1; 9)
-    R_ANGLE@[9; 10)
+    L_ANGLE@[0; 1)  "<"
+    IDENTIFIER@[1; 9)  "template"
+    R_ANGLE@[9; 10)  ">"
     ELEMENT@[10; 35)
-      L_ANGLE@[10; 11)
-      IDENTIFIER@[11; 14)
+      L_ANGLE@[10; 11)  "<"
+      IDENTIFIER@[11; 14)  "img"
       WHITESPACE@[14; 15)
       ATTRIBUTE@[15; 32)
-        IDENTIFIER@[15; 18)
-        EQ@[18; 19)
-        QUOTED@[19; 32)
+        IDENTIFIER@[15; 18)  "alt"
+        EQ@[18; 19)  "="
+        QUOTED@[19; 32)  "\'Hello World\'"
       WHITESPACE@[32; 33)
-      SLASH_R_ANGLE@[33; 35)
-    L_ANGLE_SLASH@[35; 37)
-    IDENTIFIER@[37; 45)
-    R_ANGLE@[45; 46)
+      SLASH_R_ANGLE@[33; 35)  "/>"
+    L_ANGLE_SLASH@[35; 37)  "</"
+    IDENTIFIER@[37; 45)  "template"
+    R_ANGLE@[45; 46)  ">"
 "#
             .trim()
         );
@@ -193,15 +194,16 @@ DOCUMENT@[0; 46)
             r#"
 PROGRAM@[0; 17)
   FUNCTION_DECLARATION@[0; 17)
-    FUNCTION_KW@[0; 8)
+    FUNCTION_KW@[0; 8)  "function"
     WHITESPACE@[8; 9)
     IDENTIFIER@[9; 12)
-    L_PAREN@[12; 13)
-    R_PAREN@[13; 14)
+      IDENTIFIER@[9; 12)  "foo"
+    L_PAREN@[12; 13)  "("
+    R_PAREN@[13; 14)  ")"
     WHITESPACE@[14; 15)
     BLOCK_STATEMENT@[15; 17)
-      L_CURLY@[15; 16)
-      R_CURLY@[16; 17)
+      L_CURLY@[15; 16)  "{"
+      R_CURLY@[16; 17)  "}"
 "#
             .trim()
         );

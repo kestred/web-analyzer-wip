@@ -175,10 +175,11 @@ fn has_leaf_nodes(spec: &Tree, node: &ast::Interface) -> bool {
 
 fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
     if let Some(children) = spec.children.get(&node.name) {
-        let children = children
+        let mut children = children
             .into_iter()
             .flat_map(|c| spec.find_node(c))
             .collect::<Vec<_>>();
+        children.sort_by(|a, b| a.name.cmp(&b.name));
         out.push_str("    ast_node!(");
         out.push_str(&node.name);
         out.push_str(", enum ");
@@ -198,8 +199,33 @@ fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
                     } else {
                         out.push_str(&child.name.to_shouty_snake_case());
                     }
+                    out.push_str(",\n");
+
+                    // Recurse one level for to handle possible "leaf" inheritance
+                    if let Some(children) = spec.children.get(&child.name) {
+                        let children = children
+                            .into_iter()
+                            .flat_map(|c| spec.find_node(c))
+                            .collect::<Vec<_>>();
+                        for child in children {
+                            if is_leaf_node(spec, child) {
+                                out.push_str("        ");
+                                out.push_str(&child.name);
+                                out.push_str(" = ");
+                                if child.name == "Super" {
+                                    out.push_str("SUPER_EXPRESSION");
+                                } else if child.name == "TemplateLiteral" {
+                                    out.push_str("TEMPLATE_EXPRESSION");
+                                } else {
+                                    out.push_str(&child.name.to_shouty_snake_case());
+                                }
+                                out.push_str(",\n");
+                            }
+                        }
+                    }
+                } else {
+                    out.push_str(",\n");
                 }
-                out.push_str(",\n");
             }
         }
         out.push_str("    });\n");
@@ -216,6 +242,26 @@ fn try_emit_enum(out: &mut String, spec: &Tree, node: &ast::Interface) -> bool {
                 out.push_str("Kind::");
                 out.push_str(&child.name);
                 out.push_str("(node) => node.type_(),\n");
+
+                // Recurse one level for to handle possible "leaf" inheritance
+                if !is_leaf_node(spec, child) {
+                    continue;
+                }
+                if let Some(children) = spec.children.get(&child.name) {
+                    let children = children
+                        .into_iter()
+                        .flat_map(|c| spec.find_node(c))
+                        .collect::<Vec<_>>();
+                    for child in children {
+                        if is_leaf_node(spec, child) {
+                            out.push_str("                ");
+                            out.push_str(&node.name);
+                            out.push_str("Kind::");
+                            out.push_str(&child.name);
+                            out.push_str("(node) => node.type_(),\n");
+                        }
+                    }
+                }
             }
         }
         out.push_str("            }\n");

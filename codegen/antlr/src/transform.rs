@@ -163,6 +163,7 @@ pub fn unshift(pat: &Pattern) -> Option<(Pattern, Pattern)> {
 pub fn unshift_all(choices: &[Pattern]) -> (Pattern, Pattern) {
     let mut series = Vec::new();
     let mut choices = choices.into_iter().cloned().collect::<Vec<Pattern>>();
+    let mut choice_optional = false;
     if choices.is_empty() {
         return (Pattern::Empty, Pattern::Empty);
     } else if choices.len() == 1 {
@@ -176,20 +177,39 @@ pub fn unshift_all(choices: &[Pattern]) -> (Pattern, Pattern) {
         for pat in &choices {
             let (head, tail) = match unshift(&pat) {
                 Some(pair) => pair,
-                None => break 'done,
+                None => {
+                    choice_optional = true;
+                    break 'done;
+                }
             };
             if prefix.is_none() {
                 prefix = Some(head);
-            } else if prefix != Some(head.clone()) {
-                break 'done;
+            } else if prefix.as_ref() == Some(&head) {
+                /* ok */
+            } else {
+                match (&head, prefix.as_ref().unwrap()) {
+                    (left, Pattern::NodeStart(right)) if left == &**right => {
+                        /* ok */
+                    }
+                    (Pattern::NodeStart(left), right) if &**left == right => {
+                        prefix = Some(head);
+                    }
+                    _ => break 'done,
+                }
+
             }
             suffixes.push(tail);
         }
         series.push(prefix.unwrap());
         choices = suffixes;
     }
-    (
-        Pattern::Series(series).flatten_once(),
-        Pattern::Choice(choices).flatten_once(),
-    )
+
+    let tail =
+        if choice_optional && !series.is_empty() {
+            Pattern::Repeat(Box::new(Pattern::Choice(choices).flatten_once()), Repeat::ZeroOrOne)
+        } else {
+            Pattern::Choice(choices).flatten_once()
+        };
+    let head = Pattern::Series(series).flatten_once();
+    (head, tail)
 }

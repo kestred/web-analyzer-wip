@@ -13,176 +13,178 @@ pub mod ast {
     use grammar_utils::ast_node;
 
     ast_node!(Node, enum NodeKind {
-        Program = PROGRAM,
-        Function,
-        Statement,
-        SwitchCase = SWITCH_CASE,
         CatchClause = CATCH_CLAUSE,
-        VariableDeclarator = VARIABLE_DECLARATOR,
-        Expression,
-        Property = PROPERTY,
-        Pattern,
-        Super = SUPER_EXPRESSION,
-        SpreadElement = SPREAD_ELEMENT,
-        TemplateElement = TEMPLATE_ELEMENT,
         Class,
         ClassBody = CLASS_BODY,
+        Expression,
+        Function,
         MethodDefinition = METHOD_DEFINITION,
         ModuleDeclaration,
         ModuleSpecifier,
+        Pattern,
+        Program = PROGRAM,
+        Property = PROPERTY,
+        SpreadElement = SPREAD_ELEMENT,
+        Statement,
+        Super = SUPER_EXPRESSION,
+        SwitchCase = SWITCH_CASE,
+        TemplateElement = TEMPLATE_ELEMENT,
+        VariableDeclarator = VARIABLE_DECLARATOR,
     });
     impl Node {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
-                NodeKind::Program(node) => node.type_(),
-                NodeKind::Function(node) => node.type_(),
-                NodeKind::Statement(node) => node.type_(),
-                NodeKind::SwitchCase(node) => node.type_(),
                 NodeKind::CatchClause(node) => node.type_(),
-                NodeKind::VariableDeclarator(node) => node.type_(),
-                NodeKind::Expression(node) => node.type_(),
-                NodeKind::Property(node) => node.type_(),
-                NodeKind::Pattern(node) => node.type_(),
-                NodeKind::Super(node) => node.type_(),
-                NodeKind::SpreadElement(node) => node.type_(),
-                NodeKind::TemplateElement(node) => node.type_(),
                 NodeKind::Class(node) => node.type_(),
                 NodeKind::ClassBody(node) => node.type_(),
+                NodeKind::Expression(node) => node.type_(),
+                NodeKind::Function(node) => node.type_(),
                 NodeKind::MethodDefinition(node) => node.type_(),
                 NodeKind::ModuleDeclaration(node) => node.type_(),
                 NodeKind::ModuleSpecifier(node) => node.type_(),
+                NodeKind::Pattern(node) => node.type_(),
+                NodeKind::Program(node) => node.type_(),
+                NodeKind::Property(node) => node.type_(),
+                NodeKind::SpreadElement(node) => node.type_(),
+                NodeKind::Statement(node) => node.type_(),
+                NodeKind::Super(node) => node.type_(),
+                NodeKind::SwitchCase(node) => node.type_(),
+                NodeKind::TemplateElement(node) => node.type_(),
+                NodeKind::VariableDeclarator(node) => node.type_(),
             }
         }
     }
     ast_node!(Function, enum FunctionKind {
+        ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
         FunctionDeclaration = FUNCTION_DECLARATION,
         FunctionExpression = FUNCTION_EXPRESSION,
-        ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
     });
     impl Function {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
+                FunctionKind::ArrowFunctionExpression(node) => node.type_(),
                 FunctionKind::FunctionDeclaration(node) => node.type_(),
                 FunctionKind::FunctionExpression(node) => node.type_(),
-                FunctionKind::ArrowFunctionExpression(node) => node.type_(),
             }
         }
     }
     ast_node!(Statement, enum StatementKind {
-        ExpressionStatement = EXPRESSION_STATEMENT,
         BlockStatement = BLOCK_STATEMENT,
-        EmptyStatement = EMPTY_STATEMENT,
-        DebuggerStatement = DEBUGGER_STATEMENT,
-        WithStatement = WITH_STATEMENT,
-        ReturnStatement = RETURN_STATEMENT,
-        LabeledStatement = LABELED_STATEMENT,
         BreakStatement = BREAK_STATEMENT,
         ContinueStatement = CONTINUE_STATEMENT,
+        DebuggerStatement = DEBUGGER_STATEMENT,
+        Declaration,
+        DoWhileStatement = DO_WHILE_STATEMENT,
+        EmptyStatement = EMPTY_STATEMENT,
+        ExpressionStatement = EXPRESSION_STATEMENT,
+        ForInStatement = FOR_IN_STATEMENT,
+        ForOfStatement = FOR_OF_STATEMENT,
+        ForStatement = FOR_STATEMENT,
         IfStatement = IF_STATEMENT,
+        LabeledStatement = LABELED_STATEMENT,
+        ReturnStatement = RETURN_STATEMENT,
         SwitchStatement = SWITCH_STATEMENT,
         ThrowStatement = THROW_STATEMENT,
         TryStatement = TRY_STATEMENT,
         WhileStatement = WHILE_STATEMENT,
-        DoWhileStatement = DO_WHILE_STATEMENT,
-        ForStatement = FOR_STATEMENT,
-        ForInStatement = FOR_IN_STATEMENT,
-        Declaration,
+        WithStatement = WITH_STATEMENT,
     });
     impl Statement {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
-                StatementKind::ExpressionStatement(node) => node.type_(),
                 StatementKind::BlockStatement(node) => node.type_(),
-                StatementKind::EmptyStatement(node) => node.type_(),
-                StatementKind::DebuggerStatement(node) => node.type_(),
-                StatementKind::WithStatement(node) => node.type_(),
-                StatementKind::ReturnStatement(node) => node.type_(),
-                StatementKind::LabeledStatement(node) => node.type_(),
                 StatementKind::BreakStatement(node) => node.type_(),
                 StatementKind::ContinueStatement(node) => node.type_(),
+                StatementKind::DebuggerStatement(node) => node.type_(),
+                StatementKind::Declaration(node) => node.type_(),
+                StatementKind::DoWhileStatement(node) => node.type_(),
+                StatementKind::EmptyStatement(node) => node.type_(),
+                StatementKind::ExpressionStatement(node) => node.type_(),
+                StatementKind::ForInStatement(node) => node.type_(),
+                StatementKind::ForOfStatement(node) => node.type_(),
+                StatementKind::ForStatement(node) => node.type_(),
                 StatementKind::IfStatement(node) => node.type_(),
+                StatementKind::LabeledStatement(node) => node.type_(),
+                StatementKind::ReturnStatement(node) => node.type_(),
                 StatementKind::SwitchStatement(node) => node.type_(),
                 StatementKind::ThrowStatement(node) => node.type_(),
                 StatementKind::TryStatement(node) => node.type_(),
                 StatementKind::WhileStatement(node) => node.type_(),
-                StatementKind::DoWhileStatement(node) => node.type_(),
-                StatementKind::ForStatement(node) => node.type_(),
-                StatementKind::ForInStatement(node) => node.type_(),
-                StatementKind::Declaration(node) => node.type_(),
+                StatementKind::WithStatement(node) => node.type_(),
             }
         }
     }
     ast_node!(Expression, enum ExpressionKind {
+        ArrayExpression = ARRAY_EXPRESSION,
+        ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
+        AssignmentExpression = ASSIGNMENT_EXPRESSION,
+        AwaitExpression = AWAIT_EXPRESSION,
+        BinaryExpression = BINARY_EXPRESSION,
+        CallExpression = CALL_EXPRESSION,
+        ClassExpression = CLASS_EXPRESSION,
+        ConditionalExpression = CONDITIONAL_EXPRESSION,
+        FunctionExpression = FUNCTION_EXPRESSION,
         Identifier = IDENTIFIER,
         Literal = LITERAL,
-        ThisExpression = THIS_EXPRESSION,
-        ArrayExpression = ARRAY_EXPRESSION,
-        ObjectExpression = OBJECT_EXPRESSION,
-        FunctionExpression = FUNCTION_EXPRESSION,
-        UnaryExpression = UNARY_EXPRESSION,
-        UpdateExpression = UPDATE_EXPRESSION,
-        BinaryExpression = BINARY_EXPRESSION,
-        AssignmentExpression = ASSIGNMENT_EXPRESSION,
         LogicalExpression = LOGICAL_EXPRESSION,
         MemberExpression = MEMBER_EXPRESSION,
-        ConditionalExpression = CONDITIONAL_EXPRESSION,
-        CallExpression = CALL_EXPRESSION,
-        NewExpression = NEW_EXPRESSION,
-        SequenceExpression = SEQUENCE_EXPRESSION,
-        ArrowFunctionExpression = ARROW_FUNCTION_EXPRESSION,
-        YieldExpression = YIELD_EXPRESSION,
-        TemplateLiteral = TEMPLATE_EXPRESSION,
-        TaggedTemplateExpression = TAGGED_TEMPLATE_EXPRESSION,
-        ClassExpression = CLASS_EXPRESSION,
         MetaProperty = META_PROPERTY,
-        AwaitExpression = AWAIT_EXPRESSION,
+        NewExpression = NEW_EXPRESSION,
+        ObjectExpression = OBJECT_EXPRESSION,
+        SequenceExpression = SEQUENCE_EXPRESSION,
+        TaggedTemplateExpression = TAGGED_TEMPLATE_EXPRESSION,
+        TemplateLiteral = TEMPLATE_EXPRESSION,
+        ThisExpression = THIS_EXPRESSION,
+        UnaryExpression = UNARY_EXPRESSION,
+        UpdateExpression = UPDATE_EXPRESSION,
+        YieldExpression = YIELD_EXPRESSION,
     });
     impl Expression {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
+                ExpressionKind::ArrayExpression(node) => node.type_(),
+                ExpressionKind::ArrowFunctionExpression(node) => node.type_(),
+                ExpressionKind::AssignmentExpression(node) => node.type_(),
+                ExpressionKind::AwaitExpression(node) => node.type_(),
+                ExpressionKind::BinaryExpression(node) => node.type_(),
+                ExpressionKind::CallExpression(node) => node.type_(),
+                ExpressionKind::ClassExpression(node) => node.type_(),
+                ExpressionKind::ConditionalExpression(node) => node.type_(),
+                ExpressionKind::FunctionExpression(node) => node.type_(),
                 ExpressionKind::Identifier(node) => node.type_(),
                 ExpressionKind::Literal(node) => node.type_(),
-                ExpressionKind::ThisExpression(node) => node.type_(),
-                ExpressionKind::ArrayExpression(node) => node.type_(),
-                ExpressionKind::ObjectExpression(node) => node.type_(),
-                ExpressionKind::FunctionExpression(node) => node.type_(),
-                ExpressionKind::UnaryExpression(node) => node.type_(),
-                ExpressionKind::UpdateExpression(node) => node.type_(),
-                ExpressionKind::BinaryExpression(node) => node.type_(),
-                ExpressionKind::AssignmentExpression(node) => node.type_(),
                 ExpressionKind::LogicalExpression(node) => node.type_(),
                 ExpressionKind::MemberExpression(node) => node.type_(),
-                ExpressionKind::ConditionalExpression(node) => node.type_(),
-                ExpressionKind::CallExpression(node) => node.type_(),
-                ExpressionKind::NewExpression(node) => node.type_(),
-                ExpressionKind::SequenceExpression(node) => node.type_(),
-                ExpressionKind::ArrowFunctionExpression(node) => node.type_(),
-                ExpressionKind::YieldExpression(node) => node.type_(),
-                ExpressionKind::TemplateLiteral(node) => node.type_(),
-                ExpressionKind::TaggedTemplateExpression(node) => node.type_(),
-                ExpressionKind::ClassExpression(node) => node.type_(),
                 ExpressionKind::MetaProperty(node) => node.type_(),
-                ExpressionKind::AwaitExpression(node) => node.type_(),
+                ExpressionKind::NewExpression(node) => node.type_(),
+                ExpressionKind::ObjectExpression(node) => node.type_(),
+                ExpressionKind::SequenceExpression(node) => node.type_(),
+                ExpressionKind::TaggedTemplateExpression(node) => node.type_(),
+                ExpressionKind::TemplateLiteral(node) => node.type_(),
+                ExpressionKind::ThisExpression(node) => node.type_(),
+                ExpressionKind::UnaryExpression(node) => node.type_(),
+                ExpressionKind::UpdateExpression(node) => node.type_(),
+                ExpressionKind::YieldExpression(node) => node.type_(),
             }
         }
     }
     ast_node!(Pattern, enum PatternKind {
+        ArrayPattern = ARRAY_PATTERN,
+        AssignmentPattern = ASSIGNMENT_PATTERN,
         Identifier = IDENTIFIER,
         MemberExpression = MEMBER_EXPRESSION,
         ObjectPattern = OBJECT_PATTERN,
-        ArrayPattern = ARRAY_PATTERN,
         RestElement = REST_ELEMENT,
-        AssignmentPattern = ASSIGNMENT_PATTERN,
     });
     impl Pattern {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
+                PatternKind::ArrayPattern(node) => node.type_(),
+                PatternKind::AssignmentPattern(node) => node.type_(),
                 PatternKind::Identifier(node) => node.type_(),
                 PatternKind::MemberExpression(node) => node.type_(),
                 PatternKind::ObjectPattern(node) => node.type_(),
-                PatternKind::ArrayPattern(node) => node.type_(),
                 PatternKind::RestElement(node) => node.type_(),
-                PatternKind::AssignmentPattern(node) => node.type_(),
             }
         }
     }
@@ -199,48 +201,48 @@ pub mod ast {
         }
     }
     ast_node!(ModuleDeclaration, enum ModuleDeclarationKind {
-        ImportDeclaration = IMPORT_DECLARATION,
-        ExportNamedDeclaration = EXPORT_NAMED_DECLARATION,
-        ExportDefaultDeclaration = EXPORT_DEFAULT_DECLARATION,
         ExportAllDeclaration = EXPORT_ALL_DECLARATION,
+        ExportDefaultDeclaration = EXPORT_DEFAULT_DECLARATION,
+        ExportNamedDeclaration = EXPORT_NAMED_DECLARATION,
+        ImportDeclaration = IMPORT_DECLARATION,
     });
     impl ModuleDeclaration {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
-                ModuleDeclarationKind::ImportDeclaration(node) => node.type_(),
-                ModuleDeclarationKind::ExportNamedDeclaration(node) => node.type_(),
-                ModuleDeclarationKind::ExportDefaultDeclaration(node) => node.type_(),
                 ModuleDeclarationKind::ExportAllDeclaration(node) => node.type_(),
+                ModuleDeclarationKind::ExportDefaultDeclaration(node) => node.type_(),
+                ModuleDeclarationKind::ExportNamedDeclaration(node) => node.type_(),
+                ModuleDeclarationKind::ImportDeclaration(node) => node.type_(),
             }
         }
     }
     ast_node!(ModuleSpecifier, enum ModuleSpecifierKind {
-        ImportSpecifier = IMPORT_SPECIFIER,
+        ExportSpecifier = EXPORT_SPECIFIER,
         ImportDefaultSpecifier = IMPORT_DEFAULT_SPECIFIER,
         ImportNamespaceSpecifier = IMPORT_NAMESPACE_SPECIFIER,
-        ExportSpecifier = EXPORT_SPECIFIER,
+        ImportSpecifier = IMPORT_SPECIFIER,
     });
     impl ModuleSpecifier {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
-                ModuleSpecifierKind::ImportSpecifier(node) => node.type_(),
+                ModuleSpecifierKind::ExportSpecifier(node) => node.type_(),
                 ModuleSpecifierKind::ImportDefaultSpecifier(node) => node.type_(),
                 ModuleSpecifierKind::ImportNamespaceSpecifier(node) => node.type_(),
-                ModuleSpecifierKind::ExportSpecifier(node) => node.type_(),
+                ModuleSpecifierKind::ImportSpecifier(node) => node.type_(),
             }
         }
     }
     ast_node!(Declaration, enum DeclarationKind {
+        ClassDeclaration = CLASS_DECLARATION,
         FunctionDeclaration = FUNCTION_DECLARATION,
         VariableDeclaration = VARIABLE_DECLARATION,
-        ClassDeclaration = CLASS_DECLARATION,
     });
     impl Declaration {
         pub fn type_(&self) -> &'static str {
             match self.kind() {
+                DeclarationKind::ClassDeclaration(node) => node.type_(),
                 DeclarationKind::FunctionDeclaration(node) => node.type_(),
                 DeclarationKind::VariableDeclaration(node) => node.type_(),
-                DeclarationKind::ClassDeclaration(node) => node.type_(),
             }
         }
     }

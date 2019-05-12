@@ -264,7 +264,7 @@ fn emit_pattern<'a>(
                         emit_depth(out, dep);
                         // TODO: Handle ambiguous patterns after expecting one to succeed
                         out.push_str("loop {\n");
-                        emit_pattern(out, db, rule, pat, dep + 1, Precond::empty(), &[]);
+                        emit_pattern(out, db, rule, pat, dep + 1, precond, &[]);
                         emit_depth(out, dep + 1);
                         out.push_str("if !");
                         emit_lookahead(out, db, &ts, true);
@@ -465,6 +465,10 @@ fn emit_choice(
     };
     if !prefix.is_empty() {
         emit_pattern(out, db, rule, &prefix, dep, precond.take(), &[]);
+        match suffix {
+            Pattern::Choice(..) => (),
+            _ => return emit_pattern(out, db, rule, &suffix, dep, precond, &[]),
+        }
     }
 
     // If the remaining pattern is unambiguous, emit a simple 1-token lookahead parser

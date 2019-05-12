@@ -97,11 +97,11 @@ pub(crate) fn infer_unary_expression_type(expr: &ast::UnaryExpression) -> Ty {
 ///
 /// These example would return a value:
 ///
-///     `0`, `hello`, `"goodbye"`, `false`
+/// > `0`, `hello`, `"goodbye"`, `false`
 ///
 /// But these examples would not:
 ///
-///     `0x55`, `["evaluated_literal"]`, `[1 + 2]`, `['Hello ${name}']`,
+/// > `0x55`, `["evaluated_literal"]`, `[1 + 2]`, `['Hello ${name}']`,
 ///
 pub(crate) fn infer_property_name(prop: &ast::Property) -> Option<SmolStr> {
     if prop.computed() {
@@ -111,8 +111,7 @@ pub(crate) fn infer_property_name(prop: &ast::Property) -> Option<SmolStr> {
     let key = prop.key()?;
     match key.kind() {
         ast::ExpressionKind::Identifier(ident) => {
-            let token = ident.syntax.first_token()?;
-            Some(token.text().clone())
+            Some(ident.name().into())
         }
         ast::ExpressionKind::Literal(lit) => {
             let lit = lit.syntax.first_token()?;
@@ -127,9 +126,10 @@ pub(crate) fn infer_property_name(prop: &ast::Property) -> Option<SmolStr> {
             }
         }
         ast::ExpressionKind::FunctionExpression(func) => {
-            let ident = func.syntax.children().find_map(ast::Identifier::cast)?;
-            let token = ident.syntax.first_token()?;
-            Some(token.text().clone())
+            func.syntax.children()
+                .find_map(ast::Identifier::cast)
+                .map(ast::Identifier::name)
+                .map(|s| s.into())
         }
         _ => None,
     }

@@ -423,7 +423,7 @@ impl From<Grammar> for Database {
             for dep in non_terminals(&rule.pattern) {
                 let right = match reference.get(dep.as_str()) {
                     Some(idx) => idx,
-                    None => panic!("rule `{}` is not defined", dep),
+                    None => panic!("rule `{}` is not defined (in rule `{}`)", dep, rule.name),
                 };
                 topology.add_edge(*left, *right, ());
             }

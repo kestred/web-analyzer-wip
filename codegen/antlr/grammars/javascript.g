@@ -46,17 +46,17 @@ module_declaration
     ;
 
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (from_kw {at(STRING_LITERAL)}? literal)?
+    : EXPORT_KW '{' export_specifier_list '}' (from_kw {at(STRING_LITERAL)}? literal)? eos
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW variable_declaration
+    | EXPORT_KW variable_declaration eos
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW DEFAULT_KW class_declaration
+    | EXPORT_KW DEFAULT_KW class_declaration eos
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW DEFAULT_KW function_declaration
+    | EXPORT_KW DEFAULT_KW function_declaration eos
     # EXPORT_DEFAULT_DECLARATION
     | EXPORT_KW DEFAULT_KW expression eos
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK from_kw {at(STRING_LITERAL)}? literal
+    | EXPORT_KW ASTERISK from_kw {at(STRING_LITERAL)}? literal eos
     # EXPORT_ALL_DECLARATION
     ;
 
@@ -65,12 +65,12 @@ export_specifier_list
     ;
 
 export_specifier_atom
-    : IDENTIFIER (as_kw IDENTIFIER)?
+    : identifier (as_kw identifier)?
     # EXPORT_SPECIFIER
     ;
 
 import_declaration
-    : IMPORT_KW import_declaration_list from_kw {at(STRING_LITERAL)}? literal
+    : IMPORT_KW import_declaration_list from_kw {at(STRING_LITERAL)}? literal eos
     # IMPORT_DECLARATION
     ;
 
@@ -84,14 +84,14 @@ import_specifier_list
     ;
 
 import_specifier_atom
-    : IDENTIFIER (as_kw IDENTIFIER)?
+    : identifier (as_kw identifier)?
     # IMPORT_SPECIFIER
     ;
 
 import_specifier_special
-    : IDENTIFIER
+    : identifier
     # IMPORT_DEFAULT_SPECIFIER
-    | ASTERISK as_kw IDENTIFIER
+    | ASTERISK as_kw identifier
     # IMPORT_NAMESPACE_SPECIFIER
     ;
 
@@ -142,7 +142,7 @@ variable_declarator_list
     ;
 
 variable_declarator
-    : (IDENTIFIER | array_expression | object_expression) ('=' expression)?  // ES6: Array & Object Matching
+    : (identifier | array_expression | object_expression) ('=' expression)?  // ES6: Array & Object Matching
     # VARIABLE_DECLARATOR
     ;
 
@@ -152,20 +152,20 @@ empty_statement
     ;
 
 expression_statement
-    : {!at(L_CURLY) && !at(FUNCTION_KW)}? expression_sequence eos
+    : {!at(L_CURLY) && !at(FUNCTION_KW)}? expression_list eos
     # EXPRESSION_STATEMENT
     ;
 
 if_statement
-    : IF_KW '(' expression_sequence ')' statement (ELSE_KW statement)?
+    : IF_KW '(' expression_list ')' statement (ELSE_KW statement)?
     # IF_STATEMENT
     ;
 
 for_statement
-    : FOR_KW '(' expression_sequence? ';' expression_sequence? ';' expression_sequence? ')' statement_list
+    : FOR_KW '(' expression_list? ';' expression_list? ';' expression_list? ')' statement_list
     # FOR_STATEMENT
 
-    | FOR_KW '(' variable_declaration ';' expression_sequence? ';' expression_sequence? ')' statement
+    | FOR_KW '(' variable_declaration ';' expression_list? ';' expression_list? ')' statement
     # FOR_STATEMENT
 
     | FOR_KW '(' expression IN_KW expression ')' statement_list
@@ -182,37 +182,37 @@ for_statement
     ;
 
 while_statement
-    : WHILE_KW '(' expression_sequence ')' statement
+    : WHILE_KW '(' expression_list ')' statement
     # WHILE_STATEMENT
     ;
 
 do_while_statement
-    : DO_KW statement WHILE_KW '(' expression_sequence ')' eos
+    : DO_KW statement WHILE_KW '(' expression_list ')' eos
     # DO_WHILE_STATEMENT
     ;
 
 continue_statement
-    : CONTINUE_KW ({!at_line_terminator()}? IDENTIFIER)? eos
+    : CONTINUE_KW ({!at_line_terminator()}? identifier)? eos
     # CONTINUE_STATEMENT
     ;
 
 break_statement
-    : BREAK_KW ({!at_line_terminator()}? IDENTIFIER)? eos
+    : BREAK_KW ({!at_line_terminator()}? identifier)? eos
     # BREAK_STATEMENT
     ;
 
 return_statement
-    : RETURN_KW ({!at_line_terminator()}? expression_sequence)? eos
+    : RETURN_KW ({!at_line_terminator()}? expression_list)? eos
     # RETURN_STATEMENT
     ;
 
 with_statement
-    : WITH_KW '(' expression_sequence ')' statement
+    : WITH_KW '(' expression_list ')' statement
     # WITH_STATEMENT
     ;
 
 switch_statement
-    : SWITCH_KW '(' expression_sequence ')' case_block
+    : SWITCH_KW '(' expression_list ')' case_block
     # SWITCH_STATEMENT
     ;
 
@@ -225,7 +225,7 @@ case_clauses
     ;
 
 case_clause
-    : CASE_KW expression_sequence ':' statement_list?
+    : CASE_KW expression_list ':' statement_list?
     # SWITCH_CASE
     ;
 
@@ -235,12 +235,12 @@ default_clause
     ;
 
 labeled_statement
-    : IDENTIFIER ':' statement
+    : identifier ':' statement
     # LABELED_STATEMENT
     ;
 
 throw_statement
-    : THROW_KW {!at_line_terminator()}? expression_sequence eos
+    : THROW_KW {!at_line_terminator()}? expression_list eos
     # THROW_STATEMENT
     ;
 
@@ -250,7 +250,7 @@ try_statement
     ;
 
 catch_clause
-    : CATCH_KW '(' IDENTIFIER ')' block
+    : CATCH_KW '(' identifier_pattern ')' block
     # CATCH_CLAUSE
     ;
 
@@ -264,12 +264,12 @@ debugger_statement
     ;
 
 function_declaration
-    : FUNCTION_KW '*'? IDENTIFIER '(' formal_parameter_list? ')' function_body
+    : (async_kw FUNCTION_KW | FUNCTION_KW '*'?) identifier '(' formal_parameter_list? ')' function_body
     # FUNCTION_DECLARATION
     ;
 
 class_declaration
-    : CLASS_KW IDENTIFIER class_tail
+    : CLASS_KW identifier class_tail
     # CLASS_DECLARATION
     ;
 
@@ -304,23 +304,32 @@ method_tail
     ;
 
 generator_method
-    : ('*' | async_kw)? identifier_name '(' formal_parameter_list? ')' function_body
+    : ('*' | async_kw)? identifier_or_keyword '(' formal_parameter_list? ')' function_body
     # FUNCTION_EXPRESSION
     ;
 
 formal_parameter_list
-    : formal_parameter_arg (',' formal_parameter_arg)* (',' last_formal_parameter_arg)?
-    | last_formal_parameter_arg
-    | array_expression                            // ES6: Parameter Context Matching
-    | object_expression                           // ES6: Parameter Context Matching
+    : formal_parameter (',' formal_parameter)* (',' formal_parameter_last)?
+    | formal_parameter_last
+    | array_expression                         // ES6: Parameter Context Matching
+    # ARRAY_PATTERN
+    | object_expression                        // ES6: Parameter Context Matching
+    # OBJECT_PATTERN
     ;
 
-formal_parameter_arg
-    : IDENTIFIER ('=' expression)?      // ES6: Initialization
+formal_parameter
+    : identifier_pattern ('=' expression)?     // ES6: Initialization
+    # ASSIGNMENT_PATTERN
     ;
 
-last_formal_parameter_arg                      // ES6: Rest Parameter
-    : '...' IDENTIFIER
+formal_parameter_last                          // ES6: Rest Parameter
+    : '...' identifier_pattern
+    # REST_ELEMENT
+    ;
+
+identifier_pattern
+    : IDENTIFIER         // N.B. this will eventually be updated to include capturing optional type annotations
+    # IDENTIFIER
     ;
 
 function_body
@@ -343,7 +352,7 @@ element_list
     ;
 
 last_element
-    : '...' IDENTIFIER  // ES6: Spread Operator
+    : '...' identifier  // ES6: Spread Operator
     # SPREAD_ELEMENT
     ;
 
@@ -352,7 +361,16 @@ object_expression
     # OBJECT_EXPRESSION
     ;
 
-identifier_expression
+identifier
+    /* The `identifer` rule converts an IDENTIFIER token into a node.
+     *
+     * This rule should be used for identifiers which are non-keyword and
+     * which can never have a type annotation.
+     *
+     *  - In rules where the identifier can be a keyword, use `identifier_or_keyword` instead
+     *  - In rules that accept a type annotation, use `identifier_pattern` instead
+     */
+
     : IDENTIFIER
     # IDENTIFIER // convert to node
     ;
@@ -368,12 +386,12 @@ property
     # PROPERTY
     | generator_method
     # PROPERTY
-    | identifier_expression
+    | identifier
     # PROPERTY
     ;
 
 property_name
-    : identifier_name
+    : identifier_or_keyword
     | STRING_LITERAL   # LITERAL
     | NUMBER_LITERAL   # LITERAL
     ;
@@ -384,7 +402,7 @@ getter_tail
     ;
 
 setter_tail
-    : '(' IDENTIFIER ')' function_body
+    : '(' identifier_pattern ')' function_body
     # FUNCTION_EXPRESSION
     ;
 
@@ -392,20 +410,21 @@ arguments
     : '(' ( expression (',' expression)* (',' last_argument)? | last_argument )? ')'
     ;
 
-last_argument                                  // ES6: Spread Operator
-    : '...' IDENTIFIER
+last_argument                        // ES6: Spread Operator
+    : '...' identifier
     ;
 
-expression_sequence
-    : expression (',' expression)*
+expression_list
+    : expression (',' expression)+
     # SEQUENCE_EXPRESSION
+    | expression                     // avoid wrapping in sequence
     ;
 
 expression
     : function_expression
     | class_expression
-    | expression '[' expression_sequence ']'               # MEMBER_EXPRESSION
-    | expression '.' identifier_name                       # MEMBER_EXPRESSION
+    | expression '[' expression_list ']'               # MEMBER_EXPRESSION
+    | expression '.' identifier_or_keyword                 # MEMBER_EXPRESSION
     | expression arguments                                 # CALL_EXPRESSION
     | NEW_KW expression arguments?                         # NEW_EXPRESSION
 
@@ -449,26 +468,26 @@ expression
     | array_expression
     | object_expression
     | arrow_function_expression
-    | '(' expression_sequence ')'
+    | '(' expression_list ')'
     ;
 
 class_expression
-    : CLASS_KW IDENTIFIER? class_tail
+    : CLASS_KW identifier? class_tail
     # CLASS_EXPRESSION
     ;
 
 function_expression
-    : FUNCTION_KW IDENTIFIER? '(' formal_parameter_list? ')' function_body
+    : FUNCTION_KW identifier? '(' formal_parameter_list? ')' function_body
     # FUNCTION_EXPRESSION
     ;
 
 arrow_function_expression
-    : arrow_function_parameters '=>' arrow_function_body
+    : async_kw? arrow_function_parameters '=>' arrow_function_body
     # ARROW_FUNCTION_EXPRESSION
     ;
 
 arrow_function_parameters
-    : IDENTIFIER
+    : identifier_pattern
     | '(' formal_parameter_list? ')'
     ;
 
@@ -512,7 +531,7 @@ literal
 //     | BinaryIntegerLiteral
 //     ;
 
-identifier_name
+identifier_or_keyword
     : ( IDENTIFIER | reserved_word )
     # IDENTIFIER
     ;

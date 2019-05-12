@@ -58,7 +58,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         let (expr, _) = js::Expression::parse(raw_expr);
         let errors = expr.errors();
         if errors.is_empty() {
-            expressions.push(expr);
+            expressions.push((expr, range));
         } else {
             syntax_errors(&mut results, &db, file_id, expr.syntax.range().start(), errors);
         }
@@ -131,23 +131,41 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         },
         None => (),
     };
-    let vue_data = get_object_property(vue_options, "data")
+    let vue_data_property = get_object_property(vue_options, "data");
+    let vue_data = vue_data_property
         .and_then(|expr| {
             match expr.kind() {
                 js::ExpressionKind::ObjectExpression(object) => Some(object),
                 js::ExpressionKind::FunctionExpression(func) => Some(func)
-                    .and_then(|f| f.syntax.last_child())
-                    .and_then(js::BlockStatement::cast)
-                    .and_then(|f| f.syntax.last_child())
-                    .and_then(js::ReturnStatement::cast)
-                    .and_then(|f| f.syntax.last_child())
-                    .and_then(js::SequenceExpression::cast)
-                    .and_then(|f| f.syntax.last_child())
-                    .and_then(js::ObjectExpression::cast),
+                    .and_then(|f| f.body())
+                    .and_then(|f| f.body().last())
+                    .and_then(|f| js::ReturnStatement::cast(&f.syntax).or_else(|| {
+                        results.push("warn(internal): could not find `return ...` in component's `data` method".into());
+                        None
+                    }))
+                    .and_then(|f| f.argument())
+                    .and_then(|f| js::ObjectExpression::cast(&f.syntax).or_else(|| {
+                        results.push("warn(internal): expected return type to be an object in component's `data` method".into());
+                        None
+                    })),
+                js::ExpressionKind::ArrowFunctionExpression(func) => Some(func)
+                    .and_then(|f| f.body())
+                    .and_then(|b| match b {
+                        js::ArrowFunctionBody::FunctionBody(block) => block.body().last()
+                            .and_then(|f| js::ReturnStatement::cast(&f.syntax))
+                            .and_then(|f| f.argument())
+                            .and_then(|f| js::ObjectExpression::cast(&f.syntax)),
+                        js::ArrowFunctionBody::Expression(expr) =>
+                             js::ObjectExpression::cast(&expr.syntax),
+                    }),
                 _ => None,
             }
         })
         .map(infer_object_expression_type);
+    if vue_data_property.is_some() && vue_data.is_none() {
+        results.push("warn(internal): could not infer type of component's `data`".into());
+    }
+
     if let Some(partial) = vue_data.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
     }
@@ -190,21 +208,14 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
         vm = tmp;
     }
 
-    // eprintln!("Found: {:#?}", vm);
-
     // Check that all expressions in the template reference known vm properties
-
-    // TODO: Implement this
-    //results.push("info: checking template vm properties".into());
-    eprintln!("with expressions: {}", expressions.len());
-    for expr in expressions {
-        match expr.kind() {
-            js::ExpressionKind::Identifier(ident) => {
-                let ident = ident.syntax.first_token().unwrap().text();
-                let exists_on_vm = vm.properties.iter().any(|p| &p.ident == ident);
-                eprintln!("for {}: exists? {}", ident, exists_on_vm);
+    for (expr, range) in expressions {
+        for (ident, node) in find_captured_environment(&expr) {
+            let exists_on_vm = vm.properties.iter().any(|p| p.ident == ident);
+            if !exists_on_vm {
+                let pos = error_line_col(db, file_id, range.start() + node.syntax.range().start());
+                results.push(format!("error(vue): [{}] property `{}` is not defined on the component", pos, ident))
             }
-            k => eprintln!("FOUND KIND: {:?}", k),
         }
     }
 
@@ -213,6 +224,8 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     //    globally in the project (via `Vue.component`) or included as a `Component`.
     //
     // 2. Check the `this.{property_name}` references exist in Vue apollo functions
+    //
+    // 3. Check whether the methods and properties accessed in the DOM exist in the corresponding VM property's type
     //
 
     results
@@ -248,8 +261,238 @@ fn error_line_col(db: &RootDatabase, file_id: FileLikeId, pos: TextUnit) -> Stri
 /// This works by finding all "global" or undeclared variables in an expression,
 /// including references to `this`; which has uses in other contexts outside
 /// of closure expressions.
-fn find_captured_environment() -> Vec<&Identifier> {
+fn find_captured_environment(expr: &js::Expression) -> Vec<(&str, &js::Expression)> {
+    let mut captures = Vec::new();
+    collect_captures(expr, &[], &mut captures);
+    captures
+}
 
+
+fn collect_captures<'a>(
+    expr: &'a js::Expression,
+    decls: &[&'a str],
+    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+) {
+    match expr.kind() {
+        js::ExpressionKind::Identifier(node) => {
+            let name = node.name();
+            if decls.iter().all(|decl| *decl != name) {
+                captures.push((name, expr));
+            }
+        }
+        js::ExpressionKind::Literal(node) => {
+            match node.kind() {
+                // TODO: Detect expressions used inside templates
+                js::LiteralKind::Template(token) => (),
+                _ => (),
+            }
+        }
+        js::ExpressionKind::ThisExpression(node) => {
+            captures.push(("this", expr));
+        }
+        js::ExpressionKind::ArrayExpression(node) => {
+            for el in node.elements() {
+                collect_captures(el, decls, captures);
+            }
+        }
+        js::ExpressionKind::ObjectExpression(node) => {
+            for prop in node.properties() {
+                if prop.computed() {
+                    collect_captures(prop.key().unwrap(), decls, captures);
+                }
+                collect_captures(prop.value().unwrap(), decls, captures);
+            }
+        },
+        js::ExpressionKind::FunctionExpression(node) => {
+            let mut fn_decls = decls.to_vec();
+            for param in node.params() {
+                collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
+            }
+            collect_block_captures(node.body().unwrap(), &fn_decls, captures);
+        }
+        js::ExpressionKind::UnaryExpression(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::UpdateExpression(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::BinaryExpression(node) => {
+            collect_captures(node.left().unwrap(), decls, captures);
+            collect_captures(node.right().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::AssignmentExpression(node) => {
+            let mut new_decls = decls.to_vec();
+            collect_pattern_decls_and_captures(node.left().unwrap(), &mut new_decls, captures, false);
+            collect_captures(node.right().unwrap(), decls /* N.B. assignment can't capture its own decls! */, captures);
+        }
+        js::ExpressionKind::LogicalExpression(node) => {
+            collect_captures(node.left().unwrap(), decls, captures);
+            collect_captures(node.right().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::MemberExpression(node) => {
+            collect_captures(node.object().unwrap(), decls, captures);
+            if node.computed() {
+                collect_captures(node.property().unwrap(), decls, captures);
+            }
+        }
+        js::ExpressionKind::ConditionalExpression(node) => {
+            collect_captures(node.test().unwrap(), decls, captures);
+            collect_captures(node.alternate().unwrap(), decls, captures);
+            collect_captures(node.consequent().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::CallExpression(node) => {
+            collect_captures(node.callee().unwrap(), decls, captures);
+            for arg in node.arguments() {
+                collect_captures(arg, decls, captures);
+            }
+        }
+        js::ExpressionKind::NewExpression(node) => {
+            collect_captures(node.callee().unwrap(), decls, captures);
+            for arg in node.arguments() {
+                collect_captures(arg, decls, captures);
+            }
+        }
+        js::ExpressionKind::SequenceExpression(node) => {
+            for expr in node.expressions() {
+                collect_captures(expr, decls, captures);
+            }
+        }
+        js::ExpressionKind::ArrowFunctionExpression(node) => {
+            let mut fn_decls = decls.to_vec();
+            for param in node.params() {
+                collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
+            }
+            match node.body().unwrap() {
+                js::ArrowFunctionBody::FunctionBody(block) => {
+                    collect_block_captures(block, &fn_decls, captures);
+                }
+                js::ArrowFunctionBody::Expression(expr) => {
+                    collect_captures(expr, &fn_decls, captures);
+                }
+            }
+        }
+        js::ExpressionKind::YieldExpression(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+        js::ExpressionKind::TemplateLiteral(node) => (), // TODO: Detect expressions used inside template literals
+        js::ExpressionKind::TaggedTemplateExpression(node) => {
+            collect_captures(node.tag().unwrap(), decls, captures);
+            // TODO: Detect expressions used inside template literals
+        }
+        js::ExpressionKind::ClassExpression(node) => (), // TODO: Implement
+        js::ExpressionKind::MetaProperty(node) => (), // TODO: Implement
+        js::ExpressionKind::AwaitExpression(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+    }
+}
+fn collect_block_captures<'a> (
+    block: &'a js::BlockStatement,
+    decls: &[&'a str],
+    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+) {
+    let mut decls = decls.to_vec();
+    for stmt in block.body() {
+        // TODO: Handle "hoisting" declarations.
+        //
+        // For `class`, `function` and `const` declarations, their names are hosted
+        // as if they were at the top of the lexical scope.
+        //
+        // With a `let` declaration it shadows outside variables that would otherwise
+        // be in scope but it is an error to reference it in before it's declared
+        // lexical location.
+        //
+        // With a `var` declaration it shadows outside variables that would otherwise
+        // be in scope but it is `undefined` if it is referenced before it's declared
+        // lexical location.
+        //
+        collect_statement_decls_and_captures(stmt, &mut decls, captures);
+    }
+}
+fn collect_statement_decls_and_captures<'a>(
+    stmt: &'a js::Statement,
+    decls: &mut Vec<&'a str>,
+    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+) {
+    match stmt.kind() {
+        js::StatementKind::ExpressionStatement(node) => {
+            collect_captures(node.expression().unwrap(), decls, captures);
+        }
+        js::StatementKind::BlockStatement(node) => {
+            collect_block_captures(node, decls, captures);
+        }
+        js::StatementKind::EmptyStatement(_) => (),
+        js::StatementKind::DebuggerStatement(_) => (),
+
+        // TODO: See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/with
+        js::StatementKind::WithStatement(_) => unimplemented!(),
+
+        js::StatementKind::ReturnStatement(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+        js::StatementKind::LabeledStatement(node) => {
+            collect_statement_decls_and_captures(node.body().unwrap(), decls, captures);
+        }
+        js::StatementKind::BreakStatement(_) => (),
+        js::StatementKind::ContinueStatement(_) => (),
+        // IfStatement = IF_STATEMENT,
+        // SwitchStatement = SWITCH_STATEMENT,
+        js::StatementKind::ThrowStatement(node) => {
+            collect_captures(node.argument().unwrap(), decls, captures);
+        }
+        // TryStatement = TRY_STATEMENT,
+        // WhileStatement = WHILE_STATEMENT,
+        // DoWhileStatement = DO_WHILE_STATEMENT,
+        // ForStatement = FOR_STATEMENT,
+        // ForInStatement = FOR_IN_STATEMENT,
+        // ForOfStatement = FOR_OF_STATEMENT,
+        js::StatementKind::Declaration(decl) => {
+            match decl.kind() {
+                js::DeclarationKind::FunctionDeclaration(node) => {
+                    decls.push(node.id().name());
+                    let mut fn_decls = decls.clone();
+                    for param in node.params() {
+                        collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
+                    }
+                    collect_block_captures(node.body().unwrap(), &mut fn_decls, captures);
+                }
+                js::DeclarationKind::VariableDeclaration(node) => {
+                    for decl in node.declarations() {
+                        collect_pattern_decls_and_captures(decl.id().unwrap(), decls, captures, true);
+                        if let Some(expr) = decl.init() {
+                            collect_captures(expr, decls, captures);
+                        }
+                    }
+                }
+                js::DeclarationKind::ClassDeclaration(node) => {
+                    decls.push(node.id().name());
+                    // TODO: Probably we need to recurse into the definition of the class here...
+                }
+            }
+        }
+        _ => {
+            // TODO: Implement all the block variations (If, Switch, Try, While, DoWhile, For, ForIn, ForOf)
+        }
+    }
+}
+fn collect_pattern_decls_and_captures<'a>(
+    pat: &'a js::Pattern,
+    decls: &mut Vec<&'a str>,
+    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+    declaration: bool,
+) {
+    match pat.kind() {
+        js::PatternKind::Identifier(ident) => {
+            if declaration {
+                decls.push(ident.name());
+            } else {
+                captures.push((ident.name(), ident.into()));
+            }
+        }
+
+        // TODO: Implement other patterns; with the current parser they should be `unreachable!()` but...
+        _ => unimplemented!(),
+    }
 }
 
 fn collect_expressions(template: &vue::ComponentTemplate) -> Vec<TextRange> {

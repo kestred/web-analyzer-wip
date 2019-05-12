@@ -98,10 +98,10 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             let checkpoint = p.checkpoint(true);
             arrow_function_expression(p);
 
-            // Otherwise, expect `expression_sequence`
+            // Otherwise, expect `expression_list`
             if !p.commit(checkpoint)?.is_ok() {
                 p.bump();
-                expression_sequence(p)?;
+                expression_list(p)?;
                 p.expect(R_PAREN)?;
             }
         } else {
@@ -124,11 +124,11 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         // Handle postfix expressions
         {
             // member_expression[p ≤ 19]
-            //     : expression '[' expression_sequence ']'
+            //     : expression '[' expression_list ']'
             //     # MEMBER_EXPRESSION
             //     ;
             // member_expression[p ≤ 18]
-            //     : expression '.' identifier_name
+            //     : expression '.' identifier_or_keyword
             //     # MEMBER_EXPRESSION
             //     ;
             // call_expression[p ≤ 17]
@@ -146,12 +146,12 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             while prec <= 19 && p.at_ts(&tokenset![L_SQUARE, DOT, L_PAREN, INCREMENT, DECREMENT]) {
                 if prec < 19 && p.at(L_SQUARE) {
                     p.bump();
-                    expression_sequence(p)?;
+                    expression_list(p)?;
                     p.expect(R_SQUARE)?;
                     p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
                 } else if  prec < 18 && p.at(DOT) {
                     p.bump();
-                    identifier_name(p)?;
+                    identifier_or_keyword(p)?;
                     p.complete_and_wrap(&marker, MEMBER_EXPRESSION);
                 } else if prec <= 17 && p.at(L_PAREN) {
                     arguments(p)?;
