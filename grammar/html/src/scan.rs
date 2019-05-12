@@ -1,4 +1,4 @@
-use grammar_utils::Scanner;
+use code_grammar::Scanner;
 
 pub fn is_html_tag_prefix(c: char) -> bool {
     (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')

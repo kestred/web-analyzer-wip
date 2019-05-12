@@ -1,5 +1,5 @@
 [package]
-name = "grammar_utils"
+name = "code_grammar"
 version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"

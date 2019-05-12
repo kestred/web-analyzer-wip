@@ -7,9 +7,9 @@ use crate::scan::{
     scan_regexp_literal,
     scan_template_literal,
 };
-use grammar_utils::{Lexer, Scanner, SyntaxKind};
-use grammar_utils::lexer::ResetableLexer;
-use grammar_utils::scan::{
+use code_grammar::{Lexer, Scanner, SyntaxKind};
+use code_grammar::lexer::ResetableLexer;
+use code_grammar::scan::{
     is_decimal,
     is_whitespace,
     scan_c_comment,

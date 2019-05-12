@@ -9,6 +9,6 @@ name = "estree_generate"
 path = "src/bin/generate.rs"
 
 [dependencies]
-grammar_utils = { path = "../../utils/grammar" }
+code_grammar = { path = "../../utils/grammar" }
 combine = "3.8.1"
 heck = "0.3.1"

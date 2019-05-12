@@ -1,4 +1,4 @@
-use grammar_utils::{syntax_kinds, SyntaxKind, SyntaxLanguage};
+use code_grammar::{syntax_kinds, SyntaxKind, SyntaxLanguage};
 
 pub use html_grammar::syntax_kind::{self as html, *};
 

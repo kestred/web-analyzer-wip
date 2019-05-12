@@ -1,5 +1,5 @@
-use crate::definitions::ClassId;
-use grammar_utils::SmolStr;
+use crate::ast::ClassId;
+use code_grammar::SmolStr;
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]

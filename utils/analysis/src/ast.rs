@@ -1,14 +1,13 @@
-use crate::parse::FileLikeId;
-use analysis_utils::{Arena, impl_arena_id};
-use grammar_utils::{AstNode, SyntaxElement, SyntaxKind, SyntaxNode, TextRange};
+use crate::{impl_arena_id, Arena, SourceId};
+use code_grammar::{AstNode, SyntaxElement, SyntaxKind, SyntaxNode, TextRange};
 use std::{marker::PhantomData, hash::{Hash, Hasher}};
 
 /// `AstId` points to an AST node in any file.
 ///
 /// It is stable across reparses, and can be used as salsa key/value.
 #[derive(Debug)]
-pub(crate) struct AstId<N: AstNode> {
-    file_id: FileLikeId,
+pub struct AstId<N: AstNode> {
+    file_id: SourceId,
     local_ast_id: LocalAstId<N>,
 }
 
@@ -32,14 +31,14 @@ impl<N: AstNode> Hash for AstId<N> {
 }
 
 impl<N: AstNode> AstId<N> {
-    pub(crate) fn file_id(&self) -> FileLikeId {
+    pub fn file_id(&self) -> SourceId {
         self.file_id
     }
 }
 
 /// `AstId` points to an AST node in a specific file.
 #[derive(Debug)]
-pub(crate) struct LocalAstId<N: AstNode> {
+pub struct LocalAstId<N: AstNode> {
     raw: AnonymousAstId,
     _ty: PhantomData<N>,
 }
@@ -64,23 +63,23 @@ impl<N: AstNode> Hash for LocalAstId<N> {
 }
 
 impl<N: AstNode> LocalAstId<N> {
-    pub(crate) fn with_file_id(self, file_id: FileLikeId) -> AstId<N> {
+    pub fn with_file_id(self, file_id: SourceId) -> AstId<N> {
         AstId { file_id, local_ast_id: self }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct AnonymousAstId(u32);
+pub struct AnonymousAstId(u32);
 impl_arena_id!(AnonymousAstId);
 
 /// Maps items' `SyntaxNode`s to `AnonymousAstId`s and back.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct AstIdMap {
+pub struct AstIdMap {
     arena: Arena<AnonymousAstId, SyntaxNodePtr>,
 }
 
 impl AstIdMap {
-    pub(crate) fn from_root<V>(root: &SyntaxNode, visit: V) -> AstIdMap
+    pub fn from_root<V>(root: &SyntaxNode, visit: V) -> AstIdMap
     where
         V: Fn(&SyntaxNode) -> Option<&SyntaxNode>
     {
@@ -97,7 +96,7 @@ impl AstIdMap {
         map
     }
 
-    pub(crate) fn ast_id<N: AstNode>(&self, item: &N) -> LocalAstId<N> {
+    pub fn ast_id<N: AstNode>(&self, item: &N) -> LocalAstId<N> {
         let ptr = SyntaxNodePtr::new(item.syntax());
         let raw = match self.arena.iter().find(|(_id, i)| **i == ptr) {
             Some((it, _)) => it,
@@ -111,7 +110,7 @@ impl AstIdMap {
         LocalAstId { raw, _ty: PhantomData }
     }
 
-    pub(crate) fn find_in_root<'r, T: AstNode>(&self, root: &'r SyntaxNode, id: AstId<T>) -> &'r T {
+    pub fn find_in_root<'r, T: AstNode>(&self, root: &'r SyntaxNode, id: AstId<T>) -> &'r T {
         let ptr = self.arena[id.local_ast_id.raw];
         let node = match root.covering_node(ptr.range) {
             SyntaxElement::Node(node) => node,

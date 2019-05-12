@@ -1,4 +1,4 @@
-use grammar_utils::{SyntaxKind, SyntaxLanguage};
+use code_grammar::{SyntaxKind, SyntaxLanguage};
 
 pub use javascript_grammar::syntax_kind::*;
 

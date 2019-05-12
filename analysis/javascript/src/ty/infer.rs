@@ -1,9 +1,9 @@
-use crate::types::{InterfaceTy, PropertyDef, Ty, TypeOf};
-use grammar_utils::{AstNode, SmolStr};
+use crate::ty::{InterfaceTy, PropertyDef, Ty, TypeOf};
+use code_grammar::{AstNode, SmolStr};
 use javascript_grammar::ast;
 use javascript_grammar::syntax_kind::*;
 
-pub(crate) fn infer_expression_type(expr: &ast::Expression) -> Ty {
+pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
     match expr.kind() {
         ast::ExpressionKind::Identifier(node) => {
             match node.syntax.first_token().map(|t| t.text()) {
@@ -103,7 +103,7 @@ pub(crate) fn infer_unary_expression_type(expr: &ast::UnaryExpression) -> Ty {
 ///
 /// > `0x55`, `["evaluated_literal"]`, `[1 + 2]`, `['Hello ${name}']`,
 ///
-pub(crate) fn infer_property_name(prop: &ast::Property) -> Option<SmolStr> {
+pub fn infer_property_name(prop: &ast::Property) -> Option<SmolStr> {
     if prop.computed() {
         return None;
     }

@@ -1,12 +1,14 @@
 [workspace]
 members = [
+  "analysis/html",
+  "analysis/javascript",
   "analysis/vue",
   "analysis/vue-cli",
   "codegen/antlr",
   "codegen/estree",
+  "grammar/html",
   "grammar/javascript",
   "grammar/typescript",
-  "grammar/html",
   "grammar/vue",
   "utils/analysis",
   "utils/grammar",

@@ -1,95 +1,60 @@
-use crate::db::RootDatabase;
-use crate::parse::{FileLikeId, ParseDatabase, ScriptSource, SourceLanguage};
-use crate::types::{infer_property_name, infer_object_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
-use grammar_utils::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
-use html_grammar::ast as html;
+use crate::VueDatabase;
+use code_analysis::{FileId, SourceDatabase, SourceId};
+use code_grammar::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
+use javascript_analysis::AstDatabase;
+use javascript_analysis::ty::{infer_property_name, infer_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
 use javascript_grammar::ast as js;
 use javascript_grammar::syntax_kind::*;
 use vue_grammar::ast as vue;
 use vue_grammar::syntax_kind::*;
 use rustc_hash::FxHashSet;
 
-pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
+pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     let mut results = Vec::new();
-    match db.input_language(file_id) {
-        Some(SourceLanguage::Vue) => (),
-
-        // Emit syntax errors only for `.html` and `.js` files
-        Some(SourceLanguage::Html) => {
-            let line_index = db.input_line_index(file_id);
-            let document = db.parse_html(file_id);
-            syntax_errors(&mut results, &db, file_id, TextUnit::default(), document.errors());
+    let ext = db.file_extension(file_id);
+    match ext.as_ref().map(|ext| ext.as_str()) {
+        Some("vue") => (),
+        _ => {
+            results.push("error(usage): expected file extension to be 'vue'".into());
             return results;
-        }
-        Some(SourceLanguage::Javascript) => {
-            let line_index = db.input_line_index(file_id);
-            let program = db.parse_javascript(file_id);
-            syntax_errors(&mut results, &db, file_id, TextUnit::default(), program.errors());
-            return results;
-        }
-
-        // TODO: Handle typescript
-        Some(SourceLanguage::Typescript) => return results,
-
-        None => {
-            results.push("warn(internal): `vue-analyzer` does not recognize the file extension".into())
         }
     }
 
     // Parse the vue component
-    let component = db.parse_vue(file_id);
-    syntax_errors(&mut results, &db, file_id, TextUnit::default(), component.errors());
-
-    // Check root vue component structure
-    let templates = component.root_templates().collect::<Vec<_>>();
-    if templates.len() > 1 {
-        results.push("error(correctness): vue component should contain exactly one root template".into());
-    }
-    let scripts = component.root_scripts().collect::<Vec<_>>();
-    if scripts.len() > 1 {
-        results.push("error(pedantic): vue component should contain exactly one script".into());
-    }
+    let file_id = db.file_source(file_id);
+    let component = db.vue_ast(file_id);
+    syntax_errors(&mut results, db, file_id, TextUnit::default(), component.errors());
 
     // Check all expressions in the template have valid syntax
     let mut expressions = Vec::new();
-    let expression_ranges = templates.into_iter().next().map(collect_expressions).unwrap_or_default();
+    let expression_ranges = component.template().map(collect_expressions).unwrap_or_default();
     for range in expression_ranges {
-        let raw_expr = &db.input_text(file_id)[range];
+        let raw_expr = &db.source_text(file_id)[range];
         let (expr, _) = js::Expression::parse(raw_expr);
         let errors = expr.errors();
         if errors.is_empty() {
             expressions.push((expr, range));
         } else {
-            syntax_errors(&mut results, &db, file_id, expr.syntax.range().start(), errors);
+            syntax_errors(&mut results, db, file_id, expr.syntax.range().start(), errors);
         }
     }
 
     // Find the component script
-    let source_map = db.source_map_vue(file_id);
-    let script_node = match scripts.into_iter().next() {
-        Some(node) => node,
+    let (source_id, _) = match db.component_script(file_id) {
+        Some(id) => id,
         None => return results,
     };
-    let script_block = script_node.syntax
-        .children()
-        .find_map(html::Script::cast)
-        .unwrap();
-
-    // TODO: Detect source language (e.g. handle `lang="ts"` attribute)
-    let script_id = db.script_id(ScriptSource {
-        ast_id: source_map.ast_id(script_block).with_file_id(file_id),
-        language: SourceLanguage::Javascript,
-    });
-    let script = db.parse_javascript(script_id.into());
+    let root = db.javascript_ast(source_id);
     {
-        let errors = script.errors();
+        let errors = root.errors();
         if !errors.is_empty() {
-            syntax_errors(&mut results, &db, file_id, script_block.syntax.range().start(), errors);
+            let script_block = component.script().unwrap().script().unwrap();
+            syntax_errors(&mut results, db, file_id, script_block.syntax.range().start(), errors);
             return results
         }
     }
 
-    let maybe_default_export = script.syntax.children().find_map(js::ExportDefaultDeclaration::cast);
+    let maybe_default_export = root.syntax.children().find_map(js::ExportDefaultDeclaration::cast);
     let maybe_default_expr = maybe_default_export.and_then(|n| n.syntax.children().find_map(js::Expression::cast));
     let maybe_options = maybe_default_expr.and_then(|expr| match expr.kind() {
         js::ExpressionKind::CallExpression(call) => {
@@ -135,7 +100,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     let vue_data = vue_data_property
         .and_then(|expr| {
             match expr.kind() {
-                js::ExpressionKind::ObjectExpression(object) => Some(object),
+                js::ExpressionKind::ObjectExpression(object) => Some(object.into()),
                 js::ExpressionKind::FunctionExpression(func) => Some(func)
                     .and_then(|f| f.body())
                     .and_then(|f| f.body().last())
@@ -143,36 +108,29 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
                         results.push("warn(internal): could not find `return ...` in component's `data` method".into());
                         None
                     }))
-                    .and_then(|f| f.argument())
-                    .and_then(|f| js::ObjectExpression::cast(&f.syntax).or_else(|| {
-                        results.push("warn(internal): expected return type to be an object in component's `data` method".into());
-                        None
-                    })),
+                    .and_then(|f| f.argument()),
                 js::ExpressionKind::ArrowFunctionExpression(func) => Some(func)
                     .and_then(|f| f.body())
                     .and_then(|b| match b {
                         js::ArrowFunctionBody::FunctionBody(block) => block.body().last()
                             .and_then(|f| js::ReturnStatement::cast(&f.syntax))
-                            .and_then(|f| f.argument())
-                            .and_then(|f| js::ObjectExpression::cast(&f.syntax)),
-                        js::ArrowFunctionBody::Expression(expr) =>
-                             js::ObjectExpression::cast(&expr.syntax),
+                            .and_then(|f| f.argument()),
+                        js::ArrowFunctionBody::Expression(expr) => Some(expr),
                     }),
                 _ => None,
             }
         })
-        .map(infer_object_expression_type);
-    if vue_data_property.is_some() && vue_data.is_none() {
-        results.push("warn(internal): could not infer type of component's `data`".into());
-    }
+        .map(infer_expression_type);
 
     if let Some(partial) = vue_data.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
+    }  else if vue_data_property.is_some() {
+        results.push("warn(internal): could not infer type of component's `data`".into());
     }
     let vue_computed = get_object_property(vue_options, "computed")
         .map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast)
-        .map(infer_object_expression_type);
+        .and_then(js::Expression::cast)
+        .map(infer_expression_type);
     if let Some(partial) = vue_computed.as_ref().and_then(Ty::as_interface) {
         let mut tmp = partial.clone();
         tmp.properties = tmp.properties.into_iter().map(|prop| {
@@ -184,8 +142,8 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     }
     let vue_methods = get_object_property(vue_options, "methods")
         .map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast)
-        .map(infer_object_expression_type);
+        .and_then(js::Expression::cast)
+        .map(infer_expression_type);
     if let Some(partial) = vue_methods.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
     }
@@ -193,8 +151,8 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     // TODO: Move `vue_apollo` into some sort of `extensions` or `contrib` module
     let vue_apollo = get_object_property(vue_options, "apollo")
         .map(AstNode::syntax)
-        .and_then(js::ObjectExpression::cast)
-        .map(infer_object_expression_type);
+        .and_then(js::Expression::cast)
+        .map(infer_expression_type);
     if let Some(partial) = vue_apollo.as_ref().and_then(Ty::as_interface) {
         let mut tmp = partial.clone();
         tmp.properties = tmp.properties.into_iter().map(|prop| {
@@ -231,7 +189,7 @@ pub(crate) fn check(db: &RootDatabase, file_id: FileLikeId) -> Vec<String> {
     results
 }
 
-fn syntax_errors(results: &mut Vec<String>, db: &RootDatabase, file_id: FileLikeId, base: TextUnit, errors: Vec<SyntaxError>) {
+fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, file_id: SourceId, base: TextUnit, errors: Vec<SyntaxError>) {
     // TODO: include filename in error message
     // let filename = db.input_filename(file_id);
     let mut offset_set = FxHashSet::default();
@@ -249,8 +207,8 @@ fn syntax_errors(results: &mut Vec<String>, db: &RootDatabase, file_id: FileLike
     }));
 }
 
-fn error_line_col(db: &RootDatabase, file_id: FileLikeId, pos: TextUnit) -> String {
-    let line_index = db.input_line_index(file_id);
+fn error_line_col(db: &impl VueDatabase, file_id: SourceId, pos: TextUnit) -> String {
+    let line_index = db.source_line_index(file_id);
     let line_col = line_index.line_col(pos);
     format!("line {}, col {}", line_col.line + 1, line_col.col_utf16 + 1)
 }
@@ -495,7 +453,7 @@ fn collect_pattern_decls_and_captures<'a>(
     }
 }
 
-fn collect_expressions(template: &vue::ComponentTemplate) -> Vec<TextRange> {
+fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
     let mut expressions = Vec::new();
     for visit in template.syntax.preorder_with_tokens() {
         let syn_elem = match visit {

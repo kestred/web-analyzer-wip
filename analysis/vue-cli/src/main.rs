@@ -34,7 +34,7 @@ fn main() -> Result<(), io::Error> {
             let filename = args.value_of("file").unwrap();
             let filetext = fs::read_to_string(filename)?;
             let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
-            println!("{}", analysis.debug_syntax_tree(file_id.into()))
+            println!("{}", analysis.file_syntax_tree(file_id.into()))
         }
         _ => (),
     }

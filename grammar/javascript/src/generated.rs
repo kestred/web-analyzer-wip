@@ -10,7 +10,7 @@
 
 pub mod ast {
     use crate::syntax_kind::*;
-    use grammar_utils::ast_node;
+    use code_grammar::ast_node;
 
     ast_node!(Node, enum NodeKind {
         CatchClause = CATCH_CLAUSE,
@@ -646,7 +646,7 @@ pub mod ast {
 
 pub mod syntax_kind {
     use crate::syntax_kind::JAVASCRIPT;
-    use grammar_utils::syntax_kinds;
+    use code_grammar::syntax_kinds;
 
     syntax_kinds! {
         language JAVASCRIPT;

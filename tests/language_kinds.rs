@@ -1,4 +1,4 @@
-use grammar_utils::SyntaxLanguage;
+use code_grammar::SyntaxLanguage;
 
 #[test]
 fn test_language_kinds() {

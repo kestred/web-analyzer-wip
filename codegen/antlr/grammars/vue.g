@@ -14,7 +14,7 @@ component_pattern
     ;
 
 component_template
-    : '<' template_tag WS? (attribute WS?)* '>' html_content ('<' '/' | '</') WS? template_tag WS? '>'
+    : '<' template_tag WS? (attribute WS?)* '>' template_content ('<' '/' | '</') WS? template_tag WS? '>'
     # COMPONENT_TEMPLATE
     ;
 
@@ -38,6 +38,10 @@ script_tag
 
 style_tag
     : {at_keyword("style")}? TAG_NAME
+    ;
+
+template_content
+    : html_chardata? ((element | MUSTACHE | COMMENT) html_chardata?)*
     ;
 
 html_content

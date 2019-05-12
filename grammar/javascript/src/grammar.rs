@@ -10,8 +10,8 @@
 //! This module contains an auto-generated JAVASCRIPT parser.
 use crate::grammar_ext;
 use crate::syntax_kind::*;
-use grammar_utils::{catch, tokenset, Parser, TokenSet};
-use grammar_utils::parser::Continue;
+use code_grammar::{catch, tokenset, Parser, TokenSet};
+use code_grammar::parser::Continue;
 
 pub fn program(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();

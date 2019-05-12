@@ -53,7 +53,7 @@ fn main() -> Result<(), std::io::Error> {
     // Generate ast nodes
     out.push_str("pub mod ast {\n");
     out.push_str("    use crate::syntax_kind::*;\n");
-    out.push_str("    use grammar_utils::ast_node;\n\n");
+    out.push_str("    use code_grammar::ast_node;\n\n");
     let mut leaf_nodes = Vec::new();
     let mut emitted_nodes = HashSet::new();
     {
@@ -113,7 +113,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut next_syntax_kind = BASE_SYNTAX_KIND;
     out.push_str("pub mod syntax_kind {\n");
     out.push_str("    use crate::syntax_kind::JAVASCRIPT;\n");
-    out.push_str("    use grammar_utils::syntax_kinds;\n\n");
+    out.push_str("    use code_grammar::syntax_kinds;\n\n");
     out.push_str("    syntax_kinds! {\n");
     out.push_str("        language JAVASCRIPT;\n\n");
     out.push_str("        nodes {\n");

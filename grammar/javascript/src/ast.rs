@@ -1,12 +1,12 @@
 use crate::grammar;
 use crate::lexer::JavascriptLexer;
 use crate::syntax_kind::{self, *};
-use grammar_utils::{
+use code_grammar::{
     AstNode, Lexer, Location, Parser,
     SyntaxElement, SyntaxError, SyntaxNode, SyntaxToken,
     TreeArc
 };
-use grammar_utils::parser::ParseConfig;
+use code_grammar::parser::ParseConfig;
 
 // Re-export automatically generated nodes
 pub use crate::generated::ast::*;

@@ -4,8 +4,8 @@ use crate::scan::{
     is_html_tag_suffix,
     scan_html_comment,
 };
-use grammar_utils::{Lexer, Scanner, SmolStr, SyntaxKind};
-use grammar_utils::scan::{is_whitespace, scan_string};
+use code_grammar::{Lexer, Scanner, SmolStr, SyntaxKind};
+use code_grammar::scan::{is_whitespace, scan_string};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum HtmlLexerMode {

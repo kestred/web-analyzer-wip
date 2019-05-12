@@ -1,8 +1,8 @@
 use crate::grammar;
 use crate::lexer::HtmlLexer;
 use crate::syntax_kind::{self, DOCUMENT, ELEMENT, SCRIPT_BLOCK, STYLE_BLOCK};
-use grammar_utils::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, TreeArc};
-use grammar_utils::parser::ParseConfig;
+use code_grammar::{ast_node, Lexer, Location, Parser, SyntaxError, SyntaxNode, SyntaxToken, TreeArc};
+use code_grammar::parser::ParseConfig;
 
 ast_node!(Document, DOCUMENT);
 ast_node!(Element, ELEMENT);
@@ -36,5 +36,11 @@ impl Document {
             .cloned()
             .map(|(msg, loc)| SyntaxError::new(msg, loc))
             .collect()
+    }
+}
+
+impl Script {
+    pub fn source(&self) -> Option<SyntaxToken> {
+        self.syntax.first_token()
     }
 }

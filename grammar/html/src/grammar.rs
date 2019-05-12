@@ -9,8 +9,8 @@
 
 //! This module contains an auto-generated HTML parser.
 use crate::syntax_kind::*;
-use grammar_utils::{catch, tokenset, Parser, TokenSet};
-use grammar_utils::parser::Continue;
+use code_grammar::{catch, tokenset, Parser, TokenSet};
+use code_grammar::parser::Continue;
 
 pub fn document(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();

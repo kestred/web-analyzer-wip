@@ -4,10 +4,15 @@ version = "0.1.0"
 authors = ["Kevin Stenerson <kstenerson@developers.wyyerd.com>"]
 edition = "2018"
 
+[features]
+runtime = []
+
 [dependencies]
-analysis_utils = { path = "../../utils/analysis" }
-grammar_utils = { path = "../../utils/grammar" }
+code_analysis = { path = "../../utils/analysis", features = ["ast"] }
+code_grammar = { path = "../../utils/grammar" }
+html_analysis = { path = "../../analysis/html" }
 html_grammar = { path = "../../grammar/html" }
+javascript_analysis = { path = "../../analysis/javascript" }
 javascript_grammar = { path = "../../grammar/javascript" }
 typescript_grammar = { path = "../../grammar/typescript" }
 vue_grammar = { path = "../../grammar/vue" }

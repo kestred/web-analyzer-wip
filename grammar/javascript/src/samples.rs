@@ -1,6 +1,6 @@
 use crate::ast::Program;
 use crate::syntax_kind::*;
-use grammar_utils::ast;
+use code_grammar::ast;
 use test_utils::assert_diff;
 
 pub const SAMPLE_1: &'static str = r#"

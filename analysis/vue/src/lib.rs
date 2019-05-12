@@ -1,73 +1,28 @@
-mod db;
-mod definitions;
+mod ast;
 mod diagnostics;
-mod parse;
-mod syntax;
-mod types;
 
-use analysis_utils::{FileId, LineIndex, PackageGraph, SourceChange, SourceDatabase, SourceRootId};
-use grammar_utils::TreeArc;
-use html_grammar::ast as html;
-use javascript_grammar::ast as javascript;
-use std::sync::Arc;
+pub use self::ast::{AstDatabase, AstDatabaseStorage};
 
-use self::db::RootDatabase;
-use self::parse::{ParseDatabase, SourceLanguage};
+#[cfg(feature = "runtime")]
+mod debug;
+#[cfg(feature = "runtime")]
+mod runtime;
+#[cfg(feature = "runtime")]
+pub use runtime::Analysis;
 
-#[derive(Debug)]
-pub struct Analysis {
-    db: RootDatabase,
+pub trait VueDatabase:
+    crate::AstDatabase +
+    code_analysis::SourceDatabase +
+    html_analysis::AstDatabase +
+    javascript_analysis::AstDatabase
+{
 }
 
-impl Analysis {
-    // Creates an analysis instance for a single file, without any extenal dependencies.
-    pub fn from_single_file(filename: String, text: String) -> (Analysis, FileId) {
-        let file_id = FileId(0);
-        let source_root = SourceRootId(0);
-        let mut db = RootDatabase::default();
-        let mut packages = PackageGraph::default();
-        packages.add_package_root(file_id);
-        let mut change = SourceChange::new();
-        change.add_root(source_root, true);
-        change.add_file(source_root, file_id, filename.into(), Arc::new(text));
-        change.set_package_graph(packages);
-        change.apply_to(&mut db);
-        (Analysis { db }, file_id)
-    }
-
-    /// Gets the text of the source file.
-    pub fn file_text(&self, file_id: FileId) -> Arc<String> {
-        self.db.file_text(file_id)
-    }
-
-    /// Gets the (sometimes inferred) programming language of the source file.
-    pub fn file_language(&self, file_id: FileId) -> Option<SourceLanguage> {
-        self.db.input_language(file_id.into())
-    }
-
-    /// Computes the set of diagnostics for the given file.
-    pub fn debug_syntax_tree(&self, file_id: FileId) -> String {
-        syntax::debug_syntax_tree(&self.db, file_id.into(), None)
-    }
-
-    /// Gets the file's `LineIndex`: data structure to convert between absolute
-    /// offsets and line/column representation.
-    pub fn file_line_index(&self, file_id: FileId) -> Arc<LineIndex> {
-        self.db.input_line_index(file_id.into())
-    }
-
-    /// Gets the html syntax tree of the file.
-    pub fn parse_html(&self, file_id: FileId) -> TreeArc<html::Document> {
-        self.db.parse_html(file_id.into()).clone()
-    }
-
-    /// Gets the javascript syntax tree of the file.
-    pub fn parse_javascript(&self, file_id: FileId) -> TreeArc<javascript::Program> {
-        self.db.parse_javascript(file_id.into()).clone()
-    }
-
-    /// Computes the set of diagnostics for the given file.
-    pub fn diagnostics(&self, file_id: FileId) -> Vec<String> {
-        diagnostics::check(&self.db, file_id.into())
-    }
+impl<T> VueDatabase for T
+where
+    T: crate::AstDatabase +
+       code_analysis::SourceDatabase +
+       html_analysis::AstDatabase +
+       javascript_analysis::AstDatabase
+{
 }

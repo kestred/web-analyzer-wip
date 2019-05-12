@@ -7,36 +7,22 @@ use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
 pub trait ArenaId {
-    fn into_id_type(id: u32) -> Self;
-    fn from_id_type(self) -> u32;
+    fn into_arena_id(id: u32) -> Self;
+    fn from_arena_id(self) -> u32;
 }
 
 #[macro_export]
 macro_rules! impl_arena_id {
     ($name:ident) => {
         impl $crate::ArenaId for $name {
-            fn into_id_type(id: u32) -> Self {
+            fn into_arena_id(id: u32) -> Self {
                 $name(id)
             }
-            fn from_id_type(self) -> u32 {
+            fn from_arena_id(self) -> u32 {
                 self.0
             }
         }
     };
-}
-
-#[macro_export]
-macro_rules! impl_intern_key {
-    ($name:ident) => {
-        impl salsa::InternKey for $name {
-            fn from_intern_id(v: salsa::InternId) -> Self {
-                $name(v)
-            }
-            fn as_intern_id(&self) -> salsa::InternId {
-                self.0
-            }
-        }
-    }
 }
 
 #[derive(Default)]
@@ -112,12 +98,12 @@ impl<Id: ArenaId, T> Arena<Id, T> {
         self.data.is_empty()
     }
     pub fn alloc(&mut self, value: T) -> Id {
-        let id = ArenaId::into_id_type(self.data.len() as u32);
+        let id = ArenaId::into_arena_id(self.data.len() as u32);
         self.data.push(value);
         id
     }
     pub fn iter(&self) -> impl Iterator<Item = (Id, &T)> {
-        self.data.iter().enumerate().map(|(idx, value)| (Id::into_id_type(idx as u32), value))
+        self.data.iter().enumerate().map(|(idx, value)| (Id::into_arena_id(idx as u32), value))
     }
 }
 
@@ -136,14 +122,14 @@ impl<Id: ArenaId, T> Default for Arena<Id, T> {
 impl<Id: ArenaId, T> Index<Id> for Arena<Id, T> {
     type Output = T;
     fn index(&self, idx: Id) -> &T {
-        let idx = idx.from_id_type() as usize;
+        let idx = idx.from_arena_id() as usize;
         &self.data[idx]
     }
 }
 
 impl<Id: ArenaId, T> IndexMut<Id> for Arena<Id, T> {
     fn index_mut(&mut self, idx: Id) -> &mut T {
-        let idx = idx.from_id_type() as usize;
+        let idx = idx.from_arena_id() as usize;
         &mut self.data[idx]
     }
 }

@@ -1,8 +1,8 @@
 use crate::grammar::*;
 use crate::syntax_kind::{self, *};
-use grammar_utils::Parser;
-use grammar_utils::parser::Continue;
-use grammar_utils::{catch, tokenset};
+use code_grammar::Parser;
+use code_grammar::parser::Continue;
+use code_grammar::{catch, tokenset};
 
 pub fn expression(p: &mut Parser) -> Option<Continue> {
     fn _expression_head(p: &mut Parser) -> Option<Continue> {
