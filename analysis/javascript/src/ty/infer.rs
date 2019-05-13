@@ -15,27 +15,27 @@ pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
             }
         }
         ast::ExpressionKind::Literal(node) => infer_literal_type(node),
-        ast::ExpressionKind::ThisExpression(node) => Ty::Any, // TODO: Lookup `self` type (maybe leave inference placeholder?)
+        ast::ExpressionKind::ThisExpression(_node) => Ty::Any, // TODO: Lookup `self` type (maybe leave inference placeholder?)
         ast::ExpressionKind::ArrayExpression(node) => infer_array_expression_type(node),
         ast::ExpressionKind::ObjectExpression(node) => infer_object_expression_type(node),
-        ast::ExpressionKind::FunctionExpression(node) => Ty::Hint(TypeOf::Function),
+        ast::ExpressionKind::FunctionExpression(_) => Ty::Hint(TypeOf::Function),
         ast::ExpressionKind::UnaryExpression(node) => infer_unary_expression_type(node),
-        ast::ExpressionKind::UpdateExpression(node) => Ty::Number,
-        ast::ExpressionKind::BinaryExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::AssignmentExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::LogicalExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::MemberExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::ConditionalExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::CallExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::NewExpression(node) => Ty::Hint(TypeOf::Object),
+        ast::ExpressionKind::UpdateExpression(_) => Ty::Number,
+        ast::ExpressionKind::BinaryExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::AssignmentExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::LogicalExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::MemberExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::ConditionalExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::CallExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::NewExpression(_) => Ty::Hint(TypeOf::Object),
         ast::ExpressionKind::SequenceExpression(node) => node.expressions().last().map(infer_expression_type).unwrap_or(Ty::Unknown),
-        ast::ExpressionKind::ArrowFunctionExpression(node) => Ty::Hint(TypeOf::Function),
-        ast::ExpressionKind::YieldExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::TemplateLiteral(node) => Ty::String,
-        ast::ExpressionKind::TaggedTemplateExpression(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::ClassExpression(node) => Ty::Hint(TypeOf::Function),
-        ast::ExpressionKind::MetaProperty(node) => Ty::Any, // TODO: Implement
-        ast::ExpressionKind::AwaitExpression(node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::ArrowFunctionExpression(_) => Ty::Hint(TypeOf::Function),
+        ast::ExpressionKind::YieldExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::TemplateLiteral(_) => Ty::String,
+        ast::ExpressionKind::TaggedTemplateExpression(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::ClassExpression(_node) => Ty::Hint(TypeOf::Function),
+        ast::ExpressionKind::MetaProperty(_node) => Ty::Any, // TODO: Implement
+        ast::ExpressionKind::AwaitExpression(_node) => Ty::Any, // TODO: Implement
     }
 }
 
@@ -56,7 +56,7 @@ pub(crate) fn infer_literal_type(expr: &ast::Literal) -> Ty {
     }
 }
 
-pub(crate) fn infer_array_expression_type(expr: &ast::ArrayExpression) -> Ty {
+pub(crate) fn infer_array_expression_type(_expr: &ast::ArrayExpression) -> Ty {
     Ty::Array(Ty::Any.into()) // TODO: Infer inner type
 }
 

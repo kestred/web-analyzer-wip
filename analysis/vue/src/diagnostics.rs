@@ -1,7 +1,6 @@
 use crate::VueDatabase;
-use code_analysis::{FileId, SourceDatabase, SourceId};
+use code_analysis::{FileId, SourceId};
 use code_grammar::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
-use javascript_analysis::AstDatabase;
 use javascript_analysis::ty::{infer_property_name, infer_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
 use javascript_grammar::ast as js;
 use javascript_grammar::syntax_kind::*;
@@ -241,11 +240,11 @@ fn collect_captures<'a>(
         js::ExpressionKind::Literal(node) => {
             match node.kind() {
                 // TODO: Detect expressions used inside templates
-                js::LiteralKind::Template(token) => (),
+                js::LiteralKind::Template(_token) => (),
                 _ => (),
             }
         }
-        js::ExpressionKind::ThisExpression(node) => {
+        js::ExpressionKind::ThisExpression(_) => {
             captures.push(("this", expr));
         }
         js::ExpressionKind::ArrayExpression(node) => {
@@ -332,13 +331,13 @@ fn collect_captures<'a>(
         js::ExpressionKind::YieldExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
-        js::ExpressionKind::TemplateLiteral(node) => (), // TODO: Detect expressions used inside template literals
+        js::ExpressionKind::TemplateLiteral(_node) => (), // TODO: Detect expressions used inside template literals
         js::ExpressionKind::TaggedTemplateExpression(node) => {
             collect_captures(node.tag().unwrap(), decls, captures);
             // TODO: Detect expressions used inside template literals
         }
-        js::ExpressionKind::ClassExpression(node) => (), // TODO: Implement
-        js::ExpressionKind::MetaProperty(node) => (), // TODO: Implement
+        js::ExpressionKind::ClassExpression(_node) => (), // TODO: Implement
+        js::ExpressionKind::MetaProperty(_node) => (), // TODO: Implement
         js::ExpressionKind::AwaitExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
@@ -461,7 +460,7 @@ fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
             _ => continue,
         };
         match (syn_elem.kind(), syn_elem) {
-            (ATTRIBUTE, SyntaxElement::Node(node)) => {
+            (ATTRIBUTE, SyntaxElement::Node(_node)) => {
                 // TODO: Capture `v-model`, `v-for`, `v-if` and `v-else-if` attributes
             }
             (ATTRIBUTE_KEY, SyntaxElement::Node(node)) => {
@@ -496,7 +495,6 @@ fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
                 }
             }
             (MUSTACHE, SyntaxElement::Token(token)) => {
-                let mustache = token.text();
                 let range = token.range();
                 let start = TextUnit::from_usize(range.start().to_usize() + 2);
                 let end = TextUnit::from_usize(range.end().to_usize() - 2);

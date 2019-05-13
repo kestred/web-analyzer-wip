@@ -1,10 +1,8 @@
 use crate::VueDatabase;
 use code_analysis::SourceId;
 use code_grammar::{ast, AstNode};
-use html_analysis::AstDatabase as HtmlDb;
 use html_grammar::ast as html;
 use html_grammar::syntax_kind as html_syntax;
-use javascript_analysis::AstDatabase as JsDb;
 use javascript_grammar::ast as js;
 use javascript_grammar::syntax_kind as js_syntax;
 use vue_grammar::syntax_kind as vue_syntax;
