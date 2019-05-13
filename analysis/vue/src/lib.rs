@@ -14,7 +14,8 @@ pub trait VueDatabase:
     crate::AstDatabase +
     code_analysis::SourceDatabase +
     html_analysis::AstDatabase +
-    javascript_analysis::AstDatabase
+    javascript_analysis::AstDatabase +
+    typescript_analysis::AstDatabase
 {
 }
 
@@ -23,6 +24,7 @@ where
     T: crate::AstDatabase +
        code_analysis::SourceDatabase +
        html_analysis::AstDatabase +
-       javascript_analysis::AstDatabase
+       javascript_analysis::AstDatabase +
+       typescript_analysis::AstDatabase
 {
 }

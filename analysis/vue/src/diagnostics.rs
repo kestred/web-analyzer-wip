@@ -1,9 +1,9 @@
 use crate::VueDatabase;
 use code_analysis::{FileId, SourceId};
 use code_grammar::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
-use javascript_analysis::ty::{infer_property_name, infer_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
-use javascript_grammar::ast as js;
-use javascript_grammar::syntax_kind::*;
+use typescript_analysis::ty::{infer_property_name, infer_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
+use typescript_grammar::ast as ts;
+use typescript_grammar::syntax_kind::*;
 use vue_grammar::ast as vue;
 use vue_grammar::syntax_kind::*;
 use rustc_hash::FxHashSet;
@@ -29,7 +29,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     let expression_ranges = component.template().map(collect_expressions).unwrap_or_default();
     for range in expression_ranges {
         let raw_expr = &db.source_text(file_id)[range];
-        let (expr, _) = js::Expression::parse(raw_expr);
+        let (expr, _) = ts::Expression::parse(raw_expr);
         let errors = expr.errors();
         if errors.is_empty() {
             expressions.push((expr, range));
@@ -43,7 +43,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         Some(id) => id,
         None => return results,
     };
-    let root = db.javascript_ast(source_id);
+    let root = db.typescript_ast(source_id);
     {
         let errors = root.errors();
         if !errors.is_empty() {
@@ -53,11 +53,11 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         }
     }
 
-    let maybe_default_export = root.syntax.children().find_map(js::ExportDefaultDeclaration::cast);
-    let maybe_default_expr = maybe_default_export.and_then(|n| n.syntax.children().find_map(js::Expression::cast));
+    let maybe_default_export = root.syntax.children().find_map(ts::ExportDefaultDeclaration::cast);
+    let maybe_default_expr = maybe_default_export.and_then(|n| n.syntax.children().find_map(ts::Expression::cast));
     let maybe_options = maybe_default_expr.and_then(|expr| match expr.kind() {
-        js::ExpressionKind::CallExpression(call) => {
-            let maybe_vue_extend = call.syntax.first_child().and_then(js::MemberExpression::cast)?;
+        ts::ExpressionKind::CallExpression(call) => {
+            let maybe_vue_extend = call.syntax.first_child().and_then(ts::MemberExpression::cast)?;
             let maybe_vue = maybe_vue_extend.syntax.first_token()?;
             let maybe_extend = maybe_vue_extend.syntax.last_token()?;
             if maybe_vue.text() != "Vue" || maybe_extend.text() != "extend" {
@@ -69,9 +69,9 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
                     SyntaxElement::Node(node) => Some(node),
                     SyntaxElement::Token(_) => None,
                 })
-                .and_then(js::ObjectExpression::cast)
+                .and_then(ts::ObjectExpression::cast)
         }
-        js::ExpressionKind::ObjectExpression(object) => Some(object),
+        ts::ExpressionKind::ObjectExpression(object) => Some(object),
         _ => None,
     });
     let vue_options = match maybe_options {
@@ -99,22 +99,22 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     let vue_data = vue_data_property
         .and_then(|expr| {
             match expr.kind() {
-                js::ExpressionKind::ObjectExpression(object) => Some(object.into()),
-                js::ExpressionKind::FunctionExpression(func) => Some(func)
+                ts::ExpressionKind::ObjectExpression(object) => Some(object.into()),
+                ts::ExpressionKind::FunctionExpression(func) => Some(func)
                     .and_then(|f| f.body())
                     .and_then(|f| f.body().last())
-                    .and_then(|f| js::ReturnStatement::cast(&f.syntax).or_else(|| {
+                    .and_then(|f| ts::ReturnStatement::cast(&f.syntax).or_else(|| {
                         results.push("warn(internal): could not find `return ...` in component's `data` method".into());
                         None
                     }))
                     .and_then(|f| f.argument()),
-                js::ExpressionKind::ArrowFunctionExpression(func) => Some(func)
+                ts::ExpressionKind::ArrowFunctionExpression(func) => Some(func)
                     .and_then(|f| f.body())
                     .and_then(|b| match b {
-                        js::ArrowFunctionBody::FunctionBody(block) => block.body().last()
-                            .and_then(|f| js::ReturnStatement::cast(&f.syntax))
+                        ts::ArrowFunctionBody::FunctionBody(block) => block.body().last()
+                            .and_then(|f| ts::ReturnStatement::cast(&f.syntax))
                             .and_then(|f| f.argument()),
-                        js::ArrowFunctionBody::Expression(expr) => Some(expr),
+                        ts::ArrowFunctionBody::Expression(expr) => Some(expr),
                     }),
                 _ => None,
             }
@@ -128,7 +128,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
     let vue_computed = get_object_property(vue_options, "computed")
         .map(AstNode::syntax)
-        .and_then(js::Expression::cast)
+        .and_then(ts::Expression::cast)
         .map(infer_expression_type);
     if let Some(partial) = vue_computed.as_ref().and_then(Ty::as_interface) {
         let mut tmp = partial.clone();
@@ -141,7 +141,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
     let vue_methods = get_object_property(vue_options, "methods")
         .map(AstNode::syntax)
-        .and_then(js::Expression::cast)
+        .and_then(ts::Expression::cast)
         .map(infer_expression_type);
     if let Some(partial) = vue_methods.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
@@ -150,7 +150,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     // TODO: Move `vue_apollo` into some sort of `extensions` or `contrib` module
     let vue_apollo = get_object_property(vue_options, "apollo")
         .map(AstNode::syntax)
-        .and_then(js::Expression::cast)
+        .and_then(ts::Expression::cast)
         .map(infer_expression_type);
     if let Some(partial) = vue_apollo.as_ref().and_then(Ty::as_interface) {
         let mut tmp = partial.clone();
@@ -218,7 +218,7 @@ fn error_line_col(db: &impl VueDatabase, file_id: SourceId, pos: TextUnit) -> St
 /// This works by finding all "global" or undeclared variables in an expression,
 /// including references to `this`; which has uses in other contexts outside
 /// of closure expressions.
-fn find_captured_environment(expr: &js::Expression) -> Vec<(&str, &js::Expression)> {
+fn find_captured_environment(expr: &ts::Expression) -> Vec<(&str, &ts::Expression)> {
     let mut captures = Vec::new();
     collect_captures(expr, &[], &mut captures);
     captures
@@ -226,33 +226,33 @@ fn find_captured_environment(expr: &js::Expression) -> Vec<(&str, &js::Expressio
 
 
 fn collect_captures<'a>(
-    expr: &'a js::Expression,
+    expr: &'a ts::Expression,
     decls: &[&'a str],
-    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+    captures: &mut Vec<(&'a str, &'a ts::Expression)>,
 ) {
     match expr.kind() {
-        js::ExpressionKind::Identifier(node) => {
+        ts::ExpressionKind::Identifier(node) => {
             let name = node.name();
             if decls.iter().all(|decl| *decl != name) {
                 captures.push((name, expr));
             }
         }
-        js::ExpressionKind::Literal(node) => {
+        ts::ExpressionKind::Literal(node) => {
             match node.kind() {
                 // TODO: Detect expressions used inside templates
-                js::LiteralKind::Template(_token) => (),
+                ts::LiteralKind::Template(_token) => (),
                 _ => (),
             }
         }
-        js::ExpressionKind::ThisExpression(_) => {
+        ts::ExpressionKind::ThisExpression(_) => {
             captures.push(("this", expr));
         }
-        js::ExpressionKind::ArrayExpression(node) => {
+        ts::ExpressionKind::ArrayExpression(node) => {
             for el in node.elements() {
                 collect_captures(el, decls, captures);
             }
         }
-        js::ExpressionKind::ObjectExpression(node) => {
+        ts::ExpressionKind::ObjectExpression(node) => {
             for prop in node.properties() {
                 if prop.computed() {
                     collect_captures(prop.key().unwrap(), decls, captures);
@@ -260,93 +260,93 @@ fn collect_captures<'a>(
                 collect_captures(prop.value().unwrap(), decls, captures);
             }
         },
-        js::ExpressionKind::FunctionExpression(node) => {
+        ts::ExpressionKind::FunctionExpression(node) => {
             let mut fn_decls = decls.to_vec();
             for param in node.params() {
                 collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
             }
             collect_block_captures(node.body().unwrap(), &fn_decls, captures);
         }
-        js::ExpressionKind::UnaryExpression(node) => {
+        ts::ExpressionKind::UnaryExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
-        js::ExpressionKind::UpdateExpression(node) => {
+        ts::ExpressionKind::UpdateExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
-        js::ExpressionKind::BinaryExpression(node) => {
+        ts::ExpressionKind::BinaryExpression(node) => {
             collect_captures(node.left().unwrap(), decls, captures);
             collect_captures(node.right().unwrap(), decls, captures);
         }
-        js::ExpressionKind::AssignmentExpression(node) => {
+        ts::ExpressionKind::AssignmentExpression(node) => {
             let mut new_decls = decls.to_vec();
             collect_pattern_decls_and_captures(node.left().unwrap(), &mut new_decls, captures, false);
             collect_captures(node.right().unwrap(), decls /* N.B. assignment can't capture its own decls! */, captures);
         }
-        js::ExpressionKind::LogicalExpression(node) => {
+        ts::ExpressionKind::LogicalExpression(node) => {
             collect_captures(node.left().unwrap(), decls, captures);
             collect_captures(node.right().unwrap(), decls, captures);
         }
-        js::ExpressionKind::MemberExpression(node) => {
+        ts::ExpressionKind::MemberExpression(node) => {
             collect_captures(node.object().unwrap(), decls, captures);
             if node.computed() {
                 collect_captures(node.property().unwrap(), decls, captures);
             }
         }
-        js::ExpressionKind::ConditionalExpression(node) => {
+        ts::ExpressionKind::ConditionalExpression(node) => {
             collect_captures(node.test().unwrap(), decls, captures);
             collect_captures(node.alternate().unwrap(), decls, captures);
             collect_captures(node.consequent().unwrap(), decls, captures);
         }
-        js::ExpressionKind::CallExpression(node) => {
+        ts::ExpressionKind::CallExpression(node) => {
             collect_captures(node.callee().unwrap(), decls, captures);
             for arg in node.arguments() {
                 collect_captures(arg, decls, captures);
             }
         }
-        js::ExpressionKind::NewExpression(node) => {
+        ts::ExpressionKind::NewExpression(node) => {
             collect_captures(node.callee().unwrap(), decls, captures);
             for arg in node.arguments() {
                 collect_captures(arg, decls, captures);
             }
         }
-        js::ExpressionKind::SequenceExpression(node) => {
+        ts::ExpressionKind::SequenceExpression(node) => {
             for expr in node.expressions() {
                 collect_captures(expr, decls, captures);
             }
         }
-        js::ExpressionKind::ArrowFunctionExpression(node) => {
+        ts::ExpressionKind::ArrowFunctionExpression(node) => {
             let mut fn_decls = decls.to_vec();
             for param in node.params() {
                 collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
             }
             match node.body().unwrap() {
-                js::ArrowFunctionBody::FunctionBody(block) => {
+                ts::ArrowFunctionBody::FunctionBody(block) => {
                     collect_block_captures(block, &fn_decls, captures);
                 }
-                js::ArrowFunctionBody::Expression(expr) => {
+                ts::ArrowFunctionBody::Expression(expr) => {
                     collect_captures(expr, &fn_decls, captures);
                 }
             }
         }
-        js::ExpressionKind::YieldExpression(node) => {
+        ts::ExpressionKind::YieldExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
-        js::ExpressionKind::TemplateLiteral(_node) => (), // TODO: Detect expressions used inside template literals
-        js::ExpressionKind::TaggedTemplateExpression(node) => {
+        ts::ExpressionKind::TemplateLiteral(_node) => (), // TODO: Detect expressions used inside template literals
+        ts::ExpressionKind::TaggedTemplateExpression(node) => {
             collect_captures(node.tag().unwrap(), decls, captures);
             // TODO: Detect expressions used inside template literals
         }
-        js::ExpressionKind::ClassExpression(_node) => (), // TODO: Implement
-        js::ExpressionKind::MetaProperty(_node) => (), // TODO: Implement
-        js::ExpressionKind::AwaitExpression(node) => {
+        ts::ExpressionKind::ClassExpression(_node) => (), // TODO: Implement
+        ts::ExpressionKind::MetaProperty(_node) => (), // TODO: Implement
+        ts::ExpressionKind::AwaitExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
     }
 }
 fn collect_block_captures<'a> (
-    block: &'a js::BlockStatement,
+    block: &'a ts::BlockStatement,
     decls: &[&'a str],
-    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+    captures: &mut Vec<(&'a str, &'a ts::Expression)>,
 ) {
     let mut decls = decls.to_vec();
     for stmt in block.body() {
@@ -367,34 +367,34 @@ fn collect_block_captures<'a> (
     }
 }
 fn collect_statement_decls_and_captures<'a>(
-    stmt: &'a js::Statement,
+    stmt: &'a ts::Statement,
     decls: &mut Vec<&'a str>,
-    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+    captures: &mut Vec<(&'a str, &'a ts::Expression)>,
 ) {
     match stmt.kind() {
-        js::StatementKind::ExpressionStatement(node) => {
+        ts::StatementKind::ExpressionStatement(node) => {
             collect_captures(node.expression().unwrap(), decls, captures);
         }
-        js::StatementKind::BlockStatement(node) => {
+        ts::StatementKind::BlockStatement(node) => {
             collect_block_captures(node, decls, captures);
         }
-        js::StatementKind::EmptyStatement(_) => (),
-        js::StatementKind::DebuggerStatement(_) => (),
+        ts::StatementKind::EmptyStatement(_) => (),
+        ts::StatementKind::DebuggerStatement(_) => (),
 
         // TODO: See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/with
-        js::StatementKind::WithStatement(_) => unimplemented!(),
+        ts::StatementKind::WithStatement(_) => unimplemented!(),
 
-        js::StatementKind::ReturnStatement(node) => {
+        ts::StatementKind::ReturnStatement(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
-        js::StatementKind::LabeledStatement(node) => {
+        ts::StatementKind::LabeledStatement(node) => {
             collect_statement_decls_and_captures(node.body().unwrap(), decls, captures);
         }
-        js::StatementKind::BreakStatement(_) => (),
-        js::StatementKind::ContinueStatement(_) => (),
+        ts::StatementKind::BreakStatement(_) => (),
+        ts::StatementKind::ContinueStatement(_) => (),
         // IfStatement = IF_STATEMENT,
         // SwitchStatement = SWITCH_STATEMENT,
-        js::StatementKind::ThrowStatement(node) => {
+        ts::StatementKind::ThrowStatement(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
         // TryStatement = TRY_STATEMENT,
@@ -403,9 +403,9 @@ fn collect_statement_decls_and_captures<'a>(
         // ForStatement = FOR_STATEMENT,
         // ForInStatement = FOR_IN_STATEMENT,
         // ForOfStatement = FOR_OF_STATEMENT,
-        js::StatementKind::Declaration(decl) => {
+        ts::StatementKind::Declaration(decl) => {
             match decl.kind() {
-                js::DeclarationKind::FunctionDeclaration(node) => {
+                ts::DeclarationKind::FunctionDeclaration(node) => {
                     decls.push(node.id().name());
                     let mut fn_decls = decls.clone();
                     for param in node.params() {
@@ -413,7 +413,7 @@ fn collect_statement_decls_and_captures<'a>(
                     }
                     collect_block_captures(node.body().unwrap(), &mut fn_decls, captures);
                 }
-                js::DeclarationKind::VariableDeclaration(node) => {
+                ts::DeclarationKind::VariableDeclaration(node) => {
                     for decl in node.declarations() {
                         collect_pattern_decls_and_captures(decl.id().unwrap(), decls, captures, true);
                         if let Some(expr) = decl.init() {
@@ -421,7 +421,7 @@ fn collect_statement_decls_and_captures<'a>(
                         }
                     }
                 }
-                js::DeclarationKind::ClassDeclaration(node) => {
+                ts::DeclarationKind::ClassDeclaration(node) => {
                     decls.push(node.id().name());
                     // TODO: Probably we need to recurse into the definition of the class here...
                 }
@@ -433,13 +433,13 @@ fn collect_statement_decls_and_captures<'a>(
     }
 }
 fn collect_pattern_decls_and_captures<'a>(
-    pat: &'a js::Pattern,
+    pat: &'a ts::Pattern,
     decls: &mut Vec<&'a str>,
-    captures: &mut Vec<(&'a str, &'a js::Expression)>,
+    captures: &mut Vec<(&'a str, &'a ts::Expression)>,
     declaration: bool,
 ) {
     match pat.kind() {
-        js::PatternKind::Identifier(ident) => {
+        ts::PatternKind::Identifier(ident) => {
             if declaration {
                 decls.push(ident.name());
             } else {
@@ -506,20 +506,20 @@ fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
     expressions
 }
 
-fn get_object_property<'a>(obj: &'a js::ObjectExpression, key: &str) -> Option<&'a js::Expression> {
+fn get_object_property<'a>(obj: &'a ts::ObjectExpression, key: &str) -> Option<&'a ts::Expression> {
     obj.properties()
         .find(|prop| infer_property_name(prop).as_ref().map(|x| x.as_str()) == Some(key))
         .and_then(|prop| prop.value())
 }
 
-fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>), Vec<String>> {
+fn infer_props_types(props: &ts::Expression) -> Result<(InterfaceTy, Vec<String>), Vec<String>> {
     let mut object = InterfaceTy::default();
     let mut messages = Vec::new();
     match props.kind() {
-        js::ExpressionKind::ArrayExpression(arr) => {
+        ts::ExpressionKind::ArrayExpression(arr) => {
             for el in arr.elements() {
                 match el.kind() {
-                    js::ExpressionKind::Literal(lit) => {
+                    ts::ExpressionKind::Literal(lit) => {
                         if let Some(str_lit) = lit.syntax.first_token() {
                             if str_lit.kind() == STRING_LITERAL {
                                 let text = str_lit.text();
@@ -539,7 +539,7 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                 return Err(messages);
             }
         }
-        js::ExpressionKind::ObjectExpression(obj) => {
+        ts::ExpressionKind::ObjectExpression(obj) => {
             for prop in obj.properties() {
                 if prop.computed() {
                     messages.push("error(pedantic): vue `props` keys should not be computed, but got `[...]: ...`".into());
@@ -550,7 +550,7 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                     None => continue,
                 };
                 let type_ = match prop.value().unwrap().kind() {
-                    js::ExpressionKind::Identifier(ident) => {
+                    ts::ExpressionKind::Identifier(ident) => {
                         match ident.syntax.first_token().map(|t| t.text().as_str()) {
                             Some("Array") => Ty::Union(vec![Ty::Array(Ty::Any.into()), Ty::Null, Ty::Undefined].into()),
                             Some("String") => Ty::Union(vec![Ty::String, Ty::Null, Ty::Undefined].into()),
@@ -559,10 +559,10 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                             _ => Ty::Hint(TypeOf::Null),
                         }
                     }
-                    js::ExpressionKind::ObjectExpression(prop_options) => {
+                    ts::ExpressionKind::ObjectExpression(prop_options) => {
                         let mut is_required = false;
                         if let Some(required) = get_object_property(prop_options, "required") {
-                            let required_raw = js::Literal::cast(&required.syntax)
+                            let required_raw = ts::Literal::cast(&required.syntax)
                                 .and_then(|l| l.syntax.first_token())
                                 .map(|t| t.text().as_str())
                                 .unwrap();
@@ -578,7 +578,7 @@ fn infer_props_types(props: &js::Expression) -> Result<(InterfaceTy, Vec<String>
                         let has_default = get_object_property(prop_options, "default").is_some();
                         let maybe_type = get_object_property(prop_options, "type")
                             .map(AstNode::syntax)
-                            .and_then(js::Identifier::cast)
+                            .and_then(ts::Identifier::cast)
                             .map(AstNode::syntax)
                             .and_then(|x| x.first_token())
                             .map(|x| x.text().as_str());

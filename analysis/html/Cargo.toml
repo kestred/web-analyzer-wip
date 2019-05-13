@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["Kevin Stenerson <developer@stenerson.me>"]
 edition = "2018"
 
-[features]
-runtime = []
-
 [dependencies]
 code_analysis = { path = "../../utils/analysis", features = ["ast"] }
 code_grammar = { path = "../../utils/grammar" }

@@ -1,23 +1,29 @@
-use crate::AstDatabase as _;
-use code_analysis::{FileId, LineIndex, PackageGraph, SourceChange, SourceDatabase, SourceRootId};
+use code_analysis::{FileId, LineIndex, PackageGraph, SourceChange, SourceRootId};
 use code_grammar::TreeArc;
-use html_analysis::AstDatabase as _;
 use html_grammar::ast as html;
-use javascript_analysis::AstDatabase as _;
 use javascript_grammar::ast as js;
+use typescript_grammar::ast as ts;
 use vue_grammar::ast as vue;
 use std::sync::Arc;
+
+use crate::AstDatabase as _;
+use code_analysis::SourceDatabase as _;
+use html_analysis::AstDatabase as _;
+use javascript_analysis::AstDatabase as _;
+use typescript_analysis::AstDatabase as _;
 
 use crate::AstDatabaseStorage as VueAstStorage;
 use code_analysis::SourceDatabaseStorage as SourceStorage;
 use html_analysis::AstDatabaseStorage as HtmlAstStorage;
 use javascript_analysis::AstDatabaseStorage as JsAstStorage;
+use typescript_analysis::AstDatabaseStorage as TsAstStorage;
 
 #[salsa::database(
     SourceStorage,
     HtmlAstStorage,
     VueAstStorage,
     JsAstStorage,
+    TsAstStorage,
 )]
 #[derive(Debug)]
 pub(crate) struct HostDatabase {
@@ -90,6 +96,11 @@ impl Analysis {
     /// Gets the javascript syntax tree of the file.
     pub fn parse_javacsript(&self, file_id: FileId) -> TreeArc<js::Program> {
         self.db.javascript_ast(self.db.file_source(file_id)).clone()
+    }
+
+    /// Gets the typescript syntax tree of the file.
+    pub fn parse_typecsript(&self, file_id: FileId) -> TreeArc<ts::Program> {
+        self.db.typescript_ast(self.db.file_source(file_id)).clone()
     }
 
     /// Gets the javascript syntax tree of the file.

@@ -1,7 +1,7 @@
 use crate::ty::{InterfaceTy, PropertyDef, Ty, TypeOf};
 use code_grammar::{AstNode, SmolStr};
-use javascript_grammar::ast;
-use javascript_grammar::syntax_kind::*;
+use typescript_grammar::ast;
+use typescript_grammar::syntax_kind::*;
 
 pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
     match expr.kind() {

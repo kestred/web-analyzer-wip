@@ -686,6 +686,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "typescript_analysis"
+version = "0.1.0"
+dependencies = [
+ "code_analysis 0.1.0",
+ "code_grammar 0.1.0",
+ "salsa 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typescript_grammar 0.1.0",
+ "unescape 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "typescript_grammar"
 version = "0.1.0"
 dependencies = [
@@ -749,6 +760,7 @@ dependencies = [
  "rustc-hash 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "salsa 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "test_utils 0.1.0",
+ "typescript_analysis 0.1.0",
  "typescript_grammar 0.1.0",
  "unescape 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vue_grammar 0.1.0",

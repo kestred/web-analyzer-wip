@@ -14,6 +14,7 @@ html_analysis = { path = "../../analysis/html" }
 html_grammar = { path = "../../grammar/html" }
 javascript_analysis = { path = "../../analysis/javascript" }
 javascript_grammar = { path = "../../grammar/javascript" }
+typescript_analysis = { path = "../../analysis/typescript" }
 typescript_grammar = { path = "../../grammar/typescript" }
 vue_grammar = { path = "../../grammar/vue" }
 rustc-hash = "1.0.1"
