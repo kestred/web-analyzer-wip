@@ -61,7 +61,7 @@ pub fn component_template(p: &mut Parser) -> Option<Continue> {
             p.eat(WS);
         }
         p.expect(R_ANGLE)?;
-        html_content(p)?;
+        template_content(p)?;
         if p.at(L_ANGLE) {
             p.bump();
             p.expect(SLASH)?;
@@ -164,6 +164,25 @@ pub fn style_tag(p: &mut Parser) -> Option<Continue> {
     Some(Continue)
 }
 
+pub fn template_content(p: &mut Parser) -> Option<Continue> {
+    if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+        html_chardata(p)?;
+    }
+    while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
+        if p.at(L_ANGLE) {
+            element(p)?;
+        } else if p.at(MUSTACHE) {
+            p.bump();
+        } else if p.at(COMMENT) {
+            p.bump();
+        }
+        if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+            html_chardata(p)?;
+        }
+    }
+    Some(Continue)
+}
+
 pub fn html_content(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE, TEXT, WHITESPACE]) {
         if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
@@ -195,7 +214,7 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
 
 pub fn attribute(p: &mut Parser) -> Option<Continue> {
     if (p.at(COLON) || (p.at_keyword("v-bind") && p.at(TAG_NAME))) && {
-        // try --> ({ <predicate> }? TAG_NAME)? : attribute_key (attribute_modifier)* (WS)? = (WS)? attribute_value #ATTRIBUTE_BINDING
+        // try --> ({ <predicate> }? TAG_NAME)? : attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_BINDING
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
@@ -208,10 +227,17 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
                 while p.at(DOT) {
                     attribute_modifier(p)?;
                 }
-                p.eat(WS);
-                p.expect(EQ)?;
-                p.eat(WS);
-                attribute_value(p)?;
+                if p.at_ts(&tokenset![EQ, WS]) {
+                    let mut _checkpoint = p.checkpoint(true);
+                    catch!({
+                        p.eat(WS);
+                        p.expect(EQ)?;
+                        p.eat(WS);
+                        attribute_value(p)?;
+                        Some(Continue)
+                    });
+                    p.commit(_checkpoint)?.ok();
+                }
                 Some(Continue)
             });
             p.complete(_marker, ATTRIBUTE_BINDING);
@@ -224,7 +250,7 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if (p.at(AT) || (p.at_keyword("v-on") && p.at(TAG_NAME))) && {
-        // try --> ({ <predicate> }? TAG_NAME | @) attribute_key (attribute_modifier)* (WS)? = (WS)? attribute_value #ATTRIBUTE_LISTENER
+        // try --> ({ <predicate> }? TAG_NAME | @) attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_LISTENER
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
@@ -238,10 +264,17 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
                 while p.at(DOT) {
                     attribute_modifier(p)?;
                 }
-                p.eat(WS);
-                p.expect(EQ)?;
-                p.eat(WS);
-                attribute_value(p)?;
+                if p.at_ts(&tokenset![EQ, WS]) {
+                    let mut _checkpoint = p.checkpoint(true);
+                    catch!({
+                        p.eat(WS);
+                        p.expect(EQ)?;
+                        p.eat(WS);
+                        attribute_value(p)?;
+                        Some(Continue)
+                    });
+                    p.commit(_checkpoint)?.ok();
+                }
                 Some(Continue)
             });
             p.complete(_marker, ATTRIBUTE_LISTENER);

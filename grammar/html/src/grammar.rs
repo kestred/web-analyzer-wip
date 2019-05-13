@@ -161,10 +161,15 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(TAG_NAME)?;
         if p.at_ts(&tokenset![EQ, WS]) {
-            p.eat(WS);
-            p.expect(EQ)?;
-            p.eat(WS);
-            attribute_value(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                p.eat(WS);
+                p.expect(EQ)?;
+                p.eat(WS);
+                attribute_value(p)?;
+                Some(Continue)
+            });
+            p.commit(_checkpoint)?.ok();
         }
         Some(Continue)
     });

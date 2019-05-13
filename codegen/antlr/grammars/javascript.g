@@ -423,7 +423,7 @@ expression_list
 expression
     : function_expression
     | class_expression
-    | expression '[' expression_list ']'               # MEMBER_EXPRESSION
+    | expression '[' expression_list ']'                   # MEMBER_EXPRESSION
     | expression '.' identifier_or_keyword                 # MEMBER_EXPRESSION
     | expression arguments                                 # CALL_EXPRESSION
     | NEW_KW expression arguments?                         # NEW_EXPRESSION

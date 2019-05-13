@@ -138,7 +138,7 @@ fn emit_pattern<'a>(
     pat: &Pattern,
     dep: u8,
     precond: Precond,
-    next_patterns: impl IntoIterator<Item = &'a Pattern>,
+    followed_by_patterns: impl IntoIterator<Item = &'a Pattern>,
 ) -> PatternType {
     match pat {
         Pattern::Empty => (),
@@ -193,18 +193,23 @@ fn emit_pattern<'a>(
                     out.push_str(" {\n");
 
                     // Handle ambiguity with following terms
-                    let mut next_ts = Set::new();
-                    for pat in next_patterns {
-                        next_ts.extend(db.next_predicates_of(pat));
+                    let mut followed_by_ts = Set::new();
+                    for pat in followed_by_patterns {
+                        followed_by_ts.extend(db.next_predicates_of(pat));
                         if !db.is_possibly_empty(pat) {
                             break;
                         }
                     }
-                    if !ts.is_disjoint(&next_ts) {
+                    let check_head_possibly_empty = |pat| {
+                        transform::unshift(pat)
+                            .map(|(head, _)| db.is_possibly_empty(&head))
+                            .unwrap_or(false)
+                    };
+                    if !ts.is_disjoint(&followed_by_ts) || check_head_possibly_empty(pat) {
                         emit_let_checkpoint(out, true, dep + 1);
                         emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
                         emit_depth(out, dep + 1);
-                        out.push_str("p.commit(_checkpoint)?.ok()\n");
+                        out.push_str("p.commit(_checkpoint)?.ok();\n");
                     } else {
                         emit_pattern(out, db, rule, pat, dep + 1, Precond::one_of(ts), &[]);
                     }
@@ -227,14 +232,19 @@ fn emit_pattern<'a>(
                         out.push_str(" {\n");
 
                         // Handle ambiguity with following terms
-                        let mut next_ts = Set::new();
-                        for pat in next_patterns {
-                            next_ts.extend(db.next_predicates_of(pat));
+                        let mut followed_by_ts = Set::new();
+                        for pat in followed_by_patterns {
+                            followed_by_ts.extend(db.next_predicates_of(pat));
                             if !db.is_possibly_empty(pat) {
                                 break;
                             }
                         }
-                        if !ts.is_disjoint(&next_ts) {
+                        let check_head_possibly_empty = |pat| {
+                            transform::unshift(pat)
+                                .map(|(head, _)| db.is_possibly_empty(&head))
+                                .unwrap_or(false)
+                        };
+                        if !ts.is_disjoint(&followed_by_ts) || check_head_possibly_empty(pat) {
                             emit_let_checkpoint(out, true, dep + 1);
                             emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
                             emit_depth(out, dep + 1);

@@ -51,9 +51,9 @@ html_content
     ;
 
 attribute
-    : ({at_keyword("v-bind")}? TAG_NAME)? ':' attribute_key attribute_modifier* WS? '=' WS? attribute_value
+    : ({at_keyword("v-bind")}? TAG_NAME)? ':' attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
     # ATTRIBUTE_BINDING
-    | ({at_keyword("v-on")}? TAG_NAME | '@') attribute_key attribute_modifier* WS? '=' WS? attribute_value
+    | ({at_keyword("v-on")}? TAG_NAME | '@') attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
     # ATTRIBUTE_LISTENER
     | TAG_NAME WS? '=' WS? attribute_value
     # ATTRIBUTE

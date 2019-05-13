@@ -367,6 +367,13 @@ impl QualifiedTerm {
         }
     }
 
+    pub fn optional(self) -> QualifiedTerm {
+        QualifiedTerm {
+            token: self.token,
+            predicate: self.predicate,
+        }
+    }
+
     pub fn unqualified(self) -> QualifiedTerm {
         QualifiedTerm {
             token: self.token,
