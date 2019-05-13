@@ -5,7 +5,12 @@ pub fn is_html_tag_prefix(c: char) -> bool {
 }
 
 pub fn is_html_tag_suffix(c: char) -> bool {
-    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_' || c == '.'
+    (c >= 'a' && c <= 'z') ||
+    (c >= 'A' && c <= 'Z') ||
+    (c >= '0' && c <= '9') ||
+    c == '-' ||
+    c == '_' ||
+    c == '.'
 }
 
 /// Assumes preceding `<`
