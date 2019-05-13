@@ -37,22 +37,19 @@ pub(crate) fn syntax_tree(
     ast::debug_dump(&syntax, errors, formatter)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "runtime"))]
 mod tests {
-    use crate::db::RootDatabase;
-    use crate::parse::FileLanguage::{Html, Javascript};
     use super::*;
+    use crate::runtime::HostDatabase;
     use code_analysis::{FileId, SourceDatabase};
-    use code_grammar::TextRange;
     use test_utils::assert_diff;
 
     #[test]
     fn test_syntax_tree() {
-        let mut db = RootDatabase::default();
+        let mut db = HostDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "function foo() {} /* a comment */".to_string().into());
-        db.set_file_relative_path(file_id, "example.js".into());
-        let syn = syntax_tree(&db, file_id, None);
+        let syn = syntax_tree(&db, db.file_source(file_id), "js");
         assert_diff!(
             syn.trim(),
             r#"
@@ -72,11 +69,10 @@ PROGRAM@[0; 17)
             .trim()
         );
 
-        let mut db = RootDatabase::default();
+        let mut db = HostDatabase::default();
         let file_id = FileId(1);
         db.set_file_text(file_id, "<template><img alt='Hello World' /></template>".to_string().into());
-        db.set_file_relative_path(file_id, "example.html".into());
-        let syn = syntax_tree(&db, file_id, None);
+        let syn = syntax_tree(&db, db.file_source(file_id), "html");
         assert_diff!(
             syn.trim(),
             r#"

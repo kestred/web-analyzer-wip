@@ -20,7 +20,7 @@ use javascript_analysis::AstDatabaseStorage as JsAstStorage;
     JsAstStorage,
 )]
 #[derive(Debug)]
-struct HostDatabase {
+pub(crate) struct HostDatabase {
     runtime: salsa::Runtime<HostDatabase>,
 }
 
