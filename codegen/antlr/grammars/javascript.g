@@ -264,7 +264,7 @@ debugger_statement
     ;
 
 function_declaration
-    : (async_kw FUNCTION_KW | FUNCTION_KW '*'?) identifier '(' formal_parameter_list? ')' function_body
+    : (async_kw FUNCTION_KW | FUNCTION_KW '*'?) identifier function_parameters function_body
     # FUNCTION_DECLARATION
     ;
 
@@ -299,12 +299,12 @@ method_definition
     ;
 
 method_tail
-    : '(' formal_parameter_list? ')' function_body
+    : function_parameters function_body
     # FUNCTION_EXPRESSION
     ;
 
 generator_method
-    : ('*' | async_kw)? identifier_or_keyword '(' formal_parameter_list? ')' function_body
+    : ('*' | async_kw)? identifier_or_keyword function_parameters function_body
     # FUNCTION_EXPRESSION
     ;
 
@@ -328,8 +328,12 @@ formal_parameter_last                          // ES6: Rest Parameter
     ;
 
 identifier_pattern
-    : IDENTIFIER         // N.B. this will eventually be updated to include capturing optional type annotations
+    : IDENTIFIER         // N.B. this overriden in `typescript.g` to capture type annotations
     # IDENTIFIER
+    ;
+
+function_parameters
+    : '(' formal_parameter_list? ')'
     ;
 
 function_body
@@ -347,18 +351,31 @@ array_expression
     ;
 
 element_list
-    : expression (','+ expression)* (','+ last_element)?
-    | last_element
+    : element_or_spread (','+ element_or_spread)*
     ;
 
-last_element
-    : '...' identifier  // ES6: Spread Operator
-    # SPREAD_ELEMENT
+element_or_spread
+    : expression
+    | spread_element
     ;
 
 object_expression
-    : '{' (property (',' property)*)? ','? '}'
+    : '{' property_list? ','? '}'
     # OBJECT_EXPRESSION
+    ;
+
+property_list
+    : property_or_spread (',' property_or_spread)*
+    ;
+
+property_or_spread
+    : property
+    | spread_element
+    ;
+
+spread_element
+    : '...' expression  // ES6: Spread Operator
+    # SPREAD_ELEMENT
     ;
 
 identifier
@@ -412,6 +429,7 @@ arguments
 
 last_argument                        // ES6: Spread Operator
     : '...' identifier
+    # SPREAD_ELEMENT
     ;
 
 expression_list
@@ -477,7 +495,7 @@ class_expression
     ;
 
 function_expression
-    : FUNCTION_KW identifier? '(' formal_parameter_list? ')' function_body
+    : FUNCTION_KW identifier? function_parameters function_body
     # FUNCTION_EXPRESSION
     ;
 
@@ -488,12 +506,12 @@ arrow_function_expression
 
 arrow_function_parameters
     : identifier_pattern
-    | '(' formal_parameter_list? ')'
+    | function_parameters
     ;
 
 arrow_function_body
-    : expression
-    | function_body
+    : function_body
+    | expression
     ;
 
 assignment_operator
@@ -532,7 +550,7 @@ literal
 //     ;
 
 identifier_or_keyword
-    : ( IDENTIFIER | reserved_word )
+    : (IDENTIFIER | reserved_word)
     # IDENTIFIER
     ;
 

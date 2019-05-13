@@ -5,6 +5,9 @@ use html_grammar::ast as html;
 use html_grammar::syntax_kind as html_syntax;
 use javascript_grammar::ast as js;
 use javascript_grammar::syntax_kind as js_syntax;
+use javascript_grammar::ast as ts;
+use typescript_grammar::syntax_kind as ts_syntax;
+use vue_grammar::ast as vue;
 use vue_grammar::syntax_kind as vue_syntax;
 
 pub(crate) fn syntax_tree(
@@ -15,22 +18,24 @@ pub(crate) fn syntax_tree(
     let syntax = match source_ext {
         "htm" | "html" => db.html_ast(source_id).syntax.to_owned(),
         "js" => db.javascript_ast(source_id).syntax.to_owned(),
+        "ts" => db.typescript_ast(source_id).syntax.to_owned(),
         "vue" => db.vue_ast(source_id).syntax.to_owned(),
 
         "css" => panic!("query `syntax_tree` is not implemented for CSS"),
-        "ts" => panic!("query `syntax_tree` is not implemented for TypeScript"),
         _ => panic!("unknown source extension: {:?}", source_ext),
     };
     let as_debug_repr = match source_ext {
         "htm" | "html" => html_syntax::as_debug_repr,
         "js" => js_syntax::as_debug_repr,
+        "ts" => ts_syntax::as_debug_repr,
         "vue" => vue_syntax::as_debug_repr,
         _ => unreachable!(),
     };
     let errors = match source_ext {
         "htm" | "html" => syntax.ancestors().find_map(html::Document::cast).map(|x| x.errors().to_vec()),
         "js" => syntax.ancestors().find_map(js::Program::cast).map(|x| x.errors().to_vec()),
-        "vue" => syntax.ancestors().find_map(js::Program::cast).map(|x| x.errors().to_vec()),
+        "ts" => syntax.ancestors().find_map(ts::Program::cast).map(|x| x.errors().to_vec()),
+        "vue" => syntax.ancestors().find_map(vue::Component::cast).map(|x| x.errors().to_vec()),
         _ => unreachable!(),
     }.unwrap_or_default();
     let formatter = |k| as_debug_repr(k).map(|k| k.name).unwrap_or("UNKNOWN_SYNTAX_KIND");

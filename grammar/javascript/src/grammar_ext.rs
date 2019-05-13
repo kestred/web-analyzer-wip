@@ -94,15 +94,24 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         } else if p.at(L_CURLY) {
             object_expression(p)?;
         } else if p.at(L_PAREN) {
-            // Try `arrow_function_expression`
-            let checkpoint = p.checkpoint(true);
-            arrow_function_expression(p);
-
-            // Otherwise, expect `expression_list`
-            if !p.commit(checkpoint)?.is_ok() {
+            // N.B. Do some custom lookahead logic here to avoid
+            // TODO: Implement auto-genned 2-4 token lookahead for ambiguous cases
+            let peek = p.nth(1);
+            if peek != IDENTIFIER && peek != R_PAREN {
                 p.bump();
                 expression_list(p)?;
                 p.expect(R_PAREN)?;
+            } else {
+                // Try `arrow_function_expression`
+                let checkpoint = p.checkpoint(true);
+                arrow_function_expression(p);
+
+                // Otherwise, expect `expression_list`
+                if !p.commit(checkpoint)?.is_ok() {
+                    p.bump();
+                    expression_list(p)?;
+                    p.expect(R_PAREN)?;
+                }
             }
         } else {
             let kind = p.current();
@@ -366,7 +375,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         //     # TAGGED_TEMPLATE_EXPRESSION
         //     ;
         if prec <= 0 && p.at(TEMPLATE_LITERAL) {
-            assignment_operator(p)?;
+            p.bump();
             p.complete_and_wrap(&marker, TAGGED_TEMPLATE_EXPRESSION);
         }
 

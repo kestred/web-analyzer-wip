@@ -242,7 +242,7 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     fn rollback(&mut self, checkpoint: Checkpoint) {
         assert!(checkpoint.allows_rollback(), "attempted to rollback invalid checkpoint");
         assert!(self.source_pos >= checkpoint.source_pos, "attempted to rollback expired checkpoint");
-        assert!(self.config.max_rollback_size as usize > self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
+        assert!(self.config.max_rollback_size as usize >= self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
         if let Some(branch_pos) = checkpoint.branch_pos {
             match self.events[branch_pos] {
                 Event::StartNode { kind: ref mut slot, .. } => {
