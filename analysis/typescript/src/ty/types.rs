@@ -35,6 +35,10 @@ pub enum Ty {
     /// it _could_ be any type, but does not cast to any other type.
     Unknown,
 
+    /// It is impossible for a value of this type to exist (by definition);
+    /// typically used to represent types in code that is "unreachable".
+    Never,
+
     // TODO: Maybe add a concrete `function` type?
     // Function(FunctionId),
 

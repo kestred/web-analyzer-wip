@@ -258,7 +258,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             //     ;
             // not_null_expression[p ≤ 15]
             //     : expression {!at_line_terminator()}? '!'
-            //     # NOT_NULL_EXPRESSION
+            //     # TS_NON_NULL_EXPRESSION
             //     ;
             while prec <= 19 && p.at_ts(&tokenset![L_SQUARE, DOT, L_PAREN, INCREMENT, DECREMENT, BANG]) {
                 if prec < 19 && p.at(L_SQUARE) {
@@ -281,7 +281,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
                     p.complete_and_wrap(&marker, UPDATE_EXPRESSION);
                 } else if prec <= 15 && p.at(BANG) {
                     p.bump();
-                    p.complete_and_wrap(&marker, NOT_NULL_EXPRESSION);
+                    p.complete_and_wrap(&marker, TS_NON_NULL_EXPRESSION);
                 } else {
                     break;
                 }
@@ -377,12 +377,12 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         {
             // as_expression[p ≤ 8]
             //     : expression 'as' type_expr
-            //     # AS_EXPRESSION
+            //     # TS_AS_EXPRESSION
             //     ;
             while prec <= 8 && p.at_keyword("as") && p.at(IDENTIFIER) {
-                p.bump();
+                as_kw(p)?;
                 type_expr(p)?;
-                p.complete_and_wrap(&marker, AS_EXPRESSION);
+                p.complete_and_wrap(&marker, TS_AS_EXPRESSION);
             }
             // if prec > 8 {
             //     return Some(Continue);

@@ -9,6 +9,8 @@ pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
             match node.syntax.first_token().map(|t| t.text()) {
                 // N.B. strangely, `undefined` is considered neither a keyword nor a reserved word ¯\_(ツ)_/¯
                 Some(raw) if raw == "undefined" => Ty::Hint(TypeOf::Undefined),
+                Some(raw) if raw == "Infinity" => Ty::Number,
+                Some(raw) if raw == "NaN" => Ty::Number,
 
                 // TODO: Lookup identifier declaration and perform flow typing up to this point
                 _ => Ty::Any,
@@ -28,7 +30,7 @@ pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
         ast::ExpressionKind::ConditionalExpression(_node) => Ty::Any, // TODO: Implement
         ast::ExpressionKind::CallExpression(_node) => Ty::Any, // TODO: Implement
         ast::ExpressionKind::NewExpression(_) => Ty::Hint(TypeOf::Object),
-        ast::ExpressionKind::SequenceExpression(node) => node.expressions().last().map(infer_expression_type).unwrap_or(Ty::Unknown),
+        ast::ExpressionKind::SequenceExpression(node) => node.expressions().last().map(infer_expression_type).unwrap_or(Ty::Never),
         ast::ExpressionKind::ArrowFunctionExpression(_) => Ty::Hint(TypeOf::Function),
         ast::ExpressionKind::YieldExpression(_node) => Ty::Any, // TODO: Implement
         ast::ExpressionKind::TemplateLiteral(_) => Ty::String,
@@ -36,6 +38,10 @@ pub fn infer_expression_type(expr: &ast::Expression) -> Ty {
         ast::ExpressionKind::ClassExpression(_node) => Ty::Hint(TypeOf::Function),
         ast::ExpressionKind::MetaProperty(_node) => Ty::Any, // TODO: Implement
         ast::ExpressionKind::AwaitExpression(_node) => Ty::Any, // TODO: Implement
+
+        // Typescript-specific expressions
+        ast::ExpressionKind::TSAsExpression(_node) =>  Ty::Any, // TODO: Implement
+        ast::ExpressionKind::TSNonNullExpression(node) => infer_non_null_expression_type(node),
     }
 }
 
@@ -52,7 +58,7 @@ pub(crate) fn infer_literal_type(expr: &ast::Literal) -> Ty {
         //      to be `Ty::Null` instead of `Ty::Any`; but when type-checking
         //      unannotated javascript we have to be pretty lax.
         Some(NULL_KW) => Ty::Hint(TypeOf::Null),
-        _ => Ty::Any,
+        _ => Ty::Never,
     }
 }
 
@@ -89,7 +95,36 @@ pub(crate) fn infer_unary_expression_type(expr: &ast::UnaryExpression) -> Ty {
         Some(PLUS) => Ty::Number,
         Some(TILDE) => Ty::Number,
         Some(BANG) => Ty::Boolean,
-        _ => Ty::Any,
+        _ => Ty::Never,
+    }
+}
+
+pub(crate) fn infer_non_null_expression_type(expr: &ast::TSNonNullExpression) -> Ty {
+    let expr = expr.syntax.children().find_map(ast::Expression::cast);
+    let expr = match expr {
+        Some(expr) => expr,
+        None => return Ty::Never,
+    };
+    match infer_expression_type(expr) {
+        Ty::Union(types) => {
+            let non_null_types = types
+                .into_iter()
+                .filter(|t| match t {
+                    Ty::Null => false,
+                    Ty::Undefined => false,
+                    _ => true,
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            if non_null_types.len() > 1 {
+                Ty::Union(non_null_types.into())
+            } else if let Some(ty) = non_null_types.into_iter().next() {
+                ty
+            } else {
+                Ty::Never
+            }
+        }
+        ty => ty,
     }
 }
 

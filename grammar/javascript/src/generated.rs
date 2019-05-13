@@ -132,6 +132,8 @@ pub mod ast {
         NewExpression = NEW_EXPRESSION,
         ObjectExpression = OBJECT_EXPRESSION,
         SequenceExpression = SEQUENCE_EXPRESSION,
+        TSAsExpression = TS_AS_EXPRESSION,
+        TSNonNullExpression = TS_NON_NULL_EXPRESSION,
         TaggedTemplateExpression = TAGGED_TEMPLATE_EXPRESSION,
         TemplateLiteral = TEMPLATE_EXPRESSION,
         ThisExpression = THIS_EXPRESSION,
@@ -159,6 +161,8 @@ pub mod ast {
                 ExpressionKind::NewExpression(node) => node.type_(),
                 ExpressionKind::ObjectExpression(node) => node.type_(),
                 ExpressionKind::SequenceExpression(node) => node.type_(),
+                ExpressionKind::TSAsExpression(node) => node.type_(),
+                ExpressionKind::TSNonNullExpression(node) => node.type_(),
                 ExpressionKind::TaggedTemplateExpression(node) => node.type_(),
                 ExpressionKind::TemplateLiteral(node) => node.type_(),
                 ExpressionKind::ThisExpression(node) => node.type_(),
@@ -564,6 +568,18 @@ pub mod ast {
             "SwitchStatement"
         }
     }
+    ast_node!(TSAsExpression, TS_AS_EXPRESSION);
+    impl TSAsExpression {
+        pub fn type_(&self) -> &'static str {
+            "TSAsExpression"
+        }
+    }
+    ast_node!(TSNonNullExpression, TS_NON_NULL_EXPRESSION);
+    impl TSNonNullExpression {
+        pub fn type_(&self) -> &'static str {
+            "TSNonNullExpression"
+        }
+    }
     ast_node!(TaggedTemplateExpression, TAGGED_TEMPLATE_EXPRESSION);
     impl TaggedTemplateExpression {
         pub fn type_(&self) -> &'static str {
@@ -704,19 +720,21 @@ pub mod syntax_kind {
             SUPER_EXPRESSION 254
             SWITCH_CASE 255
             SWITCH_STATEMENT 256
-            TAGGED_TEMPLATE_EXPRESSION 257
-            TEMPLATE_ELEMENT 258
-            TEMPLATE_EXPRESSION 259
-            THIS_EXPRESSION 260
-            THROW_STATEMENT 261
-            TRY_STATEMENT 262
-            UNARY_EXPRESSION 263
-            UPDATE_EXPRESSION 264
-            VARIABLE_DECLARATION 265
-            VARIABLE_DECLARATOR 266
-            WHILE_STATEMENT 267
-            WITH_STATEMENT 268
-            YIELD_EXPRESSION 269
+            TS_AS_EXPRESSION 257
+            TS_NON_NULL_EXPRESSION 258
+            TAGGED_TEMPLATE_EXPRESSION 259
+            TEMPLATE_ELEMENT 260
+            TEMPLATE_EXPRESSION 261
+            THIS_EXPRESSION 262
+            THROW_STATEMENT 263
+            TRY_STATEMENT 264
+            UNARY_EXPRESSION 265
+            UPDATE_EXPRESSION 266
+            VARIABLE_DECLARATION 267
+            VARIABLE_DECLARATOR 268
+            WHILE_STATEMENT 269
+            WITH_STATEMENT 270
+            YIELD_EXPRESSION 271
         }
     }
 }

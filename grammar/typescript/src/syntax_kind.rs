@@ -43,7 +43,5 @@ syntax_kinds! {
         TYPEOF_TYPE_EXPR 219
 
         TYPE_ARGUMENT 230
-        AS_EXPRESSION 231
-        NOT_NULL_EXPRESSION 232
     }
 }

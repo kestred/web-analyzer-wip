@@ -122,6 +122,7 @@ fn emit_grammar(out: &mut String, db: &Database) {
             continue;
         }
         if db.is_left_recursive(&rule.name) {
+            eprintln!("warn: left recursive rule '{}' must be implemented by hand in 'grammar_ext.rs'", rule.name);
             continue;
         }
 
@@ -521,7 +522,6 @@ fn emit_choice(
             return PatternType::Unit;
         }
 
-        eprintln!("warn: left recursive rule '{}' must be implemented by hand in 'grammar_ext.rs'", rule);
         emit_depth(out, dep);
         out.push_str(rule);
         out.push_str("(p)");

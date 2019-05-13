@@ -96,7 +96,7 @@ expression
     /* Unary Operators */
     | expression {!at_line_terminator()}? '++'             # UPDATE_EXPRESSION
     | expression {!at_line_terminator()}? '--'             # UPDATE_EXPRESSION
-    | expression {!at_line_terminator()}? '!'              # NOT_NULL_EXPRESSION
+    | expression {!at_line_terminator()}? '!'              # TS_NON_NULL_EXPRESSION
     | DELETE_KW expression                                 # UNARY_EXPRESSION
     | VOID_KW expression                                   # UNARY_EXPRESSION
     | TYPEOF_KW expression                                 # UNARY_EXPRESSION
@@ -114,7 +114,7 @@ expression
     | expression ('<' | '>' | '<=' | '>=') expression      # BINARY_EXPRESSION
     | expression INSTANCEOF_KW expression                  # BINARY_EXPRESSION
     | expression IN_KW expression                          # BINARY_EXPRESSION
-    | expression as_kw type_expr                           # AS_EXPRESSION
+    | expression as_kw type_expr                           # TS_AS_EXPRESSION
     | expression ('==' | '!=' | '===' | '!==') expression  # BINARY_EXPRESSION
     | expression '&' expression                            # BINARY_EXPRESSION
     | expression '^' expression                            # BINARY_EXPRESSION
@@ -177,13 +177,23 @@ type_arguments
     : '<' type_expr (',' type_expr)* '>'
     ;
 
-identifier_or_primitive
-    : (IDENTIFIER | BOOLEAN_KW)
-    # IDENTIFIER
+object_pattern
+    : '{' (assignment_property (',' assignment_property)*)? '}' (':' type_expr)?
+    # OBJECT_PATTERN
+    ;
+
+array_pattern
+    : '[' ','* (pattern (','+ pattern)*)? ','* ']' (':' type_expr)?
+    # ARRAY_PATTERN
     ;
 
 identifier_pattern
     : IDENTIFIER ('?'? ':' type_expr)?
+    # IDENTIFIER
+    ;
+
+identifier_or_primitive
+    : (IDENTIFIER | BOOLEAN_KW)
     # IDENTIFIER
     ;
 
@@ -199,10 +209,4 @@ type_kw
 keyof_kw
     : {at_keyword("keyof")}? IDENTIFIER
     # KEYOF_KW
-    ;
-
-// TODO: Re-visit whether this override is necessary when patterns are implemented properly
-variable_declarator
-    : (identifier | array_expression | object_expression) (':' type_expr)? ('=' expression)?  // ES6: Array & Object Matching
-    # VARIABLE_DECLARATOR
     ;

@@ -20,26 +20,36 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
 
     // Parse the vue component
-    let file_id = db.file_source(file_id);
-    let component = db.vue_ast(file_id);
-    syntax_errors(&mut results, db, file_id, TextUnit::default(), component.errors());
+    let src_id = db.file_source(file_id);
+    let component = db.vue_ast(src_id);
+    syntax_errors(&mut results, db, src_id, TextUnit::default(), component.errors());
 
     // Check all expressions in the template have valid syntax
-    let mut expressions = Vec::new();
-    let expression_ranges = component.template().map(collect_expressions).unwrap_or_default();
-    for range in expression_ranges {
-        let raw_expr = &db.source_text(file_id)[range];
-        let (expr, _) = ts::Expression::parse(raw_expr);
+    let (expr_ranges, decl_ranges) = component.template()
+        .map(collect_template_scope)
+        .unwrap_or_default();
+    let mut template_expressions = Vec::new();
+    for range in expr_ranges {
+        let raw_expr = &db.source_text(src_id)[range];
+        let trim_offset = raw_expr.chars().take_while(|&c| c.is_whitespace()).count();
+        let trim_range = range + TextUnit::from_usize(trim_offset);
+        let trim_expr = raw_expr.trim();
+        let (expr, _) = ts::Expression::parse(trim_expr);
         let errors = expr.errors();
         if errors.is_empty() {
-            expressions.push((expr, range));
+            template_expressions.push((expr, trim_range));
         } else {
-            syntax_errors(&mut results, db, file_id, expr.syntax.range().start(), errors);
+            syntax_errors(&mut results, db, src_id, trim_range.start(), errors);
         }
+    }
+    let mut template_declarations = Vec::new();
+    for (scope_range, ident_range) in decl_ranges {
+        let raw_expr = &db.source_text(src_id)[ident_range];
+        template_declarations.push((raw_expr.to_string(), scope_range, ident_range));
     }
 
     // Find the component script
-    let (source_id, _) = match db.component_script(file_id) {
+    let (source_id, _) = match db.component_script(src_id) {
         Some(id) => id,
         None => return results,
     };
@@ -48,7 +58,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         let errors = root.errors();
         if !errors.is_empty() {
             let script_block = component.script().unwrap().script().unwrap();
-            syntax_errors(&mut results, db, file_id, script_block.syntax.range().start(), errors);
+            syntax_errors(&mut results, db, src_id, script_block.syntax.range().start(), errors);
             return results
         }
     }
@@ -146,6 +156,15 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     if let Some(partial) = vue_methods.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
     }
+    let vue_filters = get_object_property(vue_options, "filters")
+        .map(AstNode::syntax)
+        .and_then(ts::Expression::cast)
+        .map(infer_expression_type)
+        .and_then(|ty| match ty {
+            Ty::Interface(ty) => Some(ty),
+            _ => None,
+        })
+        .unwrap_or_else(|| InterfaceTy::default().into());
 
     // TODO: Move `vue_apollo` into some sort of `extensions` or `contrib` module
     let vue_apollo = get_object_property(vue_options, "apollo")
@@ -166,11 +185,20 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
 
     // Check that all expressions in the template reference known vm properties
-    for (expr, range) in expressions {
+    let config = db.vue_config(db.file_source_root(file_id));
+    let is_decl_in_template = |name: &str, range: TextRange| -> bool {
+        template_declarations.iter().any(|(decl, scope, _item)| decl == name && range.is_subrange(scope))
+    };
+    for (expr, range) in template_expressions {
         for (ident, node) in find_captured_environment(&expr) {
-            let exists_on_vm = vm.properties.iter().any(|p| p.ident == ident);
-            if !exists_on_vm {
-                let pos = error_line_col(db, file_id, range.start() + node.syntax.range().start());
+            if !vm.properties.iter().any(|p| p.ident == ident) &&
+                !is_global(ident) &&
+                !is_decl_in_template(ident, range) &&
+                // TODO: Only perform these check if the expression is in a filter
+                !vue_filters.properties.iter().any(|p| p.ident == ident) &&
+                !config.global.filters.iter().any(|f| f == ident)
+            {
+                let pos = error_line_col(db, src_id, range.start() + node.syntax.range().start());
                 results.push(format!("error(vue): [{}] property `{}` is not defined on the component", pos, ident))
             }
         }
@@ -188,9 +216,9 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     results
 }
 
-fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, file_id: SourceId, base: TextUnit, errors: Vec<SyntaxError>) {
+fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, src_id: SourceId, base: TextUnit, errors: Vec<SyntaxError>) {
     // TODO: include filename in error message
-    // let filename = db.input_filename(file_id);
+    // let filename = db.input_filename(src_id);
     let mut offset_set = FxHashSet::default();
     results.extend(errors.into_iter().filter_map(|err| {
         // Only display the first _syntax_ error for each line.
@@ -198,7 +226,7 @@ fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, file_id: Sour
         let offset = err.offset();
         if !offset_set.contains(&offset) {
             offset_set.insert(offset);
-            let pos = error_line_col(db, file_id, base + offset);
+            let pos = error_line_col(db, src_id, base + offset);
             Some(format!("error(syntax): [{}] {}", pos, err.message))
         } else {
             None
@@ -206,8 +234,8 @@ fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, file_id: Sour
     }));
 }
 
-fn error_line_col(db: &impl VueDatabase, file_id: SourceId, pos: TextUnit) -> String {
-    let line_index = db.source_line_index(file_id);
+fn error_line_col(db: &impl VueDatabase, src_id: SourceId, pos: TextUnit) -> String {
+    let line_index = db.source_line_index(src_id);
     let line_col = line_index.line_col(pos);
     format!("line {}, col {}", line_col.line + 1, line_col.col_utf16 + 1)
 }
@@ -341,6 +369,11 @@ fn collect_captures<'a>(
         ts::ExpressionKind::AwaitExpression(node) => {
             collect_captures(node.argument().unwrap(), decls, captures);
         }
+
+        ts::ExpressionKind::TSAsExpression(_) |
+        ts::ExpressionKind::TSNonNullExpression(_) => {
+            unreachable!() // N.B. typescript isn't valid in the template
+        }
     }
 }
 fn collect_block_captures<'a> (
@@ -446,22 +479,125 @@ fn collect_pattern_decls_and_captures<'a>(
                 captures.push((ident.name(), ident.into()));
             }
         }
+        ts::PatternKind::MemberExpression(expr) => {
+            collect_captures(expr.object().unwrap(), decls, captures);
+            if expr.computed() {
+                collect_captures(expr.property().unwrap(), decls, captures);
+            }
+        }
 
-        // TODO: Implement other patterns; with the current parser they should be `unreachable!()` but...
-        _ => unimplemented!(),
+        // FIXME: Implement other patterns...
+        kind => {
+            eprintln!("UNIMPLEMENTED: {:?} of {}", kind, pat.syntax.parent().and_then(ts::Node::cast).unwrap().type_());
+            unimplemented!()
+        }
     }
 }
 
-fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
+fn collect_template_scope(template: &vue::Template) -> (Vec<(TextRange)>, Vec<(TextRange, TextRange)>) {
     let mut expressions = Vec::new();
+    let mut declarations = Vec::new();
     for visit in template.syntax.preorder_with_tokens() {
         let syn_elem = match visit {
             WalkEvent::Enter(syntax) => syntax,
             _ => continue,
         };
         match (syn_elem.kind(), syn_elem) {
-            (ATTRIBUTE, SyntaxElement::Node(_node)) => {
-                // TODO: Capture `v-model`, `v-for`, `v-if` and `v-else-if` attributes
+            (ATTRIBUTE, SyntaxElement::Node(node)) => {
+                let name = node.first_token().unwrap().text().as_str();
+                match name {
+                    "v-if" | "v-else-if" | "v-model" => {
+                        let value = node.children_with_tokens()
+                            .skip_while(|syn| syn.kind() != EQ)
+                            .skip(1) // eat `EQ`
+                            .skip_while(|syn| syn.kind() == WS)
+                            .next();
+                        if let Some(value) = value {
+                            if value.kind() == QUOTED {
+                                let range = value.range();
+                                let start = TextUnit::from_usize(range.start().to_usize() + 1);
+                                let end = TextUnit::from_usize(range.end().to_usize() - 1);
+                                expressions.push(TextRange::from_to(start, end));
+                            } else if value.kind() == IDENT {
+                                expressions.push(value.range());
+                            }
+                        }
+                    }
+                    "v-for" => {
+                        let value = node.children_with_tokens()
+                            .skip_while(|syn| syn.kind() != EQ)
+                            .skip(1) // eat `EQ`
+                            .skip_while(|syn| syn.kind() == WS)
+                            .next();
+                        if let Some(SyntaxElement::Token(token)) = value {
+                            if token.kind() != QUOTED {
+                                continue; // N.B. not a valid `v-for` expression
+                            }
+
+                            // Define simple scanner
+                            let text = token.text().as_str();
+                            let range = token.range();
+                            let mut pos = 1; // skip '"' character
+                            let eat_whitespace = |pos: &mut usize| {
+                                while text.len() > *pos && text.chars().nth(*pos).map(char::is_whitespace).unwrap_or(false) {
+                                    *pos += 1;
+                                }
+                            };
+
+                            // Collect declarations
+                            eat_whitespace(&mut pos);
+                            if text.starts_with("(") {
+                                while text.len() > pos {
+                                    eat_whitespace(&mut pos);
+                                    if text.chars().nth(pos) == Some(')') {
+                                        break;
+                                    }
+                                    pos += 1; // eat L_PAREN or COMMA
+                                    eat_whitespace(&mut pos);
+
+                                    let len = text[pos..]
+                                        .chars()
+                                        .take_while(|&c| c != ',' && c != ')' && !c.is_whitespace())
+                                        .count();
+                                    let start = TextUnit::from_usize(range.start().to_usize() + pos);
+                                    let end = TextUnit::from_usize(start.to_usize() + len);
+                                    declarations.push((
+                                        node.parent().unwrap().range(),
+                                        TextRange::from_to(start, end),
+                                    ));
+                                    pos += len;
+                                }
+                            } else {
+                                eat_whitespace(&mut pos);
+                                let len = text[pos..]
+                                    .chars()
+                                    .take_while(|&c| c != ',' && c != ')' && !c.is_whitespace())
+                                    .count();
+                                let start = TextUnit::from_usize(range.start().to_usize() + pos);
+                                let end = TextUnit::from_usize(start.to_usize() + len);
+                                declarations.push((
+                                    node.parent().unwrap().range(),
+                                    TextRange::from_to(start, end),
+                                ));
+                                pos += len;
+                            }
+
+                            // Eat "in" keyword
+                            eat_whitespace(&mut pos);
+                            pos += text[pos..]
+                                .chars()
+                                .take_while(|&c| !c.is_whitespace())
+                                .count();
+                            eat_whitespace(&mut pos);
+
+                            // The rest is an expression
+                            let start = TextUnit::from_usize(range.start().to_usize() + pos);
+                            let end = TextUnit::from_usize(range.end().to_usize() - 1);
+                            expressions.push(TextRange::from_to(start, end));
+                        }
+                    }
+                    _ => (),
+                }
             }
             (ATTRIBUTE_KEY, SyntaxElement::Node(node)) => {
                 let computed_key = node.children_with_tokens()
@@ -503,7 +639,7 @@ fn collect_expressions(template: &vue::Template) -> Vec<TextRange> {
             _ => (),
         }
     }
-    expressions
+    (expressions, declarations)
 }
 
 fn get_object_property<'a>(obj: &'a ts::ObjectExpression, key: &str) -> Option<&'a ts::Expression> {
@@ -607,4 +743,41 @@ fn infer_props_types(props: &ts::Expression) -> Result<(InterfaceTy, Vec<String>
     }
     object.typeof_ = Some(vec![TypeOf::Object].into());
     Ok((object, messages))
+}
+
+const GLOBALS: &[&str] = &[
+    // Values
+    "Infinity",
+    "NaN",
+    "undefined",
+    "null",
+    "globalThis",
+
+    // Objects / constructors / modules
+    "Object",
+    "Function",
+    "Boolean",
+    "Symbol",
+    "Error",
+    "EvalError",
+    "InternalError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "TypeError",
+    "URIError",
+    "Number",
+    "BigInt",
+    "Math",
+    "Date",
+    "String",
+    "RegExp",
+    "Array",
+    "Map",
+    "Set",
+    "JSON",
+    "Promise",
+];
+fn is_global(name: &str) -> bool {
+    GLOBALS.into_iter().any(|&g| g == name)
 }

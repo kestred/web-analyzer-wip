@@ -142,7 +142,7 @@ variable_declarator_list
     ;
 
 variable_declarator
-    : (identifier | array_expression | object_expression) ('=' expression)?  // ES6: Array & Object Matching
+    : pattern ('=' expression)?  // ES6: Array & Object Matching
     # VARIABLE_DECLARATOR
     ;
 
@@ -311,10 +311,8 @@ generator_method
 formal_parameter_list
     : formal_parameter (',' formal_parameter)* (',' formal_parameter_last)?
     | formal_parameter_last
-    | array_expression                         // ES6: Parameter Context Matching
-    # ARRAY_PATTERN
-    | object_expression                        // ES6: Parameter Context Matching
-    # OBJECT_PATTERN
+    | array_pattern
+    | object_pattern
     ;
 
 formal_parameter
@@ -325,11 +323,6 @@ formal_parameter
 formal_parameter_last                          // ES6: Rest Parameter
     : '...' identifier_pattern
     # REST_ELEMENT
-    ;
-
-identifier_pattern
-    : IDENTIFIER         // N.B. this overriden in `typescript.g` to capture type annotations
-    # IDENTIFIER
     ;
 
 function_parameters
@@ -356,7 +349,7 @@ element_list
 
 element_or_spread
     : expression
-    | spread_element
+    | spread_expression
     ;
 
 object_expression
@@ -370,12 +363,48 @@ property_list
 
 property_or_spread
     : property
-    | spread_element
+    | spread_expression
     ;
 
-spread_element
+spread_expression
     : '...' expression  // ES6: Spread Operator
     # SPREAD_ELEMENT
+    ;
+
+pattern
+    : object_pattern
+    | array_pattern
+    | spread_pattern
+    | identifier_pattern
+    ;
+
+object_pattern
+    : '{' (assignment_property (',' assignment_property)*)? '}'
+    # OBJECT_PATTERN
+    ;
+
+assignment_property
+    : identifier_or_keyword ':' pattern
+    # PROPERTY
+    | '[' expression ']' ':' pattern
+    # PROPERTY
+    | identifier
+    # PROPERTY
+    ;
+
+array_pattern
+    : '[' ','* (pattern (','+ pattern)*)? ','* ']'
+    # ARRAY_PATTERN
+    ;
+
+spread_pattern
+    : '...' identifier?
+    # SPREAD_ELEMENT
+    ;
+
+identifier_pattern
+    : IDENTIFIER         // N.B. this overriden in `typescript.g` to capture type annotations
+    # IDENTIFIER
     ;
 
 identifier

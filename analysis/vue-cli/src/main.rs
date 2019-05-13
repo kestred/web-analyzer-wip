@@ -1,5 +1,5 @@
 use clap::{App, Arg, SubCommand};
-use vue_analysis::Analysis;
+use vue_analysis::{Analysis, Config};
 use std::{fs, io};
 
 fn main() -> Result<(), io::Error> {
@@ -7,6 +7,12 @@ fn main() -> Result<(), io::Error> {
         .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("lint")
+                .arg(
+                    Arg::with_name("config")
+                        .long("config")
+                        .takes_value(true)
+                        .value_name("FILE")
+                )
                 .arg(Arg::with_name("file").required(true))
         )
         .subcommand(
@@ -18,7 +24,16 @@ fn main() -> Result<(), io::Error> {
         ("lint", Some(args)) => {
             let filename = args.value_of("file").unwrap();
             let filetext = fs::read_to_string(filename)?;
-            let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
+            let (mut analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
+            if let Some(config_path) = args.value_of("config") {
+                let config_text = fs::read_to_string(config_path)?;
+                let config: Config = if config_path.ends_with("json") {
+                    serde_json::from_str(&config_text).unwrap()
+                } else {
+                    toml::from_str(&config_text).unwrap()
+                };
+                analysis.set_config(config);
+            }
             let diagnostics = analysis.diagnostics(file_id.into());
             let mut total_errors = 0;
             for line in diagnostics {

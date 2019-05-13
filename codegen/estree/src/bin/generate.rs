@@ -15,6 +15,8 @@ fn main() -> Result<(), std::io::Error> {
         "codegen/estree/spec/es2017.md",
         "codegen/estree/spec/es2018.md",
         "codegen/estree/spec/es2019.md",
+        "codegen/estree/spec/extensions/type-annotations.md",
+        "codegen/estree/contrib/typescript.md",
     ];
     let mut spec = Tree::default();
     for filepath in filepaths {

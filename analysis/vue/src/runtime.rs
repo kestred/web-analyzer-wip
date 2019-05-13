@@ -1,3 +1,4 @@
+use crate::Config;
 use code_analysis::{FileId, LineIndex, PackageGraph, SourceChange, SourceRootId};
 use code_grammar::TreeArc;
 use html_grammar::ast as html;
@@ -7,12 +8,14 @@ use vue_grammar::ast as vue;
 use std::sync::Arc;
 
 use crate::AstDatabase as _;
+use crate::ConfigDatabase as _;
 use code_analysis::SourceDatabase as _;
 use html_analysis::AstDatabase as _;
 use javascript_analysis::AstDatabase as _;
 use typescript_analysis::AstDatabase as _;
 
 use crate::AstDatabaseStorage as VueAstStorage;
+use crate::ConfigDatabaseStorage as VueConfigStorage;
 use code_analysis::SourceDatabaseStorage as SourceStorage;
 use html_analysis::AstDatabaseStorage as HtmlAstStorage;
 use javascript_analysis::AstDatabaseStorage as JsAstStorage;
@@ -22,6 +25,7 @@ use typescript_analysis::AstDatabaseStorage as TsAstStorage;
     SourceStorage,
     HtmlAstStorage,
     VueAstStorage,
+    VueConfigStorage,
     JsAstStorage,
     TsAstStorage,
 )]
@@ -66,7 +70,12 @@ impl Analysis {
         change.add_file(source_root, file_id, filename.into(), Arc::new(text));
         change.set_package_graph(packages);
         change.apply_to(&mut db);
+        db.set_vue_config(source_root, Arc::new(Config::default()));
         (Analysis { db }, file_id)
+    }
+
+    pub fn set_config(&mut self, config: Config) {
+        self.db.set_vue_config(SourceRootId(0), Arc::new(config));
     }
 
     /// Gets the text of the source file.
