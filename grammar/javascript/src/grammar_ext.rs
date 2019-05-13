@@ -87,7 +87,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             p.eat(ASTERISK);
             expression(p)?;
             p.complete(marker, YIELD_EXPRESSION);
-        } else if p.at_ts(&tokenset![FALSE_KW, NULL_KW, NUMBER_LITERAL, REGEXP_LITERAL, STRING_LITERAL, TRUE_KW]) {
+        } else if p.at_ts(&AT_LITERAL) {
             literal(p)?;
         } else if p.at(L_SQUARE) {
             array_expression(p)?;

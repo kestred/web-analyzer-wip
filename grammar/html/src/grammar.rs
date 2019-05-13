@@ -23,6 +23,7 @@ pub fn document(p: &mut Parser) -> Option<Continue> {
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
             elements(p)?;
         }
+        p.expect(EOF)?;
         Some(Continue)
     });
     p.complete(_marker, DOCUMENT);

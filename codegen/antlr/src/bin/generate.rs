@@ -11,6 +11,7 @@ fn main() -> Result<(), std::io::Error> {
     let filepaths = &[
         ("codegen/antlr/grammars/html.g", "grammar/html/src/grammar.rs"),
         ("codegen/antlr/grammars/javascript.g", "grammar/javascript/src/grammar.rs"),
+        ("codegen/antlr/grammars/typescript.g", "grammar/typescript/src/grammar.rs"),
         ("codegen/antlr/grammars/vue.g", "grammar/vue/src/grammar.rs"),
     ];
     for (input, output) in filepaths {
@@ -61,16 +62,34 @@ fn main() -> Result<(), std::io::Error> {
         out.push_str("//! This module contains an auto-generated ");
         out.push_str(&db.grammar().name);
         out.push_str(" parser.\n");
-        if db.grammar().rules.iter().any(|r| db.is_left_recursive(&r.name)) {
-            out.push_str("use crate::grammar_ext;\n");
-        }
         out.push_str(&r#"
 use crate::syntax_kind::*;
 use code_grammar::{catch, tokenset, Parser, TokenSet};
 use code_grammar::parser::Continue;
 "#[1..]);
+
+        // Import any rules that must be written by hand
+        let lr_rules = db.grammar().rules.iter()
+            .filter(|r| db.is_left_recursive(&r.name))
+            .map(|r| &r.name)
+            .cloned()
+            .collect::<Vec<_>>();
+        if lr_rules.len() > 1 {
+            out.push('\n');
+            out.push_str("pub use crate::grammar_ext::{");
+            out.push_str(&lr_rules.join(", "));
+            out.push_str("};\n");
+        } else if let Some(rule) = lr_rules.iter().next() {
+            out.push('\n');
+            out.push_str("pub use crate::grammar_ext::");
+            out.push_str(&rule);
+            out.push_str(";\n");
+        }
+
+        // Emit the rules definitions
         emit_grammar(&mut out, &db);
 
+        // Emit any tokensets that got used
         let mut tokensets = db.tokensets()
             .into_iter()
             .filter(|(_, _, used)| *used)
@@ -81,7 +100,7 @@ use code_grammar::parser::Continue;
         }
         for (name, set, used) in tokensets {
             if used {
-                out.push_str("const ");
+                out.push_str("pub(crate) const ");
                 out.push_str(&name);
                 out.push_str(": TokenSet = tokenset![");
                 emit_tokenset_list(&mut out, set);
@@ -102,9 +121,14 @@ fn emit_grammar(out: &mut String, db: &Database) {
         if !db.is_subgrammar(&root.name, &rule.name) {
             continue;
         }
+        if db.is_left_recursive(&rule.name) {
+            continue;
+        }
 
         out.push('\n');
-        if !rule.name.starts_with("_") {
+        if rule.name.starts_with("_") {
+            out.push_str("pub(crate) ");
+        } else {
             out.push_str("pub ");
         }
         out.push_str("fn ");
@@ -499,7 +523,6 @@ fn emit_choice(
 
         eprintln!("warn: left recursive rule '{}' must be implemented by hand in 'grammar_ext.rs'", rule);
         emit_depth(out, dep);
-        out.push_str("grammar_ext::");
         out.push_str(rule);
         out.push_str("(p)");
         if dep > 1 {

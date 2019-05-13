@@ -30,7 +30,7 @@
 grammar HTML;
 
 document
-    : WS? doctype? WS? elements*
+    : WS? doctype? WS? elements* EOF
     # DOCUMENT
     ;
 

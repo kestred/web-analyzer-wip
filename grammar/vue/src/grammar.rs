@@ -18,6 +18,7 @@ pub fn component(p: &mut Parser) -> Option<Continue> {
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
             component_pattern(p)?;
         }
+        p.expect(EOF)?;
         Some(Continue)
     });
     p.complete(_marker, COMPONENT);

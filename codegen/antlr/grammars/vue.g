@@ -2,7 +2,7 @@ grammar VUE;
 import HTML from "html.g";
 
 component
-    : component_pattern*
+    : component_pattern* EOF
     # COMPONENT
     ;
 
