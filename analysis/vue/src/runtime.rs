@@ -1,5 +1,5 @@
 use crate::Config;
-use code_analysis::{FileId, LineIndex, PackageGraph, SourceChange, SourceRootId};
+use code_analysis::{FileId, LineIndex, PackageGraph, RelativePathBuf, SourceChange, SourceRootId};
 use code_grammar::TreeArc;
 use html_grammar::ast as html;
 use javascript_grammar::ast as js;
@@ -14,6 +14,7 @@ use html_analysis::AstDatabase as _;
 use javascript_analysis::AstDatabase as _;
 use typescript_analysis::AstDatabase as _;
 
+use crate::AppDatabaseStorage as VueAppStorage;
 use crate::AstDatabaseStorage as VueAstStorage;
 use crate::ConfigDatabaseStorage as VueConfigStorage;
 use code_analysis::SourceDatabaseStorage as SourceStorage;
@@ -24,6 +25,7 @@ use typescript_analysis::AstDatabaseStorage as TsAstStorage;
 #[salsa::database(
     SourceStorage,
     HtmlAstStorage,
+    VueAppStorage,
     VueAstStorage,
     VueConfigStorage,
     JsAstStorage,
@@ -124,5 +126,10 @@ impl Analysis {
     /// Computes the set of diagnostics for the given file.
     pub fn diagnostics(&self, file_id: FileId) -> Vec<String> {
         crate::diagnostics::check(&self.db, file_id)
+    }
+
+    /// Gets the list of files in the source root
+    pub fn files(&self, root_id: SourceRootId) -> impl Iterator<Item = (RelativePathBuf, FileId)> {
+        self.db.source_root(root_id).files.clone().into_iter()
     }
 }

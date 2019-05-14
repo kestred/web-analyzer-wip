@@ -1,7 +1,7 @@
 mod workspace;
 
 use clap::{App, Arg, SubCommand};
-use code_analysis::FileId;
+use code_analysis::SourceRootId;
 use vue_analysis::{Analysis, Config};
 use std::{fs, io, path::PathBuf};
 
@@ -40,7 +40,7 @@ fn main() -> Result<(), io::Error> {
             // Load project
             let entrypoint = PathBuf::from(args.value_of("main").unwrap());
             let (mut analysis, vfs) = workspace::load(entrypoint.clone());
-            let file_id = vfs.path2file(&entrypoint).map(|id| FileId(id.0)).unwrap();
+            let root_id = vfs.path2file(&entrypoint).map(|id| SourceRootId(id.0)).unwrap();
 
             // Load configuration
             if let Some(config_path) = args.value_of("config") {
@@ -51,16 +51,25 @@ fn main() -> Result<(), io::Error> {
                     toml::from_str(&config_text).unwrap()
                 };
                 analysis.set_config(config);
+            } else {
+                analysis.set_config(Config::default());
             }
 
-            // Run analytics
-            let diagnostics = analysis.diagnostics(file_id.into());
+            // Run diagnostics
             let mut total_errors = 0;
-            for line in diagnostics {
-                if line.starts_with("error") {
-                    total_errors += 1;
-                }
-                eprintln!("{}", line);
+            for (path, file_id) in analysis.files(root_id) {
+                match path.extension() {
+                    Some("js") | Some("ts") | Some("vue") => {
+                        let diagnostics = analysis.diagnostics(file_id.into());
+                        for line in diagnostics {
+                            if line.starts_with("error") {
+                                total_errors += 1;
+                            }
+                            eprintln!("{}", line);
+                        }
+                    },
+                    _ => continue,
+                };
             }
             eprintln!("info: found {} error(s)", total_errors);
             std::process::exit(if total_errors > 0 { 1 } else { 0 });

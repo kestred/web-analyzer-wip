@@ -19,6 +19,9 @@ macro_rules! ast_node {
             }
 
             fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
+            fn downcast(ast: &impl $crate::AstNode) -> Option<&Self> {
+                Self::cast(ast.syntax())
+            }
         }
         impl ToOwned for $node {
             type Owned = $crate::TreeArc<Self>;
@@ -69,6 +72,9 @@ macro_rules! ast_node {
             }
 
             fn syntax(&self) -> &$crate::SyntaxNode { &self.syntax }
+            fn downcast(ast: &impl $crate::AstNode) -> Option<&Self> {
+                Self::cast(ast.syntax())
+            }
         }
         impl ToOwned for $node {
             type Owned = $crate::TreeArc<Self>;

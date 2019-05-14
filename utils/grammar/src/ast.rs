@@ -9,6 +9,9 @@ use std::fmt::Write;
 pub trait AstNode: TransparentNewType<Repr = SyntaxNode> + ToOwned<Owned = TreeArc<Self>> {
     fn cast(syntax: &SyntaxNode) -> Option<&Self> where Self: Sized;
     fn syntax(&self) -> &SyntaxNode;
+
+    #[inline]
+    fn downcast(ast: &impl AstNode) -> Option<&Self> where Self: Sized;
 }
 
 pub fn debug_dump<'a, Fmt>(node: &SyntaxNode, mut errors: Vec<SyntaxError>, fmt_debug: Fmt) -> String

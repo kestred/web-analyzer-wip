@@ -1,6 +1,7 @@
 use crate::VueDatabase;
 use code_analysis::{FileId, SourceId};
 use code_grammar::{AstNode, SyntaxElement, SyntaxError, TextUnit, TextRange, WalkEvent};
+use javascript_grammar::ast as js;
 use typescript_analysis::ty::{infer_property_name, infer_expression_type, InterfaceTy, PropertyDef, Ty, TypeOf};
 use typescript_grammar::ast as ts;
 use typescript_grammar::syntax_kind::*;
@@ -10,8 +11,14 @@ use rustc_hash::FxHashSet;
 
 pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     let mut results = Vec::new();
-    let ext = db.file_extension(file_id);
-    match ext.as_ref().map(|ext| ext.as_str()) {
+    let path = db.file_relative_path(file_id);
+    let src_id = db.file_source(file_id);
+    match path.extension() {
+        Some("js") | Some("ts") => {
+            let module = db.typescript_ast(src_id);
+            syntax_errors(&mut results, db, src_id, path.as_str(), TextUnit::default(), module.errors());
+            return results;
+        }
         Some("vue") => (),
         _ => {
             results.push("error(usage): expected file extension to be 'vue'".into());
@@ -20,9 +27,8 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
 
     // Parse the vue component
-    let src_id = db.file_source(file_id);
     let component = db.vue_ast(src_id);
-    syntax_errors(&mut results, db, src_id, TextUnit::default(), component.errors());
+    syntax_errors(&mut results, db, src_id, path.as_str(), TextUnit::default(), component.errors());
 
     // Check all expressions in the template have valid syntax
     let (expr_ranges, decl_ranges) = component.template()
@@ -34,12 +40,12 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         let trim_offset = raw_expr.chars().take_while(|&c| c.is_whitespace()).count();
         let trim_range = range + TextUnit::from_usize(trim_offset);
         let trim_expr = raw_expr.trim();
-        let (expr, _) = ts::Expression::parse(trim_expr);
+        let (expr, _) = js::Expression::parse(trim_expr);
         let errors = expr.errors();
         if errors.is_empty() {
             template_expressions.push((expr, trim_range));
         } else {
-            syntax_errors(&mut results, db, src_id, trim_range.start(), errors);
+            syntax_errors(&mut results, db, src_id, path.as_str(), trim_range.start(), errors);
         }
     }
     let mut template_declarations = Vec::new();
@@ -58,7 +64,7 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         let errors = root.errors();
         if !errors.is_empty() {
             let script_block = component.script().unwrap().script().unwrap();
-            syntax_errors(&mut results, db, src_id, script_block.syntax.range().start(), errors);
+            syntax_errors(&mut results, db, src_id, path.as_str(), script_block.syntax.range().start(), errors);
             return results
         }
     }
@@ -185,20 +191,31 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     }
 
     // Check that all expressions in the template reference known vm properties
-    let config = db.vue_config(db.file_source_root(file_id));
+    let root_id = db.file_source_root(file_id);
+    let config = db.vue_config(root_id);
+    let global = db.global_registry(root_id);
     let is_decl_in_template = |name: &str, range: TextRange| -> bool {
         template_declarations.iter().any(|(decl, scope, _item)| decl == name && range.is_subrange(scope))
     };
+    // eprintln!("{:?}", global);
+    // for component in &global.components {
+    //     eprintln!("Vue.component(\"{}\", ...)", component);
+    // }
+    // for filter in &global.filters {
+    //     eprintln!("Vue.filter(\"{}\", ...)", filter);
+    // }
     for (expr, range) in template_expressions {
         for (ident, node) in find_captured_environment(&expr) {
             if !vm.properties.iter().any(|p| p.ident == ident) &&
+                !ident.starts_with('$') &&
                 !is_global(ident) &&
                 !is_decl_in_template(ident, range) &&
                 // TODO: Only perform these check if the expression is in a filter
                 !vue_filters.properties.iter().any(|p| p.ident == ident) &&
-                !config.global.filters.iter().any(|f| f == ident)
+                !config.global.filters.iter().any(|f| f == ident) &&
+                !global.filters.contains(ident)
             {
-                let pos = error_line_col(db, src_id, range.start() + node.syntax.range().start());
+                let pos = error_at(db, src_id, path.as_str(), range.start() + node.syntax.range().start());
                 results.push(format!("error(vue): [{}] property `{}` is not defined on the component", pos, ident))
             }
         }
@@ -216,7 +233,14 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     results
 }
 
-fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, src_id: SourceId, base: TextUnit, errors: Vec<SyntaxError>) {
+fn syntax_errors(
+    results: &mut Vec<String>,
+    db: &impl VueDatabase,
+    src_id: SourceId,
+    filename: &str,
+    base: TextUnit,
+    errors: Vec<SyntaxError>,
+) {
     // TODO: include filename in error message
     // let filename = db.input_filename(src_id);
     let mut offset_set = FxHashSet::default();
@@ -226,7 +250,7 @@ fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, src_id: Sourc
         let offset = err.offset();
         if !offset_set.contains(&offset) {
             offset_set.insert(offset);
-            let pos = error_line_col(db, src_id, base + offset);
+            let pos = error_at(db, src_id, filename, base + offset);
             Some(format!("error(syntax): [{}] {}", pos, err.message))
         } else {
             None
@@ -234,10 +258,10 @@ fn syntax_errors(results: &mut Vec<String>, db: &impl VueDatabase, src_id: Sourc
     }));
 }
 
-fn error_line_col(db: &impl VueDatabase, src_id: SourceId, pos: TextUnit) -> String {
+fn error_at(db: &impl VueDatabase, src_id: SourceId, filename: &str, pos: TextUnit) -> String {
     let line_index = db.source_line_index(src_id);
     let line_col = line_index.line_col(pos);
-    format!("line {}, col {}", line_col.line + 1, line_col.col_utf16 + 1)
+    format!("{}:{}:{}", filename, line_col.line + 1, line_col.col_utf16 + 1)
 }
 
 /// Find all of the variables captured by a closure (or other expression),
@@ -253,6 +277,16 @@ fn find_captured_environment(expr: &ts::Expression) -> Vec<(&str, &ts::Expressio
 }
 
 
+#[inline(always)]
+fn maybe_collect_captures<'a>(
+    expr: Option<&'a ts::Expression>,
+    decls: &[&'a str],
+    captures: &mut Vec<(&'a str, &'a ts::Expression)>,
+) {
+    if let Some(expr) = expr {
+        collect_captures(expr, decls, captures)
+    }
+}
 fn collect_captures<'a>(
     expr: &'a ts::Expression,
     decls: &[&'a str],
@@ -283,9 +317,9 @@ fn collect_captures<'a>(
         ts::ExpressionKind::ObjectExpression(node) => {
             for prop in node.properties() {
                 if prop.computed() {
-                    collect_captures(prop.key().unwrap(), decls, captures);
+                    maybe_collect_captures(prop.key(), decls, captures);
                 }
-                collect_captures(prop.value().unwrap(), decls, captures);
+                maybe_collect_captures(prop.value(), decls, captures);
             }
         },
         ts::ExpressionKind::FunctionExpression(node) => {
@@ -293,46 +327,50 @@ fn collect_captures<'a>(
             for param in node.params() {
                 collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
             }
-            collect_block_captures(node.body().unwrap(), &fn_decls, captures);
+            if let Some(block) = node.body() {
+                collect_block_captures(block, &fn_decls, captures);
+            }
         }
         ts::ExpressionKind::UnaryExpression(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
         ts::ExpressionKind::UpdateExpression(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
         ts::ExpressionKind::BinaryExpression(node) => {
-            collect_captures(node.left().unwrap(), decls, captures);
-            collect_captures(node.right().unwrap(), decls, captures);
+            maybe_collect_captures(node.left(), decls, captures);
+            maybe_collect_captures(node.right(), decls, captures);
         }
         ts::ExpressionKind::AssignmentExpression(node) => {
             let mut new_decls = decls.to_vec();
-            collect_pattern_decls_and_captures(node.left().unwrap(), &mut new_decls, captures, false);
-            collect_captures(node.right().unwrap(), decls /* N.B. assignment can't capture its own decls! */, captures);
+            if let Some(pattern) = node.left() {
+                collect_pattern_decls_and_captures(pattern, &mut new_decls, captures, false);
+            }
+            maybe_collect_captures(node.right(), decls /* N.B. assignment can't capture its own decls! */, captures);
         }
         ts::ExpressionKind::LogicalExpression(node) => {
-            collect_captures(node.left().unwrap(), decls, captures);
-            collect_captures(node.right().unwrap(), decls, captures);
+            maybe_collect_captures(node.left(), decls, captures);
+            maybe_collect_captures(node.right(), decls, captures);
         }
         ts::ExpressionKind::MemberExpression(node) => {
-            collect_captures(node.object().unwrap(), decls, captures);
+            maybe_collect_captures(node.object(), decls, captures);
             if node.computed() {
-                collect_captures(node.property().unwrap(), decls, captures);
+                maybe_collect_captures(node.property(), decls, captures);
             }
         }
         ts::ExpressionKind::ConditionalExpression(node) => {
-            collect_captures(node.test().unwrap(), decls, captures);
-            collect_captures(node.alternate().unwrap(), decls, captures);
-            collect_captures(node.consequent().unwrap(), decls, captures);
+            maybe_collect_captures(node.test(), decls, captures);
+            maybe_collect_captures(node.alternate(), decls, captures);
+            maybe_collect_captures(node.consequent(), decls, captures);
         }
         ts::ExpressionKind::CallExpression(node) => {
-            collect_captures(node.callee().unwrap(), decls, captures);
+            maybe_collect_captures(node.callee(), decls, captures);
             for arg in node.arguments() {
                 collect_captures(arg, decls, captures);
             }
         }
         ts::ExpressionKind::NewExpression(node) => {
-            collect_captures(node.callee().unwrap(), decls, captures);
+            maybe_collect_captures(node.callee(), decls, captures);
             for arg in node.arguments() {
                 collect_captures(arg, decls, captures);
             }
@@ -347,27 +385,28 @@ fn collect_captures<'a>(
             for param in node.params() {
                 collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
             }
-            match node.body().unwrap() {
-                ts::ArrowFunctionBody::FunctionBody(block) => {
+            match node.body() {
+                Some(ts::ArrowFunctionBody::FunctionBody(block)) => {
                     collect_block_captures(block, &fn_decls, captures);
                 }
-                ts::ArrowFunctionBody::Expression(expr) => {
+                Some(ts::ArrowFunctionBody::Expression(expr)) => {
                     collect_captures(expr, &fn_decls, captures);
                 }
+                None => (),
             }
         }
         ts::ExpressionKind::YieldExpression(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
         ts::ExpressionKind::TemplateLiteral(_node) => (), // TODO: Detect expressions used inside template literals
         ts::ExpressionKind::TaggedTemplateExpression(node) => {
-            collect_captures(node.tag().unwrap(), decls, captures);
+            maybe_collect_captures(node.tag(), decls, captures);
             // TODO: Detect expressions used inside template literals
         }
         ts::ExpressionKind::ClassExpression(_node) => (), // TODO: Implement
         ts::ExpressionKind::MetaProperty(_node) => (), // TODO: Implement
         ts::ExpressionKind::AwaitExpression(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
 
         ts::ExpressionKind::TSAsExpression(_) |
@@ -406,7 +445,7 @@ fn collect_statement_decls_and_captures<'a>(
 ) {
     match stmt.kind() {
         ts::StatementKind::ExpressionStatement(node) => {
-            collect_captures(node.expression().unwrap(), decls, captures);
+            maybe_collect_captures(node.expression(), decls, captures);
         }
         ts::StatementKind::BlockStatement(node) => {
             collect_block_captures(node, decls, captures);
@@ -418,17 +457,19 @@ fn collect_statement_decls_and_captures<'a>(
         ts::StatementKind::WithStatement(_) => unimplemented!(),
 
         ts::StatementKind::ReturnStatement(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
         ts::StatementKind::LabeledStatement(node) => {
-            collect_statement_decls_and_captures(node.body().unwrap(), decls, captures);
+            if let Some(stmt) = node.body() {
+                collect_statement_decls_and_captures(stmt, decls, captures);
+            }
         }
         ts::StatementKind::BreakStatement(_) => (),
         ts::StatementKind::ContinueStatement(_) => (),
         // IfStatement = IF_STATEMENT,
         // SwitchStatement = SWITCH_STATEMENT,
         ts::StatementKind::ThrowStatement(node) => {
-            collect_captures(node.argument().unwrap(), decls, captures);
+            maybe_collect_captures(node.argument(), decls, captures);
         }
         // TryStatement = TRY_STATEMENT,
         // WhileStatement = WHILE_STATEMENT,
@@ -444,11 +485,15 @@ fn collect_statement_decls_and_captures<'a>(
                     for param in node.params() {
                         collect_pattern_decls_and_captures(param, &mut fn_decls, captures, true);
                     }
-                    collect_block_captures(node.body().unwrap(), &mut fn_decls, captures);
+                    if let Some(block) = node.body() {
+                        collect_block_captures(block, &mut fn_decls, captures);
+                    }
                 }
                 ts::DeclarationKind::VariableDeclaration(node) => {
                     for decl in node.declarations() {
-                        collect_pattern_decls_and_captures(decl.id().unwrap(), decls, captures, true);
+                        if let Some(pattern) = decl.id() {
+                            collect_pattern_decls_and_captures(pattern, decls, captures, true);
+                        }
                         if let Some(expr) = decl.init() {
                             collect_captures(expr, decls, captures);
                         }
@@ -480,9 +525,23 @@ fn collect_pattern_decls_and_captures<'a>(
             }
         }
         ts::PatternKind::MemberExpression(expr) => {
-            collect_captures(expr.object().unwrap(), decls, captures);
+            maybe_collect_captures(expr.object(), decls, captures);
             if expr.computed() {
-                collect_captures(expr.property().unwrap(), decls, captures);
+                maybe_collect_captures(expr.property(), decls, captures);
+            }
+        }
+        ts::PatternKind::ObjectPattern(obj) => {
+            for prop in obj.properties() {
+                if let Some(pattern) = prop.value() {
+                    collect_pattern_decls_and_captures(pattern, decls, captures, true);
+                }
+            }
+        }
+        ts::PatternKind::ArrayPattern(arr) => {
+            for el in arr.elements() {
+                if let Some(pattern) = el {
+                    collect_pattern_decls_and_captures(pattern, decls, captures, true);
+                }
             }
         }
 
@@ -504,8 +563,38 @@ fn collect_template_scope(template: &vue::Template) -> (Vec<(TextRange)>, Vec<(T
         };
         match (syn_elem.kind(), syn_elem) {
             (ATTRIBUTE, SyntaxElement::Node(node)) => {
-                let name = node.first_token().unwrap().text().as_str();
+                let name = node.first_token().map(|tok| tok.text().as_str()).unwrap_or("");
                 match name {
+                    "slot-scope" => {
+                        let value = node.children_with_tokens()
+                            .skip_while(|syn| syn.kind() != EQ)
+                            .skip(1) // eat `EQ`
+                            .skip_while(|syn| syn.kind() == WS)
+                            .next();
+                        if let Some(SyntaxElement::Token(token)) = value {
+                            if token.kind() != QUOTED {
+                                continue; // N.B. not a valid `v-for` expression
+                            }
+
+                            // TODO: This probably needs to be parsed as a pattern
+                            let text = token.text().as_str();
+                            let offset = 1 + text[1..]
+                                .chars()
+                                .take_while(|&c| c.is_whitespace())
+                                .count();
+                            let len = text[offset .. text.len() - 1]
+                                .chars()
+                                .take_while(|&c| !c.is_whitespace())
+                                .count();
+                            let range = token.range();
+                            let start = TextUnit::from_usize(range.start().to_usize() + offset);
+                            let end = TextUnit::from_usize(start.to_usize() + len);
+                            declarations.push((
+                                node.parent().unwrap().range(),
+                                TextRange::from_to(start, end)
+                            ));
+                        }
+                    }
                     "v-if" | "v-else-if" | "v-model" => {
                         let value = node.children_with_tokens()
                             .skip_while(|syn| syn.kind() != EQ)

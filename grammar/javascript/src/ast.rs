@@ -2,7 +2,7 @@ use crate::grammar;
 use crate::lexer::JavascriptLexer;
 use crate::syntax_kind::{self, *};
 use code_grammar::{
-    AstNode, Lexer, Location, Parser,
+    ast_node, AstNode, Lexer, Location, Parser,
     SyntaxElement, SyntaxError, SyntaxNode, SyntaxToken,
     TreeArc
 };
@@ -519,6 +519,51 @@ impl Property {
 
     pub fn shorthand(&self) -> bool {
         self.syntax.children().count() == 1
+    }
+}
+
+impl ArrayPattern {
+    pub fn elements(&self) -> impl Iterator<Item = Option<&Pattern>> {
+        let mut elements = Vec::new();
+        let mut iter = self.syntax.children_with_tokens();
+        while let Some(el) = iter.next() {
+            match el {
+                SyntaxElement::Node(node) => {
+                    elements.push(Pattern::cast(node));
+                    if let Some(bump) = iter.next() {
+                        if bump.kind() == COMMA {
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                SyntaxElement::Token(tok) => {
+                    if tok.kind() == COMMA {
+                        elements.push(None);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        elements.into_iter()
+    }
+}
+
+impl ObjectPattern {
+    pub fn properties(&self) -> impl Iterator<Item = &AssignmentProperty> {
+        self.syntax.children().filter_map(AssignmentProperty::cast)
+    }
+}
+
+ast_node!(AssignmentProperty, PROPERTY);
+impl AssignmentProperty {
+    pub fn key(&self) -> Option<&Expression> {
+        self.syntax.first_child().and_then(Expression::cast)
+    }
+
+    pub fn value(&self) -> Option<&Pattern> {
+        self.syntax.last_child().and_then(Pattern::cast)
     }
 }
 

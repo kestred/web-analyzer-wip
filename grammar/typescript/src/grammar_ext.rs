@@ -163,7 +163,9 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
                 ok?;
             }
         } else if p.at(TEMPLATE_LITERAL) {
+            let marker = p.start();
             p.bump();
+            p.complete(marker, TEMPLATE_EXPRESSION);
         } else if p.at(IDENTIFIER) {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
@@ -201,7 +203,8 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             // N.B. Do some custom lookahead logic here to avoid
             // TODO: Implement auto-genned 2-4 token lookahead for ambiguous cases
             let peek = p.nth(1);
-            if peek != IDENTIFIER && peek != R_PAREN {
+            let lookahead = tokenset![IDENTIFIER, L_SQUARE, L_CURLY, R_PAREN];
+            if !lookahead.contains(&peek) {
                 p.bump();
                 expression_list(p)?;
                 p.expect(R_PAREN)?;

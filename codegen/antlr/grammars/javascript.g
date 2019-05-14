@@ -31,7 +31,7 @@
 grammar JAVASCRIPT;
 
 program
-    : source_elements? EOF
+    : SHEBANG? source_elements? EOF
     # PROGRAM
     ;
 
@@ -309,18 +309,25 @@ generator_method
     ;
 
 formal_parameter_list
-    : formal_parameter (',' formal_parameter)* (',' formal_parameter_last)?
-    | formal_parameter_last
+    : formal_parameter (',' formal_parameter)* (',' formal_parameter_rest)?
+    | formal_parameter_rest
     | array_pattern
     | object_pattern
     ;
 
-formal_parameter
-    : identifier_pattern ('=' expression)?     // ES6: Initialization
+formal_parameter_init
+    : formal_parameter ('=' expression)?
     # ASSIGNMENT_PATTERN
+    | formal_parameter
     ;
 
-formal_parameter_last                          // ES6: Rest Parameter
+formal_parameter
+    : array_pattern
+    | object_pattern
+    | identifier_pattern
+    ;
+
+formal_parameter_rest
     : '...' identifier_pattern
     # REST_ELEMENT
     ;
@@ -534,8 +541,8 @@ arrow_function_expression
     ;
 
 arrow_function_parameters
-    : identifier_pattern
-    | function_parameters
+    : function_parameters
+    | identifier_pattern
     ;
 
 arrow_function_body

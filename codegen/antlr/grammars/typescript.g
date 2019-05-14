@@ -3,7 +3,7 @@ import TYPESCRIPT from "javascript.g";
 
 // N.B. ensure 'program' appears first
 program
-    : source_elements? EOF
+    : SHEBANG? source_elements? EOF
     # PROGRAM
     ;
 

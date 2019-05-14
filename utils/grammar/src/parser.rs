@@ -129,17 +129,20 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     pub fn finalize(mut self) -> (TreeNode, TokenInput<'a, 'b>) {
         for op in self.events {
             match op {
+                Event::Error { error } => self.sink.error(error),
                 Event::StartNode { kind } if kind == TOMBSTONE => {}
                 Event::StartNode { kind } => {
-                    // eprintln!("start {:?} {{", (self.config.debug_repr)(kind).map(|k| k.name));
+                    // eprintln!("start {} {{", (self.config.debug_repr)(kind).map(|k| k.name).unwrap_or("UNKNOWN"));
                     self.sink.start_node(kind, self.config.skip_predicate())
                 }
                 Event::CompleteNode => {
                     // eprintln!("}}");
                     self.sink.complete_node()
                 }
-                Event::Error { error } => self.sink.error(error),
-                Event::Span { kind, len } => self.sink.span(kind, len, self.config.skip_predicate()),
+                Event::Span { kind, len } => {
+                    // eprintln!("  @{}", (self.config.debug_repr)(kind).map(|k| k.name).unwrap_or("_"));
+                    self.sink.span(kind, len, self.config.skip_predicate())
+                }
             }
         }
         self.sink.finalize()

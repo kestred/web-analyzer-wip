@@ -6,6 +6,7 @@ mod source;
 pub use arena::{ArenaId, Arena, Interner};
 pub use change::{SourceChange, DependencyData};
 pub use line_index::{LineIndex, LineCol};
+pub use relative_path::{RelativePath, RelativePathBuf};
 pub use source::*;
 
 #[cfg(feature = "ast")]

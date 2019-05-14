@@ -17,6 +17,7 @@ pub use crate::grammar_ext::{expression, type_expr};
 pub fn program(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
+        p.eat(SHEBANG);
         if p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
             source_elements(p)?;
         }
@@ -1158,50 +1159,58 @@ pub fn generator_method(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
-    if p.at(IDENTIFIER) {
-        formal_parameter(p)?;
-        while p.at(COMMA) {
-            let mut _checkpoint = p.checkpoint(true);
-            catch!({
-                p.bump();
-                formal_parameter(p)?;
-                Some(Continue)
-            });
-            if !p.commit(_checkpoint)?.is_ok() {
-                break;
+    if p.at_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE]) && {
+        // try --> formal_parameter (, formal_parameter)* (, formal_parameter_rest)?
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            formal_parameter(p)?;
+            while p.at(COMMA) {
+                let mut _checkpoint = p.checkpoint(true);
+                catch!({
+                    p.bump();
+                    formal_parameter(p)?;
+                    Some(Continue)
+                });
+                if !p.commit(_checkpoint)?.is_ok() {
+                    break;
+                }
             }
-        }
-        if p.at(COMMA) {
-            p.bump();
-            formal_parameter_last(p)?;
-        }
+            if p.at(COMMA) {
+                p.bump();
+                formal_parameter_rest(p)?;
+            }
+            Some(Continue)
+        });
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
     } else if p.at(DOTDOTDOT) {
-        formal_parameter_last(p)?;
+        formal_parameter_rest(p)?;
     } else if p.at(L_SQUARE) {
         array_pattern(p)?;
     } else if p.at(L_CURLY) {
         object_pattern(p)?;
     } else {
+        // otherwise, emit an error
         p.expected_ts_in("formal_parameter_list", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
     Some(Continue)
 }
 
 pub fn formal_parameter(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
+    if p.at(L_SQUARE) {
+        array_pattern(p)?;
+    } else if p.at(L_CURLY) {
+        object_pattern(p)?;
+    } else if p.at(IDENTIFIER) {
         identifier_pattern(p)?;
-        if p.at(EQ) {
-            p.bump();
-            expression(p)?;
-        }
-        Some(Continue)
-    });
-    p.complete(_marker, ASSIGNMENT_PATTERN);
-    _ok
+    } else {
+        p.expected_ts_in("formal_parameter", &tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
+    }
+    Some(Continue)
 }
 
-pub fn formal_parameter_last(p: &mut Parser) -> Option<Continue> {
+pub fn formal_parameter_rest(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(DOTDOTDOT)?;
@@ -1646,10 +1655,10 @@ pub fn arrow_function_expression(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn arrow_function_parameters(p: &mut Parser) -> Option<Continue> {
-    if p.at(IDENTIFIER) {
-        identifier_pattern(p)?;
-    } else if p.at(L_PAREN) {
+    if p.at(L_PAREN) {
         function_parameters(p)?;
+    } else if p.at(IDENTIFIER) {
+        identifier_pattern(p)?;
     } else {
         p.expected_ts_in("arrow_function_parameters", &tokenset![IDENTIFIER, L_PAREN])?;
     }
