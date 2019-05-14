@@ -65,10 +65,16 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         } else if p.at(IDENTIFIER) {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
+            } else if !p.at_keyword("async") {
+                identifier(p)?;
             } else {
-                let marker = p.start();
-                p.bump(); // just `IDENTIFIER`
-                p.complete(marker, IDENTIFIER);
+                let checkpoint = p.checkpoint(true);
+                arrow_function_expression(p);
+
+                // Otherwise, expect a single identifier
+                if !p.commit(checkpoint)?.is_ok() {
+                    identifier(p)?;
+                }
             }
         } else if p.at(THIS_KW) {
             let marker = p.start();
@@ -106,7 +112,13 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
                 p.expect(R_PAREN)?;
             } else {
                 // Try `arrow_function_expression`
-                let checkpoint = p.checkpoint(true);
+                let checkpoint = if peek == L_SQUARE || peek == L_CURLY {
+                    // N.B. Allow lots of roll-back to disambiguate
+                    //      between a pattern and an expression.
+                    p.checkpoint_upto(16)
+                } else {
+                    p.checkpoint(true)
+                };
                 arrow_function_expression(p);
 
                 // Otherwise, expect `expression_list`
@@ -351,7 +363,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         while prec <= 2 && p.at(QUESTION) {
             p.bump();
             _expression_prec(p, 2)?;
-            p.expect(COLON);
+            p.expect(COLON)?;
             _expression_prec(p, 2)?;
             p.complete_and_wrap(&marker, CONDITIONAL_EXPRESSION);
         }

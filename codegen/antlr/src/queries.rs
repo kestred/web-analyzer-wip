@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::transform;
 use petgraph::{algo, Graph};
 use petgraph::graph::NodeIndex;
 use smol_str::SmolStr;
@@ -81,11 +82,6 @@ impl Database {
         self.is_direct_left_corner(rule, rule)
     }
 
-    // TODO: Decide whether I care
-    // pub fn is_indirectly_left_recursive(&self, rule: &str) -> bool {
-    //     !self.is_directly_left_recursive(rule) && self.is_left_recursive(rule)
-    // }
-
     /// If `symbol` `is_direct_left_corner` of `rule` transitively
     pub fn is_left_corner(&self, rule: &str, symbol: &str) -> bool {
         self.is_left_corner_(rule, symbol, &mut Set::new())
@@ -136,6 +132,27 @@ impl Database {
 
     pub fn is_direct_left_corner_of(&self, pat: &Pattern, symbol: &str) -> bool {
         self.next_symbols_of(&pat).contains(symbol)
+    }
+
+    pub fn is_enum_like(&self, pat: &Pattern) -> bool {
+        if pat.is_term() {
+            return true
+        }
+        match pat {
+            Pattern::Ident(nonterm) => {
+                if let Some(result) = self.memos.get_is_enum_like(&nonterm) {
+                    result
+                } else {
+                    self.memos.set_is_enum_like(&nonterm, false);
+                    let call = self.rule(&nonterm);
+                    let result = self.is_enum_like(&call.pattern);
+                    self.memos.set_is_enum_like(&nonterm, result);
+                    result
+                }
+            }
+            Pattern::Choice(choices) => choices.iter().all(|p| p.is_term() || self.is_enum_like(p)),
+            _ => false,
+        }
     }
 
     pub fn is_possibly_empty(&self, pat: &Pattern) -> bool {
@@ -228,6 +245,41 @@ impl Database {
             Pattern::Node(_, pat) => self.is_next_term_ambiguous(pat),
             Pattern::NodeStart(pat) => self.is_next_term_ambiguous(pat),
             Pattern::NodeComplete(_, pat) => self.is_next_term_ambiguous(pat),
+        }
+    }
+
+    /// Approx. the inverse of `is_possibly_empty` but differs in handling of `Choice` patterns.
+    /// If a generated parser contains a non-enum `Choice`, this will return false.
+    pub fn does_parser_advance_unconditionally(&self, pat: &Pattern) -> bool {
+        let (head, _) = match transform::unshift(pat) {
+            Some(head) => head,
+            None => return false,
+        };
+        if head.is_term() || self.is_enum_like(&head) {
+            return true;
+        }
+        match head {
+            Pattern::Ident(nonterm) => {
+                if let Some(result) = self.memos.get_does_parser_advance_unconditionally(&nonterm) {
+                    result
+                } else {
+                    self.memos.set_does_parser_advance_unconditionally(&nonterm, false);
+                    let call = self.rule(&nonterm);
+                    let result = self.is_enum_like(&call.pattern);
+                    self.memos.set_does_parser_advance_unconditionally(&nonterm, result);
+                    result
+                }
+            }
+            Pattern::Series(series) => series.iter().next()
+                .map(|pat| self.does_parser_advance_unconditionally(&pat))
+                .unwrap_or(false),
+            Pattern::Repeat(head, repeat) =>
+                head.is_term() && repeat == Repeat::OneOrMore,
+            Pattern::Node(_, pat) =>
+                self.does_parser_advance_unconditionally(&pat),
+            Pattern::NodeStart(pat) =>
+                self.does_parser_advance_unconditionally(&pat),
+            _ => false,
         }
     }
 
@@ -448,10 +500,14 @@ impl From<Grammar> for Database {
 }
 
 struct Memos {
+    /// Memoized results for `is_enum_like`
+    is_enum_like: RefCell<Map<SmolStr, bool>>,
     /// Memoized results for `is_possibly_empty`
     is_possibly_empty: RefCell<Map<SmolStr, bool>>,
     /// Memoized results for `is_next_term_ambiguous`
     is_next_term_ambiguous: RefCell<Map<SmolStr, bool>>,
+    /// Memoized results for `does_parser_advance_unconditionally`
+    does_parser_advance_unconditionally: RefCell<Map<SmolStr, bool>>,
     /// Memoized results for `next_predicates_of`
     next_predicates_of: RefCell<Map<SmolStr, Set<QualifiedTerm>>>,
 }
@@ -459,10 +515,20 @@ struct Memos {
 impl Memos {
     fn new() -> Memos {
         Memos {
+            is_enum_like: RefCell::new(Map::new()),
             is_possibly_empty: RefCell::new(Map::new()),
             is_next_term_ambiguous: RefCell::new(Map::new()),
+            does_parser_advance_unconditionally: RefCell::new(Map::new()),
             next_predicates_of: RefCell::new(Map::new()),
         }
+    }
+
+    fn get_is_enum_like(&self, key: &str) -> Option<bool> {
+        self.is_enum_like.borrow().get(key).cloned()
+    }
+
+    fn set_is_enum_like(&self, key: &str, result: bool) {
+        self.is_enum_like.borrow_mut().insert(key.into(), result);
     }
 
     fn get_is_possibly_empty(&self, key: &str) -> Option<bool> {
@@ -479,6 +545,14 @@ impl Memos {
 
     fn set_is_next_term_ambiguous(&self, key: &str, result: bool) {
         self.is_next_term_ambiguous.borrow_mut().insert(key.into(), result);
+    }
+
+    fn get_does_parser_advance_unconditionally(&self, key: &str) -> Option<bool> {
+        self.does_parser_advance_unconditionally.borrow().get(key).cloned()
+    }
+
+    fn set_does_parser_advance_unconditionally(&self, key: &str, result: bool) {
+        self.does_parser_advance_unconditionally.borrow_mut().insert(key.into(), result);
     }
 
     fn get_next_predicates_of(&self, key: &str) -> Option<Set<QualifiedTerm>> {

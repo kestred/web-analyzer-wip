@@ -16,7 +16,11 @@ pub fn component(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
-            component_pattern(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            component_pattern(p);
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(EOF)?;
         Some(Continue)
@@ -58,8 +62,15 @@ pub fn component_template(p: &mut Parser) -> Option<Continue> {
         template_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                attribute(p)?;
+                p.eat(WS);
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(R_ANGLE)?;
         template_content(p)?;
@@ -88,8 +99,15 @@ pub fn component_script(p: &mut Parser) -> Option<Continue> {
         script_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                attribute(p)?;
+                p.eat(WS);
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(R_ANGLE)?;
         script_block(p)?;
@@ -118,8 +136,15 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
         style_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                attribute(p)?;
+                p.eat(WS);
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(R_ANGLE)?;
         style_block(p)?;
@@ -170,15 +195,22 @@ pub fn template_content(p: &mut Parser) -> Option<Continue> {
         html_chardata(p)?;
     }
     while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
-        if p.at(L_ANGLE) {
-            element(p)?;
-        } else if p.at(MUSTACHE) {
-            p.bump();
-        } else if p.at(COMMENT) {
-            p.bump();
-        }
-        if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-            html_chardata(p)?;
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            if p.at(L_ANGLE) {
+                element(p)?;
+            } else if p.at(MUSTACHE) {
+                p.bump();
+            } else if p.at(COMMENT) {
+                p.bump();
+            }
+            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+                html_chardata(p)?;
+            }
+            Some(Continue)
+        });
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
         }
     }
     Some(Continue)
@@ -190,15 +222,22 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
             html_chardata(p)?;
         }
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
-            if p.at(L_ANGLE) {
-                element(p)?;
-            } else if p.at(MUSTACHE) {
-                p.bump();
-            } else if p.at(COMMENT) {
-                p.bump();
-            }
-            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-                html_chardata(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                if p.at(L_ANGLE) {
+                    element(p)?;
+                } else if p.at(MUSTACHE) {
+                    p.bump();
+                } else if p.at(COMMENT) {
+                    p.bump();
+                }
+                if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+                    html_chardata(p)?;
+                }
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
             }
         }
     } else if p.at(SCRIPT_CONTENT) {
@@ -226,7 +265,11 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
                 p.expect(COLON)?;
                 attribute_key(p)?;
                 while p.at(DOT) {
-                    attribute_modifier(p)?;
+                    let mut _checkpoint = p.checkpoint(true);
+                    attribute_modifier(p);
+                    if !p.commit(_checkpoint)?.is_ok() {
+                        break;
+                    }
                 }
                 if p.at_ts(&tokenset![EQ, WS]) {
                     let mut _checkpoint = p.checkpoint(true);
@@ -263,7 +306,11 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
                 }
                 attribute_key(p)?;
                 while p.at(DOT) {
-                    attribute_modifier(p)?;
+                    let mut _checkpoint = p.checkpoint(true);
+                    attribute_modifier(p);
+                    if !p.commit(_checkpoint)?.is_ok() {
+                        break;
+                    }
                 }
                 if p.at_ts(&tokenset![EQ, WS]) {
                     let mut _checkpoint = p.checkpoint(true);
@@ -372,8 +419,15 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
             empty_element_tag_name(p)?;
             p.eat(WS);
             while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-                attribute(p)?;
-                p.eat(WS);
+                let mut _checkpoint = p.checkpoint(true);
+                catch!({
+                    attribute(p)?;
+                    p.eat(WS);
+                    Some(Continue)
+                });
+                if !p.commit(_checkpoint)?.is_ok() {
+                    break;
+                }
             }
             p.expect_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
             Some(Continue)
@@ -385,8 +439,15 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
         p.bump();
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            attribute(p)?;
-            p.eat(WS);
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                attribute(p)?;
+                p.eat(WS);
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         if p.at(SLASH_R_ANGLE) {
             p.bump();

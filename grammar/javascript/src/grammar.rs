@@ -308,9 +308,13 @@ pub fn block(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn statement_list(p: &mut Parser) -> Option<Continue> {
-    loop {
-        statement(p)?;
-        if !(p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1))) { break }
+    statement(p)?;
+    while p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
+        let mut _checkpoint = p.checkpoint(true);
+        statement(p);
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
     Some(Continue)
 }
@@ -611,9 +615,13 @@ pub fn case_block(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn case_clauses(p: &mut Parser) -> Option<Continue> {
-    loop {
-        case_clause(p)?;
-        if !p.at(CASE_KW) { break }
+    case_clause(p)?;
+    while p.at(CASE_KW) {
+        let mut _checkpoint = p.checkpoint(true);
+        case_clause(p);
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
     Some(Continue)
 }
@@ -773,7 +781,11 @@ pub fn class_body(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(L_CURLY)?;
         while p.at_ts(&AT_CLASS_ELEMENT) {
-            class_element(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            class_element(p);
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(R_CURLY)?;
         Some(Continue)
@@ -960,9 +972,13 @@ pub fn function_body(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn source_elements(p: &mut Parser) -> Option<Continue> {
-    loop {
-        source_element(p)?;
-        if !(p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1))) { break }
+    source_element(p)?;
+    while p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
+        let mut _checkpoint = p.checkpoint(true);
+        source_element(p);
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
     Some(Continue)
 }
@@ -1369,10 +1385,11 @@ pub fn expression_list(p: &mut Parser) -> Option<Continue> {
     expression(p)?;
     if p.at(COMMA) {
         if p.at(COMMA) {
-            loop {
+            p.bump();
+            expression(p)?;
+            while p.at(COMMA) {
                 p.bump();
                 expression(p)?;
-                if !p.at(COMMA) { break }
             }
             p.complete(_checkpoint.branch(&_marker), SEQUENCE_EXPRESSION);
         }

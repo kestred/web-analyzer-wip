@@ -26,6 +26,7 @@ fn main() -> Result<(), io::Error> {
         )
         .subcommand(
             SubCommand::with_name("parse")
+                .arg(Arg::with_name("script").long("script"))
                 .arg(Arg::with_name("file").required(true))
         )
         .get_matches();
@@ -40,7 +41,13 @@ fn main() -> Result<(), io::Error> {
             // Load project
             let entrypoint = PathBuf::from(args.value_of("main").unwrap());
             let (mut analysis, vfs) = workspace::load(entrypoint.clone());
-            let root_id = vfs.path2file(&entrypoint).map(|id| SourceRootId(id.0)).unwrap();
+            let root_id = match vfs.path2file(&entrypoint) {
+                Some(id) => SourceRootId(id.0),
+                None => {
+                    eprintln!("error(usage): could not find file '{}'", entrypoint.display());
+                    std::process::exit(1);
+                }
+            };
 
             // Load configuration
             if let Some(config_path) = args.value_of("config") {
@@ -78,7 +85,7 @@ fn main() -> Result<(), io::Error> {
             let filename = args.value_of("file").unwrap();
             let filetext = fs::read_to_string(filename)?;
             let (analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
-            println!("{}", analysis.file_syntax_tree(file_id.into()))
+            println!("{}", analysis.file_syntax_tree(file_id.into(), args.is_present("script")))
         }
         _ => (),
     }

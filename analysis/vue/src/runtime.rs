@@ -90,11 +90,20 @@ impl Analysis {
     }
 
     /// Computes the set of diagnostics for the given file.
-    pub fn file_syntax_tree(&self, file_id: FileId) -> String {
+    pub fn file_syntax_tree(&self, file_id: FileId, extract_script: bool) -> String {
         let file_ext = self.db.file_extension(file_id);
-        let source_ext = file_ext.as_ref().map(|ext| ext.as_str()).unwrap_or("");
         let source_id = self.db.file_source(file_id);
-        crate::debug::syntax_tree(&self.db, source_id, source_ext)
+        let source_ext = file_ext.as_ref().map(|ext| ext.as_str()).unwrap_or("");
+        if source_ext == "vue" && extract_script {
+            let script_meta = self.db.component_script(source_id);
+            if let Some((source_id, _lang)) = script_meta {
+                crate::debug::syntax_tree(&self.db, source_id, "ts")
+            } else {
+                String::new()
+            }
+        } else {
+            crate::debug::syntax_tree(&self.db, source_id, source_ext)
+        }
     }
 
     /// Gets the file's `LineIndex`: data structure to convert between absolute

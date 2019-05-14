@@ -21,7 +21,11 @@ pub fn document(p: &mut Parser) -> Option<Continue> {
         }
         p.eat(WS);
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
-            elements(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            elements(p);
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         p.expect(EOF)?;
         Some(Continue)
@@ -39,10 +43,11 @@ pub fn doctype(p: &mut Parser) -> Option<Continue> {
         }
         p.expect(IDENT)?;
         p.eat(WS);
-        loop {
+        p.expect_ts(&tokenset![IDENT, QUOTED])?;
+        p.eat(WS);
+        while p.at_ts(&tokenset![IDENT, QUOTED]) {
             p.expect_ts(&tokenset![IDENT, QUOTED])?;
             p.eat(WS);
-            if !p.at_ts(&tokenset![IDENT, QUOTED]) { break }
         }
         p.expect(R_ANGLE)?;
         Some(Continue)
@@ -78,8 +83,15 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
             empty_element_tag_name(p)?;
             p.eat(WS);
             while p.at(TAG_NAME) {
-                attribute(p)?;
-                p.eat(WS);
+                let mut _checkpoint = p.checkpoint(true);
+                catch!({
+                    attribute(p)?;
+                    p.eat(WS);
+                    Some(Continue)
+                });
+                if !p.commit(_checkpoint)?.is_ok() {
+                    break;
+                }
             }
             p.expect_ts(&tokenset![R_ANGLE, SLASH_R_ANGLE])?;
             Some(Continue)
@@ -91,8 +103,15 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
         p.bump();
         p.eat(WS);
         while p.at(TAG_NAME) {
-            attribute(p)?;
-            p.eat(WS);
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                attribute(p)?;
+                p.eat(WS);
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
+            }
         }
         if p.at(SLASH_R_ANGLE) {
             p.bump();
@@ -188,13 +207,20 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
             html_chardata(p)?;
         }
         while p.at_ts(&tokenset![COMMENT, L_ANGLE]) {
-            if p.at(L_ANGLE) {
-                element(p)?;
-            } else if p.at(COMMENT) {
-                p.bump();
-            }
-            if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
-                html_chardata(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                if p.at(L_ANGLE) {
+                    element(p)?;
+                } else if p.at(COMMENT) {
+                    p.bump();
+                }
+                if p.at_ts(&tokenset![TEXT, WHITESPACE]) {
+                    html_chardata(p)?;
+                }
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
             }
         }
     } else if p.at(SCRIPT_CONTENT) {

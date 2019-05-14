@@ -21,7 +21,9 @@ pub fn load(entrypoint: PathBuf) -> (Analysis, Vfs) {
         let vfs_file = vfs.load(path);
         vfs_file.map(|f| FileId(f.0.into()))
     };
-    package_graph.add_package_root(load(&entrypoint).unwrap());
+    if let Some(file_id) = load(&entrypoint) {
+        package_graph.add_package_root(file_id);
+    }
     change.set_package_graph(package_graph);
 
     let mut analysis = Analysis::default();

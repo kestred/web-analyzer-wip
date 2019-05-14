@@ -197,17 +197,32 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// - Be used in relative comparisons against a marker.
     ///
     pub fn checkpoint(&self, allow_rollback: bool) -> Checkpoint {
+        let (rb, rb_limit) = if allow_rollback {
+            let incr = self.checkpoints.get();
+            self.checkpoints.set(incr + 1);
+            (Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) }, self.config.max_rollback_size)
+        } else {
+            (Rollback::Prevent, 0)
+        };
+        Checkpoint {
+            event_pos: self.events.len(),
+            source_pos: self.source_pos,
+            branch_pos: None,
+            rollback: rb,
+            rollback_limit: rb_limit
+        }
+    }
+
+    /// Like `checkpoint` but override the default rollback limit to allow more/less rollback.
+    pub fn checkpoint_upto(&self, max_rollback: u16) -> Checkpoint {
         let incr = self.checkpoints.get();
         self.checkpoints.set(incr + 1);
         Checkpoint {
             event_pos: self.events.len(),
             source_pos: self.source_pos,
             branch_pos: None,
-            rollback: if allow_rollback {
-                Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) }
-            } else {
-                Rollback::Prevent
-            },
+            rollback: Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) },
+            rollback_limit: max_rollback
         }
     }
 
@@ -225,15 +240,26 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
             .map(|(key, _val)| key + checkpoint.event_pos);
         if let Some(idx) = error_idx {
             let distance = self.source_pos - checkpoint.source_pos;
-            if checkpoint.allows_rollback() && distance <= self.config.max_rollback_size as usize {
+            if checkpoint.allows_rollback() && distance <= checkpoint.rollback_limit as usize {
                 let error = match self.events.remove(idx) {
                     Event::Error { error } => error,
                     _ => unreachable!()
                 };
-                // eprintln!("rollback of size {} at {}: {:?}", self.source_pos - checkpoint.source_pos, (self.config.debug_repr)(self.current()).unwrap().name, error);
+                // eprintln!(
+                //     "rollback in commit of size {} at {} (with {} checkpoints): {:?}",
+                //     distance,
+                //     (self.config.debug_repr)(self.current()).unwrap().name,
+                //     self.checkpoints.get(),
+                //     error,
+                // );
                 self.rollback(checkpoint);
                 Some(Err(error))
             } else {
+                // eprintln!(
+                //     "wouldn't rollback in commit of size {} at {}",
+                //     distance,
+                //     (self.config.debug_repr)(self.current()).unwrap().name,
+                // );
                 None
             }
         } else {
@@ -245,7 +271,7 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     fn rollback(&mut self, checkpoint: Checkpoint) {
         assert!(checkpoint.allows_rollback(), "attempted to rollback invalid checkpoint");
         assert!(self.source_pos >= checkpoint.source_pos, "attempted to rollback expired checkpoint");
-        assert!(self.config.max_rollback_size as usize >= self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
+        assert!(checkpoint.rollback_limit as usize >= self.source_pos - checkpoint.source_pos, "a rollback exceeded the max rollback size");
         if let Some(branch_pos) = checkpoint.branch_pos {
             match self.events[branch_pos] {
                 Event::StartNode { kind: ref mut slot, .. } => {
@@ -268,6 +294,7 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     }
 
     /// Consume the next token if it is `kind` or emit an error otherwise.
+    #[must_use]
     pub fn expect(&mut self, kind: SyntaxKind) -> Option<Continue> {
         if self.eat(kind) {
             Some(Continue)
@@ -423,6 +450,8 @@ pub struct Checkpoint {
     branch_pos: Option<usize>,
     /// Whether the checkpoint allows rollback or not
     rollback: Rollback,
+    /// The maximum amount the parser is allowed to rollback to reach this checkpoint
+    rollback_limit: u16,
 }
 
 impl Checkpoint {

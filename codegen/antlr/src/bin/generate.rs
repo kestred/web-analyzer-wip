@@ -18,7 +18,7 @@ fn main() -> Result<(), std::io::Error> {
         let root = match Grammar::from_file(input) {
             Err(ImportError::Io(err)) => return Err(err),
             Err(ImportError::Parse(filename, err)) => {
-                eprintln!("while parsing file `{}`:\n{}", filename, err);
+                eprintln!("error: while parsing file `{}`:\n{}", filename, err);
                 std::process::exit(1);
             }
             Ok(ok) => ok,
@@ -264,12 +264,7 @@ fn emit_pattern<'a>(
                                 break;
                             }
                         }
-                        let check_head_possibly_empty = |pat| {
-                            transform::unshift(pat)
-                                .map(|(head, _)| db.is_possibly_empty(&head))
-                                .unwrap_or(false)
-                        };
-                        if !ts.is_disjoint(&followed_by_ts) || check_head_possibly_empty(pat) {
+                        if !ts.is_disjoint(&followed_by_ts) || !db.does_parser_advance_unconditionally(pat) {
                             emit_let_checkpoint(out, true, dep + 1);
                             emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
                             emit_depth(out, dep + 1);
@@ -287,26 +282,9 @@ fn emit_pattern<'a>(
                     }
                 }
                 Repeat::OneOrMore => {
-                    let ts = db.next_predicates_of(pat);
-                    if pat.is_term() {
-                        let term = ts.into_iter().next().unwrap();
-                        emit_pattern(out, db, rule, &Pattern::Ident(term.token.clone().into()), dep, precond, &[]);
-                        emit_depth(out, dep);
-                        out.push_str("while p.eat(");
-                        out.push_str(&term.token);
-                        out.push_str(") {}\n");
-                    } else {
-                        emit_depth(out, dep);
-                        // TODO: Handle ambiguous patterns after expecting one to succeed
-                        out.push_str("loop {\n");
-                        emit_pattern(out, db, rule, pat, dep + 1, precond, &[]);
-                        emit_depth(out, dep + 1);
-                        out.push_str("if !");
-                        emit_lookahead(out, db, &ts, true);
-                        out.push_str(" { break }\n");
-                        emit_depth(out, dep);
-                        out.push_str("}\n");
-                    }
+                    emit_pattern(out, db, rule, pat, dep, precond, &[]);
+                    let maybe = Pattern::Repeat(pat.clone(), Repeat::ZeroOrMore);
+                    emit_pattern(out, db, rule, &maybe, dep, Precond::empty(), &[]);
                 }
             }
         }
