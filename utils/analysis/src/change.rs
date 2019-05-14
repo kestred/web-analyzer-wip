@@ -32,6 +32,15 @@ impl SourceChange {
         self.roots_changed.entry(root_id).or_default().added.push(file);
     }
 
+    pub fn change_file(&mut self, file_id: FileId, new_text: Arc<String>) {
+        self.files_changed.push((file_id, new_text))
+    }
+
+    pub fn remove_file(&mut self, root_id: SourceRootId, file_id: FileId, path: RelativePathBuf) {
+        let file = RemoveFile { file_id, path };
+        self.roots_changed.entry(root_id).or_default().removed.push(file);
+    }
+
     pub fn set_package_graph(&mut self, graph: PackageGraph) {
         self.package_graph = Some(graph);
     }
@@ -58,7 +67,7 @@ struct RootChange {
 
 impl fmt::Debug for RootChange {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("AnalysisChange")
+        fmt.debug_struct("SourceChange")
             .field("added", &self.added.len())
             .field("removed", &self.removed.len())
             .finish()

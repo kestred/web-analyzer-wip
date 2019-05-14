@@ -9,8 +9,10 @@ name = "vue-analyzer"
 path = "src/main.rs"
 
 [dependencies]
+code_analysis = { path = "../../utils/analysis" }
 vue_analysis = { path = "../vue", features = ["runtime"] }
 clap = "2.33.0"
 toml = "0.5.0"
 serde_json = "1.0.39"
+ra_vfs = "0.2.3"
 

@@ -1,19 +1,28 @@
+mod workspace;
+
 use clap::{App, Arg, SubCommand};
+use code_analysis::FileId;
 use vue_analysis::{Analysis, Config};
-use std::{fs, io};
+use std::{fs, io, path::PathBuf};
 
 fn main() -> Result<(), io::Error> {
     let args = App::new("vue_analyzer")
         .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
-            SubCommand::with_name("lint")
+            SubCommand::with_name("check")
                 .arg(
                     Arg::with_name("config")
                         .long("config")
                         .takes_value(true)
-                        .value_name("FILE")
+                        .value_name("CONFIG_FILE")
                 )
-                .arg(Arg::with_name("file").required(true))
+                // .arg(
+                //     Arg::with_name("file")
+                //         .long("file")
+                //         .takes_value(true)
+                //         .value_name("TARGET_FILE")
+                // )
+                .arg(Arg::with_name("main").required(true))
         )
         .subcommand(
             SubCommand::with_name("parse")
@@ -21,10 +30,19 @@ fn main() -> Result<(), io::Error> {
         )
         .get_matches();
     match args.subcommand() {
-        ("lint", Some(args)) => {
-            let filename = args.value_of("file").unwrap();
+        ("check", Some(args)) => {
+            // Load "single-file" project
+            /*
             let filetext = fs::read_to_string(filename)?;
             let (mut analysis, file_id) = Analysis::from_single_file(filename.into(), filetext);
+            */
+
+            // Load project
+            let entrypoint = PathBuf::from(args.value_of("main").unwrap());
+            let (mut analysis, vfs) = workspace::load(entrypoint.clone());
+            let file_id = vfs.path2file(&entrypoint).map(|id| FileId(id.0)).unwrap();
+
+            // Load configuration
             if let Some(config_path) = args.value_of("config") {
                 let config_text = fs::read_to_string(config_path)?;
                 let config: Config = if config_path.ends_with("json") {
@@ -34,6 +52,8 @@ fn main() -> Result<(), io::Error> {
                 };
                 analysis.set_config(config);
             }
+
+            // Run analytics
             let diagnostics = analysis.diagnostics(file_id.into());
             let mut total_errors = 0;
             for line in diagnostics {

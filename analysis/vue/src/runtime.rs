@@ -52,7 +52,7 @@ impl Default for HostDatabase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Analysis {
     db: HostDatabase,
 }
@@ -76,6 +76,10 @@ impl Analysis {
 
     pub fn set_config(&mut self, config: Config) {
         self.db.set_vue_config(SourceRootId(0), Arc::new(config));
+    }
+
+    pub fn apply_change(&mut self, change: SourceChange) {
+        change.apply_to(&mut self.db);
     }
 
     /// Gets the text of the source file.
