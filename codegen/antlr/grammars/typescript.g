@@ -7,21 +7,27 @@ program
     # PROGRAM
     ;
 
+module_declaration
+    : import_declaration
+    | export_declaration
+    | ts_declare_declaration
+    ;
+
 export_declaration
     : EXPORT_KW '{' export_specifier_list '}' (from_kw {at(STRING_LITERAL)}? literal)? eos
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW variable_declaration eos
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW interface_declaration
+    | EXPORT_KW class_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW alias_declaration eos
+    | EXPORT_KW function_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW enum_declaration
+    | EXPORT_KW ts_interface_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW DEFAULT_KW class_declaration
-    # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW DEFAULT_KW function_declaration
-    # EXPORT_DEFAULT_DECLARATION
+    | EXPORT_KW ts_alias_declaration eos
+    # EXPORT_NAMED_DECLARATION
+    | EXPORT_KW ts_enum_declaration
+    # EXPORT_NAMED_DECLARATION
     | EXPORT_KW DEFAULT_KW expression eos
     # EXPORT_DEFAULT_DECLARATION
     | EXPORT_KW ASTERISK from_kw {at(STRING_LITERAL)}? literal eos
@@ -48,41 +54,14 @@ statement
     | function_declaration
 
     // typescript declarations
-    | interface_declaration
-    | alias_declaration
-    | enum_declaration
+    | ts_interface_declaration
+    | ts_alias_declaration eos
+    | ts_enum_declaration
 
     // must occur after everything else to handle precedence
     // with typescript-introduced contextual keywords
     | expression_statement
     | labeled_statement
-    ;
-
-interface_declaration
-    : INTERFACE_KW identifier '{' (interface_property eos)* '}'
-    # INTERFACE_DECLARATION
-    ;
-
-interface_property
-    : identifier_or_keyword '?'? ':' type_expr
-    # INTERFACE_PROPERTY
-    | '[' identifier ':' type_expr ']' ':' type_expr
-    # INTERFACE_PROPERTY
-    ;
-
-alias_declaration
-    : type_kw identifier '=' type_expr eos
-    # ALIAS_DECLARATION
-    ;
-
-enum_declaration
-    : ENUM_KW identifier '{' (enum_variant ',')* '}'
-    # ENUM_DECLARATION
-    ;
-
-enum_variant
-    : identifier ('=' expression)?
-    # ENUM_VARIANT
     ;
 
 expression
@@ -114,7 +93,7 @@ expression
     | expression ('<' | '>' | '<=' | '>=') expression      # BINARY_EXPRESSION
     | expression INSTANCEOF_KW expression                  # BINARY_EXPRESSION
     | expression IN_KW expression                          # BINARY_EXPRESSION
-    | expression as_kw type_expr                           # TS_AS_EXPRESSION
+    | expression as_kw ts_type_annotation                           # TS_AS_EXPRESSION
     | expression ('==' | '!=' | '===' | '!==') expression  # BINARY_EXPRESSION
     | expression '&' expression                            # BINARY_EXPRESSION
     | expression '^' expression                            # BINARY_EXPRESSION
@@ -138,57 +117,18 @@ expression
     | '(' expression_list ')'
     ;
 
-type_expr
-    : type_expr '.' identifier_or_keyword      # MEMBER_TYPE_EXPR
-    | type_expr type_arguments                 # GENERIC_TYPE_EXPR
-    | type_expr '[' ']'                        # ARRAY_TYPE_EXPR
-    | type_expr '&' type_expr                  # INTERSECTION_TYPE_EXPR
-    | type_expr '|' type_expr                  # UNION_TYPE_EXPR
-    | type_expr '?' type_expr ':' type_expr    # CONDITIONAL_TYPE_EXPR
-    | _type_expr_interface
-    | _type_expr_function
-    | _type_expr_tuple
-    | _type_expr_typeof
-    | identifier_or_primitive
-    | literal
-    ;
-
-_type_expr_interface
-    : '{' (interface_property eos)* '}'
-    # INTERFACE_TYPE_EXPR
-    ;
-
-_type_expr_function
-    : '(' ')' '=>' type_expr
-    # FUNCTION_TYPE_EXPR
-    ;
-
-_type_expr_tuple
-    : '[' (type_expr (',' type_expr)*)? ']'
-    # TUPLE_TYPE_EXPR
-    ;
-
-_type_expr_typeof
-    : TYPEOF_KW identifier
-    # TYPEOF_TYPE_EXPR
-    ;
-
-type_arguments
-    : '<' type_expr (',' type_expr)* '>'
-    ;
-
 object_pattern
-    : '{' (assignment_property (',' assignment_property)*)? '}' (':' type_expr)?
+    : '{' (assignment_property (',' assignment_property)*)? '}' (':' ts_type_annotation)?
     # OBJECT_PATTERN
     ;
 
 array_pattern
-    : '[' ','* (pattern (','+ pattern)*)? ','* ']' (':' type_expr)?
+    : '[' ','* (pattern (','+ pattern)*)? ','* ']' (':' ts_type_annotation)?
     # ARRAY_PATTERN
     ;
 
 identifier_pattern
-    : IDENTIFIER ('?'? ':' type_expr)?
+    : IDENTIFIER '?'? (':' ts_type_annotation)?
     # IDENTIFIER
     ;
 
@@ -198,15 +138,173 @@ identifier_or_primitive
     ;
 
 function_parameters
-    : '(' formal_parameter_list? ')' (':' type_expr)?
+    : ts_type_parameters? '(' formal_parameter_list? ')' (':' function_return_type)?
+    ;
+
+function_return_type
+    : ts_type_predicate
+    | ts_type_annotation
+    ;
+
+ts_type_predicate
+    : identifier is_kw ts_type_annotation
+    # TYPE_PREDICATE
+    ;
+
+ts_declare_declaration
+    : declare_kw ts_module_declaration
+    | declare_kw ts_namespace_declaration
+    ;
+
+ts_module_declaration
+    : module_kw module_path '{' ts_d_source_element* '}'
+    | module_kw module_path ';'
+    ;
+
+ts_namespace_declaration
+    : namespace_kw identifier '{' ts_d_source_element* '}'
+    ;
+
+ts_d_source_element
+    : import_declaration
+    | export_declaration
+    | ts_interface_declaration
+    ;
+
+ts_interface_declaration
+    : INTERFACE_KW identifier ts_type_parameters? (EXTENDS_KW ts_type_annotation)? '{' (ts_interface_property eos)* '}'
+    # INTERFACE_DECLARATION
+    ;
+
+ts_interface_property
+    : identifier_or_keyword ts_type_parameters? '?'? (':' ts_type_annotation | ts_method_type)?
+    # INTERFACE_PROPERTY
+    | '[' identifier ':' ts_type_annotation ']' ':' ts_type_annotation
+    # INTERFACE_PROPERTY
+    | ts_method_type
+    # INTERFACE_PROPERTY
+    ;
+
+ts_method_type
+    : ts_function_parameters ':' ts_type_annotation
+    # FUNCTION_TYPE_EXPR
+    ;
+
+ts_alias_declaration
+    : type_kw identifier '=' ts_type_annotation
+    # ALIAS_DECLARATION
+    ;
+
+ts_enum_declaration
+    : ENUM_KW identifier '{' (ts_enum_variant ',')* '}'
+    # ENUM_DECLARATION
+    ;
+
+ts_enum_variant
+    : identifier ('=' expression)?
+    # ENUM_VARIANT
+    ;
+
+ts_type_parameters
+    : '<' (ts_type_parameter (',' ts_type_parameter)*)? '>'
+    ;
+
+ts_type_parameter
+    : identifier (EXTENDS_KW ts_type_annotation)? ('=' ts_type_annotation)?
+    # TYPE_PARAMETER_DECLARATION
+    ;
+
+ts_type_annotation
+    : '|' ts_type_annotation
+    | ts_type_annotation '.' identifier_or_keyword                      # MEMBER_TYPE_EXPR
+    | ts_type_annotation ts_type_arguments                              # GENERIC_TYPE_EXPR
+    | ts_type_annotation '[' ']'                                        # ARRAY_TYPE_EXPR
+    | ts_type_annotation '&' ts_type_annotation                         # INTERSECTION_TYPE_EXPR
+    | ts_type_annotation '|' ts_type_annotation                         # UNION_TYPE_EXPR
+    | ts_type_annotation '?' ts_type_annotation ':' ts_type_annotation  # CONDITIONAL_TYPE_EXPR
+    | _ts_type_annotation_typeof
+    | _ts_type_annotation_interface
+    | ts_tuple_type
+    | ts_function_type
+    | '(' ts_type_annotation ')'
+    | identifier_or_primitive
+    | literal
+    ;
+
+_ts_type_annotation_typeof
+    : TYPEOF_KW identifier
+    # TYPEOF_TYPE_EXPR
+    ;
+
+_ts_type_annotation_interface
+    : '{' (ts_interface_property eos)* '}'
+    # INTERFACE_TYPE_EXPR
+    ;
+
+ts_function_type
+    : ts_function_parameters '=>' ts_type_annotation
+    # FUNCTION_TYPE_EXPR
+    ;
+
+ts_function_parameters
+    : '(' ts_function_parameter_list? ')'
+    ;
+
+ts_function_parameter_list
+    : ts_function_parameter (',' ts_function_parameter)* (',' ts_function_parameter_rest)?
+    | ts_function_parameter_rest
+    ;
+
+ts_function_parameter
+    : identifier ('?'? ':' ts_type_annotation)?
+    # PARAMETER_PROPERTY
+    ;
+
+ts_function_parameter_rest
+    : '...' identifier_pattern
+    # REST_TYPE
+    ;
+
+ts_tuple_type
+    : '[' (ts_type_annotation (',' ts_type_annotation)*)? ']'
+    # TUPLE_TYPE_EXPR
+    ;
+
+ts_type_arguments
+    : '<' ts_type_argument (',' ts_type_argument)* {split(SHR, &[R_ANGLE, R_ANGLE])}? '>'
+    ;
+
+ts_type_argument
+    : ts_type_annotation
+    # TYPE_PARAMETER_INSTANTIATION
     ;
 
 type_kw
-    : {at_keyword("type")}? IDENTIFIER
+    : {at_contextual_kw("type")}? IDENTIFIER
     # TYPE_KW
     ;
 
+declare_kw
+    : {at_contextual_kw("declare")}? IDENTIFIER
+    # DECLARE_KW
+    ;
+
+namespace_kw
+    : {at_contextual_kw("namespace")}? IDENTIFIER
+    # NAMESPACE_KW
+    ;
+
+module_kw
+    : {at_contextual_kw("module")}? IDENTIFIER
+    # MODULE_KW
+    ;
+
 keyof_kw
-    : {at_keyword("keyof")}? IDENTIFIER
+    : {at_contextual_kw("keyof")}? IDENTIFIER
     # KEYOF_KW
+    ;
+
+is_kw
+    : {at_contextual_kw("is")}? IDENTIFIER
+    # IS_KW
     ;

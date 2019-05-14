@@ -4,17 +4,16 @@ use code_grammar::lexer::ResetableLexer;
 use code_grammar::scan::{is_decimal, scan_string};
 
 pub fn is_javascript_ident_prefix(c: char) -> bool {
-    (c >= 'a' && c <= 'z')
-        || (c >= 'A' && c <= 'Z')
+    c.is_alphabetic()
         || c == '_'
         || c == '$'
 }
 
 pub fn is_javascript_ident_suffix(c: char) -> bool {
-    (c >= 'a' && c <= 'z')
-        || (c >= 'A' && c <= 'Z')
+    c.is_alphabetic()
         || (c >= '0' && c <= '9')
         || c == '_'
+        || c == '$'
 }
 
 /// Assumes preceding back tick

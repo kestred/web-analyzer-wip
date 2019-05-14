@@ -5,6 +5,7 @@
  * Copyright (c) 2017 by Ivan Kochurkin (Positive Technologies):
     added ES6 support, cleared and transformed to the universal grammar.
  * Copyright (c) 2018 by Juan Alvarez (contributor -> ported to Go)
+ * Copyright (c) 2019 by Kevin Stenerson (contributor -> adapted for Rust)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -45,18 +46,23 @@ module_declaration
     | export_declaration
     ;
 
+module_path
+    : STRING_LITERAL
+    # LITERAL
+    ;
+
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (from_kw {at(STRING_LITERAL)}? literal)? eos
+    : EXPORT_KW '{' export_specifier_list '}' (from_kw module_path)? eos
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW variable_declaration eos
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW DEFAULT_KW class_declaration eos
-    # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW DEFAULT_KW function_declaration eos
-    # EXPORT_DEFAULT_DECLARATION
+    | EXPORT_KW class_declaration
+    # EXPORT_NAMED_DECLARATION
+    | EXPORT_KW function_declaration
+    # EXPORT_NAMED_DECLARATION
     | EXPORT_KW DEFAULT_KW expression eos
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK from_kw {at(STRING_LITERAL)}? literal eos
+    | EXPORT_KW ASTERISK from_kw module_path eos
     # EXPORT_ALL_DECLARATION
     ;
 
@@ -70,7 +76,9 @@ export_specifier_atom
     ;
 
 import_declaration
-    : IMPORT_KW import_declaration_list from_kw {at(STRING_LITERAL)}? literal eos
+    : IMPORT_KW import_declaration_list from_kw module_path eos
+    # IMPORT_DECLARATION
+    | IMPORT_KW module_path eos
     # IMPORT_DECLARATION
     ;
 
@@ -311,17 +319,15 @@ generator_method
 formal_parameter_list
     : formal_parameter (',' formal_parameter)* (',' formal_parameter_rest)?
     | formal_parameter_rest
-    | array_pattern
-    | object_pattern
-    ;
-
-formal_parameter_init
-    : formal_parameter ('=' expression)?
-    # ASSIGNMENT_PATTERN
-    | formal_parameter
     ;
 
 formal_parameter
+    : formal_parameter_uninit ('=' expression)?
+    # ASSIGNMENT_PATTERN
+    | formal_parameter_uninit
+    ;
+
+formal_parameter_uninit
     : array_pattern
     | object_pattern
     | identifier_pattern
@@ -374,11 +380,17 @@ property_or_spread
     ;
 
 spread_expression
-    : '...' expression  // ES6: Spread Operator
+    : '...' expression
     # SPREAD_ELEMENT
     ;
 
 pattern
+    : pattern_uninit ('=' expression)?
+    # ASSIGNMENT_PATTERN
+    | pattern_uninit
+    ;
+
+pattern_uninit
     : object_pattern
     | array_pattern
     | spread_pattern
@@ -395,8 +407,14 @@ assignment_property
     # PROPERTY
     | '[' expression ']' ':' pattern
     # PROPERTY
-    | identifier
+    | assignment_shorthand
     # PROPERTY
+    ;
+
+assignment_shorthand
+    : identifier ('=' expression)?
+    # ASSIGNMENT_PATTERN
+    | identifier
     ;
 
 array_pattern
@@ -460,12 +478,7 @@ setter_tail
     ;
 
 arguments
-    : '(' ( expression (',' expression)* (',' last_argument)? | last_argument )? ')'
-    ;
-
-last_argument                        // ES6: Spread Operator
-    : '...' identifier
-    # SPREAD_ELEMENT
+    : '(' ( expression (',' expression)* (',' spread_expression)? | spread_expression )? ')'
     ;
 
 expression_list
@@ -641,6 +654,14 @@ keyword
     | PROTECTED_KW
     | STATIC_KW
     | YIELD_KW
+
+    | BOOLEAN_KW
+    | BYTE_KW
+    | CHAR_KW
+    | INT_KW
+    | LONG_KW
+    | FLOAT_KW
+    | DOUBLE_KW
     ;
 
 getter
@@ -652,32 +673,32 @@ setter
     ;
 
 as_kw
-    : {at_keyword("as")}? IDENTIFIER
+    : {at_contextual_kw("as")}? IDENTIFIER
     # AS_KW
     ;
 
 from_kw
-    : {at_keyword("from")}? IDENTIFIER
+    : {at_contextual_kw("from")}? IDENTIFIER
     # FROM_KW
     ;
 
 get_kw
-    : {at_keyword("get")}? IDENTIFIER
+    : {at_contextual_kw("get")}? IDENTIFIER
     # GET_KW
     ;
 
 set_kw
-    : {at_keyword("set")}? IDENTIFIER
+    : {at_contextual_kw("set")}? IDENTIFIER
     # SET_KW
     ;
 
 of_kw
-    : {at_keyword("of")}? IDENTIFIER
+    : {at_contextual_kw("of")}? IDENTIFIER
     # OF_KW
     ;
 
 async_kw
-    : {at_keyword("async")}? IDENTIFIER
+    : {at_contextual_kw("async")}? IDENTIFIER
     # ASYNC_KW
     ;
 

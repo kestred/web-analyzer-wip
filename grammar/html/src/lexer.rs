@@ -205,8 +205,20 @@ impl Lexer for HtmlLexer {
                     }
                     '>' => {
                         self.mode = match self.current_tag.take() {
-                            Some(ref tag) if tag == "script" => HtmlLexerMode::Script,
-                            Some(ref tag) if tag == "style" => HtmlLexerMode::Style,
+                            Some(ref tag) if tag == "script" => {
+                                if s.at('<') {
+                                    HtmlLexerMode::Tag
+                                } else {
+                                    HtmlLexerMode::Script
+                                }
+                            }
+                            Some(ref tag) if tag == "style" => {
+                                if s.at('<') {
+                                    HtmlLexerMode::Tag
+                                } else {
+                                    HtmlLexerMode::Style
+                                }
+                            }
                             _ => {
                                 let open = self.template_opener();
                                 let open_like = open.chars().next().unwrap();

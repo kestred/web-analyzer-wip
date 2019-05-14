@@ -65,7 +65,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         } else if p.at(IDENTIFIER) {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
-            } else if !p.at_keyword("async") {
+            } else if !p.at_contextual_kw("async") {
                 identifier(p)?;
             } else {
                 let checkpoint = p.checkpoint(true);

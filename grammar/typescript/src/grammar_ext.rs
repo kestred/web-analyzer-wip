@@ -4,16 +4,34 @@ use code_grammar::Parser;
 use code_grammar::parser::Continue;
 use code_grammar::{catch, tokenset};
 
-pub fn type_expr(p: &mut Parser) -> Option<Continue> {
-    fn _type_expr_head(p: &mut Parser) -> Option<Continue> {
-        if p.at(L_CURLY) {
-            _type_expr_interface(p)?;
-        } else if p.at(L_PAREN) {
-            _type_expr_function(p)?;
-        } else if p.at(L_SQUARE) {
-            _type_expr_tuple(p)?;
+pub fn ts_type_annotation(p: &mut Parser) -> Option<Continue> {
+    fn _ts_type_annotation_head(p: &mut Parser) -> Option<Continue> {
+        if p.at(PIPE) {
+            let marker = p.start();
+            let ok = catch!({
+                p.bump(); // eat PIPE
+                ts_type_annotation(p)?;
+                Some(Continue)
+            });
+            p.complete(marker, UNION_TYPE_EXPR);
+            ok?;
         } else if p.at(TYPEOF_KW) {
-            _type_expr_typeof(p)?;
+            _ts_type_annotation_typeof(p)?;
+        } else if p.at(L_CURLY) {
+            _ts_type_annotation_interface(p)?;
+        } else if p.at(L_SQUARE) {
+            ts_tuple_type(p)?;
+        } else if p.at(L_PAREN) {
+            // Try `ts_function_type`
+            let checkpoint = p.checkpoint(true);
+            ts_function_type(p); /* .ok(); */
+
+            // Otherwise, expect `ts_type_annotation`
+            if !p.commit(checkpoint)?.is_ok() {
+                p.bump();
+                ts_type_annotation(p)?;
+                p.expect(R_PAREN)?;
+            }
         } else if p.at_ts(&tokenset![IDENTIFIER, BOOLEAN_KW]) {
             identifier_or_primitive(p)?;
         } else if p.at_ts(&AT_LITERAL) {
@@ -28,24 +46,24 @@ pub fn type_expr(p: &mut Parser) -> Option<Continue> {
         Some(Continue)
     }
 
-    fn _type_expr_prec(p: &mut Parser, prec: u32) -> Option<Continue> {
+    fn _ts_type_annotation_prec(p: &mut Parser, prec: u32) -> Option<Continue> {
         // N.B. We start markers here, but its ok not to consume them; if we don't `complete` it
         //      then the extra level of nesting will just be ignored.
         let marker = p.start();
-        _type_expr_head(p)?;
+        _ts_type_annotation_head(p)?;
 
         // Handle postfix type operators
         {
-            // member_type_expr[p ≤ 5]
-            //     : type_expr '&' identifier_or_keyword
+            // member_ts_type_annotation[p ≤ 5]
+            //     : ts_type_annotation '&' identifier_or_keyword
             //     # MEMBER_TYPE_EXPR
             //     ;
-            // generic_type_expr[p ≤ 4]
-            //     : type_expr <' type_generic_arg (',' type_generic_arg)* '>'
+            // generic_ts_type_annotation[p ≤ 4]
+            //     : ts_type_annotation <' type_generic_arg (',' type_generic_arg)* '>'
             //     # GENERIC_TYPE_EXPR
             //     ;
-            // array_type_expr[p ≤ 3]
-            //     : type_expr '[' ']'
+            // array_ts_type_annotation[p ≤ 3]
+            //     : ts_type_annotation '[' ']'
             //     # ARRAY_TYPE_EXPR
             //     ;
             while p.at_ts(&tokenset![DOT, L_ANGLE, L_SQUARE]) {
@@ -54,7 +72,7 @@ pub fn type_expr(p: &mut Parser) -> Option<Continue> {
                     identifier_or_keyword(p)?;
                     p.complete_and_wrap(&marker, MEMBER_TYPE_EXPR);
                 } else if prec < 4 && p.at(L_ANGLE) {
-                    type_arguments(p)?;
+                    ts_type_arguments(p)?;
                     p.complete_and_wrap(&marker, GENERIC_TYPE_EXPR);
                 } else if prec < 3 && p.at(L_SQUARE) {
                     p.bump();
@@ -66,45 +84,45 @@ pub fn type_expr(p: &mut Parser) -> Option<Continue> {
             }
         }
 
-        // intersection_type_expr[p ≤ 2]
-        //     : type_expr '&' type_expr
+        // intersection_ts_type_annotation[p ≤ 2]
+        //     : ts_type_annotation '&' ts_type_annotation
         //     # INTERSECTION_TYPE_EXPR
         //     ;
         if prec > 2 { return Some(Continue); }
         while p.at(AMPERSAND) {
             p.bump();
-            _type_expr_prec(p, 2)?;
+            _ts_type_annotation_prec(p, 2)?;
             p.complete_and_wrap(&marker, INTERSECTION_TYPE_EXPR);
         }
 
-        // union_type_expr[p ≤ 1]
-        //     : type_expr '|' type_expr
+        // union_ts_type_annotation[p ≤ 1]
+        //     : ts_type_annotation '|' ts_type_annotation
         //     # UNION_TYPE_EXPR
         //     ;
         if prec > 1 { return Some(Continue); }
         while p.at(PIPE) {
             p.bump();
-            _type_expr_prec(p, 1)?;
+            _ts_type_annotation_prec(p, 1)?;
             p.complete_and_wrap(&marker, UNION_TYPE_EXPR);
         }
 
-        // conditional_type_expr[p ≤ 0]
-        //     : type_expr '?' type_expr ':' type_expr
+        // conditional_ts_type_annotation[p ≤ 0]
+        //     : ts_type_annotation '?' ts_type_annotation ':' ts_type_annotation
         //     # CONDITIONAL_TYPE_EXPR
         //     ;
         if prec > 0 { return Some(Continue); }
         while p.at(QUESTION) {
             p.bump();
-            _type_expr_prec(p, 0)?;
+            _ts_type_annotation_prec(p, 0)?;
             p.expect(SEMICOLON)?;
-            _type_expr_prec(p, 0)?;
+            _ts_type_annotation_prec(p, 0)?;
             p.complete_and_wrap(&marker, CONDITIONAL_TYPE_EXPR);
         }
 
         Some(Continue)
     }
 
-    _type_expr_prec(p, 0)
+    _ts_type_annotation_prec(p, 0)
 }
 
 // BLECH... really didn't want to have to copy this; but need to support type assertions
@@ -169,11 +187,11 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         } else if p.at(IDENTIFIER) {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
-            } else if !p.at_keyword("async") {
+            } else if !p.at_contextual_kw("async") {
                 identifier(p)?;
             } else {
                 let checkpoint = p.checkpoint(true);
-                arrow_function_expression(p);
+                arrow_function_expression(p); /* .ok(); */
 
                 // Otherwise, expect a single identifier
                 if !p.commit(checkpoint)?.is_ok() {
@@ -205,6 +223,9 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             array_expression(p)?;
         } else if p.at(L_CURLY) {
             object_expression(p)?;
+        } else if p.at(L_ANGLE) {
+            // TODO: Handle prefix `<...>` type assertions
+            arrow_function_expression(p);
         } else if p.at(L_PAREN) {
             // N.B. Do some custom lookahead logic here to avoid
             // TODO: Implement auto-genned 2-4 token lookahead for ambiguous cases
@@ -390,12 +411,12 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         // FIXME: Need to introduce a new precedence level here
         {
             // as_expression[p ≤ 8]
-            //     : expression 'as' type_expr
+            //     : expression 'as' ts_type_annotation
             //     # TS_AS_EXPRESSION
             //     ;
-            while prec <= 8 && p.at_keyword("as") && p.at(IDENTIFIER) {
+            while prec <= 8 && p.at_contextual_kw("as") && p.at(IDENTIFIER) {
                 as_kw(p)?;
-                type_expr(p)?;
+                ts_type_annotation(p)?;
                 p.complete_and_wrap(&marker, TS_AS_EXPRESSION);
             }
             // if prec > 8 {

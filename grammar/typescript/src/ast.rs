@@ -62,7 +62,8 @@ impl Program {
     TUPLE_TYPE_EXPR 217
     TYPEOF_TYPE_EXPR 218
 
-    TYPE_ARGUMENT 230
+    TYPE_PARAMETER_DECLARATION 230
+    TYPE_PARAMETER_INSTANTIATON 231
 */
 
 // TODO: These `AstNodes` are defined by `ts-estree`

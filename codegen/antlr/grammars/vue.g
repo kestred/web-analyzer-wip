@@ -19,25 +19,25 @@ component_template
     ;
 
 component_script
-    : '<' script_tag WS? (attribute WS?)* '>' script_block ('<' '/' | '</') WS? script_tag WS? '>'
+    : '<' script_tag WS? (attribute WS?)* '>' script_block? ('<' '/' | '</') WS? script_tag WS? '>'
     # COMPONENT_SCRIPT
     ;
 
 component_style
-    : '<' style_tag WS? (attribute WS?)* '>' style_block ('<' '/' | '</') WS? style_tag WS? '>'
+    : '<' style_tag WS? (attribute WS?)* '>' style_block? ('<' '/' | '</') WS? style_tag WS? '>'
     # COMPONENT_STYLE
     ;
 
 template_tag
-    : {at_keyword("template")}? TAG_NAME
+    : {at_contextual_kw("template")}? TAG_NAME
     ;
 
 script_tag
-    : {at_keyword("script")}? TAG_NAME
+    : {at_contextual_kw("script")}? TAG_NAME
     ;
 
 style_tag
-    : {at_keyword("style")}? TAG_NAME
+    : {at_contextual_kw("style")}? TAG_NAME
     ;
 
 template_content
@@ -51,9 +51,9 @@ html_content
     ;
 
 attribute
-    : ({at_keyword("v-bind")}? TAG_NAME)? ':' attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
+    : ({at_contextual_kw("v-bind")}? TAG_NAME)? ':' attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
     # ATTRIBUTE_BINDING
-    | ({at_keyword("v-on")}? TAG_NAME | '@') attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
+    | ({at_contextual_kw("v-on")}? TAG_NAME | '@') attribute_key attribute_modifier* (WS? '=' WS? attribute_value)?
     # ATTRIBUTE_LISTENER
     | TAG_NAME WS? '=' WS? attribute_value
     # ATTRIBUTE

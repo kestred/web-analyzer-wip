@@ -50,6 +50,13 @@ pub fn module_declaration(p: &mut Parser) -> Option<Continue> {
     Some(Continue)
 }
 
+pub fn module_path(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = p.expect(STRING_LITERAL);
+    p.complete(_marker, LITERAL);
+    _ok
+}
+
 pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     let mut _checkpoint = p.checkpoint(false);
     let _marker = p.start();
@@ -58,12 +65,9 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.bump();
         export_specifier_list(p)?;
         p.expect(R_CURLY)?;
-        if p.at_keyword("from") && p.at(IDENTIFIER) {
+        if p.at_contextual_kw("from") && p.at(IDENTIFIER) {
             from_kw(p)?;
-            if !(p.at(STRING_LITERAL)) {
-                p.error("expected to be at STRING_LITERAL")?;
-            }
-            literal(p)?;
+            module_path(p)?;
         }
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
@@ -71,32 +75,12 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         variable_declaration(p)?;
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
-    } else if p.at(DEFAULT_KW) && {
-        // try --> DEFAULT_KW class_declaration eos #EXPORT_DEFAULT_DECLARATION
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            p.bump();
-            class_declaration(p)?;
-            eos(p)?;
-            p.complete(_checkpoint.branch(&_marker), EXPORT_DEFAULT_DECLARATION);
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if p.at(DEFAULT_KW) && {
-        // try --> DEFAULT_KW function_declaration eos #EXPORT_DEFAULT_DECLARATION
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            p.bump();
-            function_declaration(p)?;
-            eos(p)?;
-            p.complete(_checkpoint.branch(&_marker), EXPORT_DEFAULT_DECLARATION);
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
+    } else if p.at(CLASS_KW) {
+        class_declaration(p)?;
+        p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
+    } else if p.at(FUNCTION_KW) || (p.at_contextual_kw("async") && p.at(IDENTIFIER)) {
+        function_declaration(p)?;
+        p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
     } else if p.at(DEFAULT_KW) {
         p.bump();
         expression(p)?;
@@ -105,14 +89,10 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     } else if p.at(ASTERISK) {
         p.bump();
         from_kw(p)?;
-        if !(p.at(STRING_LITERAL)) {
-            p.error("expected to be at STRING_LITERAL")?;
-        }
-        literal(p)?;
+        module_path(p)?;
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
     } else {
-        // otherwise, emit an error
         p.expected_ts_in("export_declaration", &_TS3)?;
     }
     Some(Continue)
@@ -131,7 +111,7 @@ pub fn export_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         identifier(p)?;
-        if p.at_keyword("as") && p.at(IDENTIFIER) {
+        if p.at_contextual_kw("as") && p.at(IDENTIFIER) {
             as_kw(p)?;
             identifier(p)?;
         }
@@ -142,20 +122,23 @@ pub fn export_specifier_atom(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
     let _marker = p.start();
-    let _ok = catch!({
-        p.expect(IMPORT_KW)?;
+    p.expect(IMPORT_KW)?;
+    if p.at_ts(&tokenset![ASTERISK, IDENTIFIER, L_CURLY]) {
         import_declaration_list(p)?;
         from_kw(p)?;
-        if !(p.at(STRING_LITERAL)) {
-            p.error("expected to be at STRING_LITERAL")?;
-        }
-        literal(p)?;
+        module_path(p)?;
         eos(p)?;
-        Some(Continue)
-    });
-    p.complete(_marker, IMPORT_DECLARATION);
-    _ok
+        p.complete(_checkpoint.branch(&_marker), IMPORT_DECLARATION);
+    } else if p.at(STRING_LITERAL) {
+        module_path(p)?;
+        eos(p)?;
+        p.complete(_checkpoint.branch(&_marker), IMPORT_DECLARATION);
+    } else {
+        p.expected_ts_in("import_declaration", &tokenset![ASTERISK, IDENTIFIER, L_CURLY, STRING_LITERAL])?;
+    }
+    Some(Continue)
 }
 
 pub fn import_declaration_list(p: &mut Parser) -> Option<Continue> {
@@ -190,7 +173,7 @@ pub fn import_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         identifier(p)?;
-        if p.at_keyword("as") && p.at(IDENTIFIER) {
+        if p.at_contextual_kw("as") && p.at(IDENTIFIER) {
             as_kw(p)?;
             identifier(p)?;
         }
@@ -270,14 +253,14 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
         eos(p)?;
-    } else if (p.at(FUNCTION_KW) || (p.at_keyword("async") && p.at(IDENTIFIER))) && {
+    } else if (p.at(FUNCTION_KW) || (p.at_contextual_kw("async") && p.at(IDENTIFIER))) && {
         // try --> function_declaration
         let mut _checkpoint = p.checkpoint(true);
         function_declaration(p);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if ((p.at_keyword("async") && !p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at(IDENTIFIER)) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&AT_EXPRESSION))) && {
+    } else if ((p.at_contextual_kw("async") && !p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at(IDENTIFIER)) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&AT_EXPRESSION))) && {
         // try --> expression_statement
         let mut _checkpoint = p.checkpoint(true);
         expression_statement(p);
@@ -310,7 +293,7 @@ pub fn block(p: &mut Parser) -> Option<Continue> {
 pub fn statement_list(p: &mut Parser) -> Option<Continue> {
     statement(p)?;
     while p.at_ts(&_TS2) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
-        let mut _checkpoint = p.checkpoint(true);
+        let _checkpoint = p.checkpoint_ambiguous();
         statement(p);
         if !p.commit(_checkpoint)?.is_ok() {
             break;
@@ -558,7 +541,7 @@ pub fn return_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(RETURN_KW)?;
-        if (!p.at_line_terminator() && p.at_ts(&AT_EXPRESSION)) || (p.at_keyword("async") && !p.at_line_terminator() && p.at(IDENTIFIER)) {
+        if (!p.at_line_terminator() && p.at_ts(&AT_EXPRESSION)) || (p.at_contextual_kw("async") && !p.at_line_terminator() && p.at(IDENTIFIER)) {
             if !(!p.at_line_terminator()) {
                 p.error("expected to be not at line terminator")?;
             }
@@ -617,7 +600,7 @@ pub fn case_block(p: &mut Parser) -> Option<Continue> {
 pub fn case_clauses(p: &mut Parser) -> Option<Continue> {
     case_clause(p)?;
     while p.at(CASE_KW) {
-        let mut _checkpoint = p.checkpoint(true);
+        let _checkpoint = p.checkpoint_ambiguous();
         case_clause(p);
         if !p.commit(_checkpoint)?.is_ok() {
             break;
@@ -737,7 +720,7 @@ pub fn debugger_statement(p: &mut Parser) -> Option<Continue> {
 pub fn function_declaration(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at_keyword("async") && p.at(IDENTIFIER) {
+        if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
             async_kw(p)?;
             p.expect(FUNCTION_KW)?;
         } else if p.at(FUNCTION_KW) {
@@ -781,7 +764,7 @@ pub fn class_body(p: &mut Parser) -> Option<Continue> {
     let _ok = catch!({
         p.expect(L_CURLY)?;
         while p.at_ts(&AT_CLASS_ELEMENT) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             class_element(p);
             if !p.commit(_checkpoint)?.is_ok() {
                 break;
@@ -821,7 +804,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
+    } else if (p.at_contextual_kw("get") && p.at(IDENTIFIER)) && {
         // try --> getter getter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -833,7 +816,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
+    } else if (p.at_contextual_kw("set") && p.at(IDENTIFIER)) && {
         // try --> setter setter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -869,10 +852,10 @@ pub fn method_tail(p: &mut Parser) -> Option<Continue> {
 pub fn generator_method(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at(ASTERISK) || (p.at_keyword("async") && p.at(IDENTIFIER)) {
+        if p.at(ASTERISK) || (p.at_contextual_kw("async") && p.at(IDENTIFIER)) {
             if p.at(ASTERISK) {
                 p.bump();
-            } else if p.at_keyword("async") && p.at(IDENTIFIER) {
+            } else if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
                 async_kw(p)?;
             }
         }
@@ -886,45 +869,48 @@ pub fn generator_method(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE]) && {
-        // try --> formal_parameter (, formal_parameter)* (, formal_parameter_rest)?
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            formal_parameter(p)?;
-            while p.at(COMMA) {
-                let mut _checkpoint = p.checkpoint(true);
-                catch!({
-                    p.bump();
-                    formal_parameter(p)?;
-                    Some(Continue)
-                });
-                if !p.commit(_checkpoint)?.is_ok() {
-                    break;
-                }
-            }
-            if p.at(COMMA) {
+    if p.at_ts(&tokenset![IDENTIFIER, L_CURLY, L_SQUARE]) {
+        formal_parameter(p)?;
+        while p.at(COMMA) {
+            let _checkpoint = p.checkpoint_ambiguous();
+            catch!({
                 p.bump();
-                formal_parameter_rest(p)?;
+                formal_parameter(p)?;
+                Some(Continue)
+            });
+            if !p.commit(_checkpoint)?.is_ok() {
+                break;
             }
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
+        }
+        if p.at(COMMA) {
+            p.bump();
+            formal_parameter_rest(p)?;
+        }
     } else if p.at(DOTDOTDOT) {
         formal_parameter_rest(p)?;
-    } else if p.at(L_SQUARE) {
-        array_pattern(p)?;
-    } else if p.at(L_CURLY) {
-        object_pattern(p)?;
     } else {
-        // otherwise, emit an error
         p.expected_ts_in("formal_parameter_list", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
     Some(Continue)
 }
 
 pub fn formal_parameter(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
+    formal_parameter_uninit(p)?;
+    if p.at(EQ) {
+        if p.at(EQ) {
+            if p.at(EQ) {
+                p.bump();
+                expression(p)?;
+            }
+            p.complete(_checkpoint.branch(&_marker), ASSIGNMENT_PATTERN);
+        }
+    }
+    Some(Continue)
+}
+
+pub fn formal_parameter_uninit(p: &mut Parser) -> Option<Continue> {
     if p.at(L_SQUARE) {
         array_pattern(p)?;
     } else if p.at(L_CURLY) {
@@ -932,7 +918,7 @@ pub fn formal_parameter(p: &mut Parser) -> Option<Continue> {
     } else if p.at(IDENTIFIER) {
         identifier_pattern(p)?;
     } else {
-        p.expected_ts_in("formal_parameter", &tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
+        p.expected_ts_in("formal_parameter_uninit", &tokenset![IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
     Some(Continue)
 }
@@ -974,7 +960,7 @@ pub fn function_body(p: &mut Parser) -> Option<Continue> {
 pub fn source_elements(p: &mut Parser) -> Option<Continue> {
     source_element(p)?;
     while p.at_ts(&_TS0) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1)) {
-        let mut _checkpoint = p.checkpoint(true);
+        let _checkpoint = p.checkpoint_ambiguous();
         source_element(p);
         if !p.commit(_checkpoint)?.is_ok() {
             break;
@@ -1067,6 +1053,22 @@ pub fn spread_expression(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn pattern(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
+    pattern_uninit(p)?;
+    if p.at(EQ) {
+        if p.at(EQ) {
+            if p.at(EQ) {
+                p.bump();
+                expression(p)?;
+            }
+            p.complete(_checkpoint.branch(&_marker), ASSIGNMENT_PATTERN);
+        }
+    }
+    Some(Continue)
+}
+
+pub fn pattern_uninit(p: &mut Parser) -> Option<Continue> {
     if p.at(L_CURLY) {
         object_pattern(p)?;
     } else if p.at(L_SQUARE) {
@@ -1076,7 +1078,7 @@ pub fn pattern(p: &mut Parser) -> Option<Continue> {
     } else if p.at(IDENTIFIER) {
         identifier_pattern(p)?;
     } else {
-        p.expected_ts_in("pattern", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
+        p.expected_ts_in("pattern_uninit", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
     Some(Continue)
 }
@@ -1136,7 +1138,7 @@ pub fn assignment_property(p: &mut Parser) -> Option<Continue> {
         }
     } else if p.at(IDENTIFIER) {
         let _marker = p.start();
-        let _ok = identifier(p);
+        let _ok = assignment_shorthand(p);
         p.complete(_marker, PROPERTY);
         if _ok.is_none() {
             return None;
@@ -1144,6 +1146,22 @@ pub fn assignment_property(p: &mut Parser) -> Option<Continue> {
     } else {
         // otherwise, emit an error
         p.expected_ts_in("assignment_property", &AT_ASSIGNMENT_PROPERTY)?;
+    }
+    Some(Continue)
+}
+
+pub fn assignment_shorthand(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
+    identifier(p)?;
+    if p.at(EQ) {
+        if p.at(EQ) {
+            if p.at(EQ) {
+                p.bump();
+                expression(p)?;
+            }
+            p.complete(_checkpoint.branch(&_marker), ASSIGNMENT_PATTERN);
+        }
     }
     Some(Continue)
 }
@@ -1231,7 +1249,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         if _ok.is_none() {
             return None;
         }
-    } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
+    } else if (p.at_contextual_kw("get") && p.at(IDENTIFIER)) && {
         // try --> getter getter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1250,7 +1268,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
+    } else if (p.at_contextual_kw("set") && p.at(IDENTIFIER)) && {
         // try --> setter setter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1346,7 +1364,7 @@ pub fn arguments(p: &mut Parser) -> Option<Continue> {
         if p.at_ts(&AT_EXPRESSION) {
             expression(p)?;
             while p.at(COMMA) {
-                let mut _checkpoint = p.checkpoint(true);
+                let _checkpoint = p.checkpoint_ambiguous();
                 catch!({
                     p.bump();
                     expression(p)?;
@@ -1358,25 +1376,14 @@ pub fn arguments(p: &mut Parser) -> Option<Continue> {
             }
             if p.at(COMMA) {
                 p.bump();
-                last_argument(p)?;
+                spread_expression(p)?;
             }
         } else if p.at(DOTDOTDOT) {
-            last_argument(p)?;
+            spread_expression(p)?;
         }
     }
     p.expect(R_PAREN)?;
     Some(Continue)
-}
-
-pub fn last_argument(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        p.expect(DOTDOTDOT)?;
-        identifier(p)?;
-        Some(Continue)
-    });
-    p.complete(_marker, SPREAD_ELEMENT);
-    _ok
 }
 
 pub fn expression_list(p: &mut Parser) -> Option<Continue> {
@@ -1429,7 +1436,7 @@ pub fn function_expression(p: &mut Parser) -> Option<Continue> {
 pub fn arrow_function_expression(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at_keyword("async") && p.at(IDENTIFIER) {
+        if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
             async_kw(p)?;
         }
         arrow_function_parameters(p)?;
@@ -1530,7 +1537,7 @@ pub fn setter(p: &mut Parser) -> Option<Continue> {
 pub fn as_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("as")) {
+        if !(p.at_contextual_kw("as")) {
             p.error("expected to be at keyword 'as'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1543,7 +1550,7 @@ pub fn as_kw(p: &mut Parser) -> Option<Continue> {
 pub fn from_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("from")) {
+        if !(p.at_contextual_kw("from")) {
             p.error("expected to be at keyword 'from'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1556,7 +1563,7 @@ pub fn from_kw(p: &mut Parser) -> Option<Continue> {
 pub fn get_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("get")) {
+        if !(p.at_contextual_kw("get")) {
             p.error("expected to be at keyword 'get'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1569,7 +1576,7 @@ pub fn get_kw(p: &mut Parser) -> Option<Continue> {
 pub fn set_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("set")) {
+        if !(p.at_contextual_kw("set")) {
             p.error("expected to be at keyword 'set'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1582,7 +1589,7 @@ pub fn set_kw(p: &mut Parser) -> Option<Continue> {
 pub fn of_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("of")) {
+        if !(p.at_contextual_kw("of")) {
             p.error("expected to be at keyword 'of'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1595,7 +1602,7 @@ pub fn of_kw(p: &mut Parser) -> Option<Continue> {
 pub fn async_kw(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if !(p.at_keyword("async")) {
+        if !(p.at_contextual_kw("async")) {
             p.error("expected to be at keyword 'async'")?;
         }
         p.expect(IDENTIFIER)?;
@@ -1619,24 +1626,24 @@ pub fn eos(p: &mut Parser) -> Option<Continue> {
 }
 
 pub(crate) const AT_ASSIGNMENT_OPERATOR: TokenSet = tokenset![AMPERSAND_EQ, ASTERISK_EQ, CARET_EQ, EQ, MINUS_EQ, PERCENT_EQ, PIPE_EQ, PLUS_EQ, SHL_EQ, SHR_EQ, SHU_EQ, SLASH_EQ];
-pub(crate) const AT_ASSIGNMENT_PROPERTY: TokenSet = tokenset![BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, L_SQUARE, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_CLASS_ELEMENT: TokenSet = tokenset![ASTERISK, BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, SEMICOLON, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_ASSIGNMENT_PROPERTY: TokenSet = tokenset![BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, L_SQUARE, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_CLASS_ELEMENT: TokenSet = tokenset![ASTERISK, BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, SEMICOLON, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
 pub(crate) const AT_ELEMENT_OR_SPREAD: TokenSet = tokenset![AWAIT_KW, BANG, CLASS_KW, DECREMENT, DELETE_KW, DOTDOTDOT, FALSE_KW, FUNCTION_KW, IDENTIFIER, INCREMENT, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, STRING_LITERAL, SUPER_KW, TEMPLATE_LITERAL, THIS_KW, TILDE, TRUE_KW, TYPEOF_KW, VOID_KW, YIELD_KW];
 pub(crate) const AT_EXPRESSION: TokenSet = tokenset![AWAIT_KW, BANG, CLASS_KW, DECREMENT, DELETE_KW, FALSE_KW, FUNCTION_KW, IDENTIFIER, INCREMENT, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, STRING_LITERAL, SUPER_KW, TEMPLATE_LITERAL, THIS_KW, TILDE, TRUE_KW, TYPEOF_KW, VOID_KW, YIELD_KW];
-pub(crate) const AT_GENERATOR_METHOD: TokenSet = tokenset![ASTERISK, BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_IDENTIFIER_OR_KEYWORD: TokenSet = tokenset![BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_KEYWORD: TokenSet = tokenset![BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_GENERATOR_METHOD: TokenSet = tokenset![ASTERISK, BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_IDENTIFIER_OR_KEYWORD: TokenSet = tokenset![BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_KEYWORD: TokenSet = tokenset![BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
 pub(crate) const AT_LITERAL: TokenSet = tokenset![FALSE_KW, NULL_KW, NUMBER_LITERAL, REGEXP_LITERAL, STRING_LITERAL, TEMPLATE_LITERAL, TRUE_KW];
-pub(crate) const AT_METHOD_DEFINITION: TokenSet = tokenset![ASTERISK, BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_PROPERTY: TokenSet = tokenset![ASTERISK, BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, L_SQUARE, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_PROPERTY_NAME: TokenSet = tokenset![BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_PROPERTY_OR_SPREAD: TokenSet = tokenset![ASTERISK, BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOTDOTDOT, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, L_SQUARE, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
-pub(crate) const AT_RESERVED_WORD: TokenSet = tokenset![BREAK_KW, CASE_KW, CATCH_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FOR_KW, FUNCTION_KW, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, IN_KW, LET_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_METHOD_DEFINITION: TokenSet = tokenset![ASTERISK, BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_PROPERTY: TokenSet = tokenset![ASTERISK, BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, L_SQUARE, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_PROPERTY_NAME: TokenSet = tokenset![BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_PROPERTY_OR_SPREAD: TokenSet = tokenset![ASTERISK, BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOTDOTDOT, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, L_SQUARE, NEW_KW, NULL_KW, NUMBER_LITERAL, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, STRING_LITERAL, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
+pub(crate) const AT_RESERVED_WORD: TokenSet = tokenset![BOOLEAN_KW, BREAK_KW, BYTE_KW, CASE_KW, CATCH_KW, CHAR_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DEFAULT_KW, DELETE_KW, DOUBLE_KW, DO_KW, ELSE_KW, ENUM_KW, EXPORT_KW, EXTENDS_KW, FALSE_KW, FINALLY_KW, FLOAT_KW, FOR_KW, FUNCTION_KW, IF_KW, IMPLEMENTS_KW, IMPORT_KW, INSTANCEOF_KW, INTERFACE_KW, INT_KW, IN_KW, LET_KW, LONG_KW, NEW_KW, NULL_KW, PACKAGE_KW, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW, RETURN_KW, STATIC_KW, SUPER_KW, SWITCH_KW, THIS_KW, THROW_KW, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
 pub(crate) const AT_SOURCE_ELEMENT: TokenSet = tokenset![AWAIT_KW, BANG, BREAK_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DECREMENT, DELETE_KW, DO_KW, EXPORT_KW, FALSE_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPORT_KW, INCREMENT, LET_KW, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, RETURN_KW, SEMICOLON, STRING_LITERAL, SUPER_KW, SWITCH_KW, TEMPLATE_LITERAL, THIS_KW, THROW_KW, TILDE, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
 pub(crate) const AT_STATEMENT: TokenSet = tokenset![AWAIT_KW, BANG, BREAK_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DECREMENT, DELETE_KW, DO_KW, FALSE_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, INCREMENT, LET_KW, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, RETURN_KW, SEMICOLON, STRING_LITERAL, SUPER_KW, SWITCH_KW, TEMPLATE_LITERAL, THIS_KW, THROW_KW, TILDE, TRUE_KW, TRY_KW, TYPEOF_KW, VAR_KW, VOID_KW, WHILE_KW, WITH_KW, YIELD_KW];
 pub(crate) const _TS0: TokenSet = tokenset![BREAK_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DO_KW, EXPORT_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, IMPORT_KW, LET_KW, L_CURLY, RETURN_KW, SEMICOLON, SWITCH_KW, THROW_KW, TRY_KW, VAR_KW, WHILE_KW, WITH_KW];
 pub(crate) const _TS1: TokenSet = tokenset![AWAIT_KW, BANG, DECREMENT, DELETE_KW, FALSE_KW, INCREMENT, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, STRING_LITERAL, SUPER_KW, TEMPLATE_LITERAL, THIS_KW, TILDE, TRUE_KW, TYPEOF_KW, VOID_KW, YIELD_KW];
 pub(crate) const _TS2: TokenSet = tokenset![BREAK_KW, CLASS_KW, CONST_KW, CONTINUE_KW, DEBUGGER_KW, DO_KW, FOR_KW, FUNCTION_KW, IDENTIFIER, IF_KW, LET_KW, L_CURLY, RETURN_KW, SEMICOLON, SWITCH_KW, THROW_KW, TRY_KW, VAR_KW, WHILE_KW, WITH_KW];
-pub(crate) const _TS3: TokenSet = tokenset![ASTERISK, CONST_KW, DEFAULT_KW, LET_KW, L_CURLY, VAR_KW];
+pub(crate) const _TS3: TokenSet = tokenset![ASTERISK, CLASS_KW, CONST_KW, DEFAULT_KW, FUNCTION_KW, IDENTIFIER, LET_KW, L_CURLY, VAR_KW];
 pub(crate) const _TS4: TokenSet = tokenset![AWAIT_KW, BANG, CLASS_KW, DECREMENT, DELETE_KW, FALSE_KW, FUNCTION_KW, IDENTIFIER, INCREMENT, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, SEMICOLON, STRING_LITERAL, SUPER_KW, TEMPLATE_LITERAL, THIS_KW, TILDE, TRUE_KW, TYPEOF_KW, VOID_KW, YIELD_KW];
 pub(crate) const _TS5: TokenSet = tokenset![AWAIT_KW, BANG, CLASS_KW, CONST_KW, DECREMENT, DELETE_KW, FALSE_KW, FUNCTION_KW, IDENTIFIER, INCREMENT, LET_KW, L_CURLY, L_PAREN, L_SQUARE, MINUS, NEW_KW, NULL_KW, NUMBER_LITERAL, PLUS, REGEXP_LITERAL, SEMICOLON, STRING_LITERAL, SUPER_KW, TEMPLATE_LITERAL, THIS_KW, TILDE, TRUE_KW, TYPEOF_KW, VAR_KW, VOID_KW, YIELD_KW];

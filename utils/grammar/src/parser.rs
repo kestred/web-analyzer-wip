@@ -152,7 +152,7 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// Checks if the current token is a specified keyword.
     ///
     /// Does not consider the SyntaxKind (e.g. to detect contextual keywords)
-    pub fn at_keyword(&self, kw: &str) -> bool {
+    pub fn at_contextual_kw(&self, kw: &str) -> bool {
         self.source.is_keyword(self.source_pos, kw)
     }
 
@@ -191,6 +191,38 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
         self.nth(0)
     }
 
+    /// Returns the kinds of the current two tokens, if they are not separated
+    /// by trivia.
+    ///
+    /// Useful for parsing things like `>>`.
+    pub(crate) fn current2(&self) -> Option<(SyntaxKind, SyntaxKind)> {
+        let c1 = self.nth(0);
+        let c2 = self.nth(1);
+
+        if self.token_source.is_token_joint_to_next(self.token_pos) {
+            Some((c1, c2))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the kinds of the current three tokens, if they are not separated
+    /// by trivia.
+    ///
+    /// Useful for parsing things like `=>>`.
+    pub(crate) fn current3(&self) -> Option<(SyntaxKind, SyntaxKind, SyntaxKind)> {
+        let c1 = self.nth(0);
+        let c2 = self.nth(1);
+        let c3 = self.nth(2);
+        if self.token_source.is_token_joint_to_next(self.token_pos)
+            && self.token_source.is_token_joint_to_next(self.token_pos + 1)
+        {
+            Some((c1, c2, c3))
+        } else {
+            None
+        }
+}
+
     /// Records the current state of the parser so that it can either:
     ///
     /// - Be passed to `Parser::commit` which may possibly bactrack.
@@ -199,6 +231,24 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     pub fn checkpoint(&self, allow_rollback: bool) -> Checkpoint {
         let (rb, rb_limit) = if allow_rollback {
             let incr = self.checkpoints.get();
+            self.checkpoints.set(incr + 1);
+            (Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) }, self.config.max_rollback_size)
+        } else {
+            (Rollback::Prevent, 0)
+        };
+        Checkpoint {
+            event_pos: self.events.len(),
+            source_pos: self.source_pos,
+            branch_pos: None,
+            rollback: rb,
+            rollback_limit: rb_limit
+        }
+    }
+
+    /// Like a `checkpoint` but will only rolling back if we're already in an ambigous context
+    pub fn checkpoint_ambiguous(&self) -> Checkpoint {
+        let incr = self.checkpoints.get();
+        let (rb, rb_limit) = if incr > 0 {
             self.checkpoints.set(incr + 1);
             (Rollback::Allow { checkpoints: Rc::clone(&self.checkpoints) }, self.config.max_rollback_size)
         } else {
@@ -355,6 +405,27 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
             return;
         }
         self.advance(kind, 1);
+    }
+
+    /// Advances the parser by one token, remapping its kind.
+    /// This is useful to create contextual keywords from
+    /// identifiers. For example, the lexer creates an `union`
+    /// *identifier* token, but the parser remaps it to the
+    /// `union` keyword, and keyword is what ends up in the
+    /// final tree.
+    pub fn bump_remap(&mut self, kind: SyntaxKind) {
+        if self.nth(0) == EOF {
+            // FIXME: panic!?
+            return;
+        }
+        self.advance(kind, 1);
+    }
+
+    /// Advances the parser by `n` tokens, remapping its kind.
+    /// This is useful to create compound tokens from parts. For
+    /// example, an `<<` token is two consecutive remapped `<` tokens
+    pub fn bump_compound(&mut self, kind: SyntaxKind, n: u8) {
+        self.advance(kind, n);
     }
 
     /// Starts a new node in the syntax tree. All nodes and tokens

@@ -43,7 +43,7 @@ pub enum Pattern {
     /// A choice between multiple patterns (e.g. `"public" | "private"`)
     Choice(Vec<Pattern>),
 
-    /// A repetition of a pattern group (e.g. `(IDENT COLON type_expr COMMA)+`)
+    /// A repetition of a pattern group (e.g. `(IDENT COLON ts_type_annotation COMMA)+`)
     Repeat(Box<Pattern>, Repeat),
 
     /// A pre-condition to check before parsing a tree, typically

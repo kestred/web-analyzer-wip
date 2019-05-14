@@ -16,7 +16,7 @@ pub fn component(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, TEXT, WHITESPACE]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             component_pattern(p);
             if !p.commit(_checkpoint)?.is_ok() {
                 break;
@@ -62,7 +62,7 @@ pub fn component_template(p: &mut Parser) -> Option<Continue> {
         template_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 attribute(p)?;
                 p.eat(WS);
@@ -99,7 +99,7 @@ pub fn component_script(p: &mut Parser) -> Option<Continue> {
         script_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 attribute(p)?;
                 p.eat(WS);
@@ -110,7 +110,9 @@ pub fn component_script(p: &mut Parser) -> Option<Continue> {
             }
         }
         p.expect(R_ANGLE)?;
-        script_block(p)?;
+        if p.at(SCRIPT_CONTENT) {
+            script_block(p)?;
+        }
         if p.at(L_ANGLE) {
             p.bump();
             p.expect(SLASH)?;
@@ -136,7 +138,7 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
         style_tag(p)?;
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 attribute(p)?;
                 p.eat(WS);
@@ -147,7 +149,9 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
             }
         }
         p.expect(R_ANGLE)?;
-        style_block(p)?;
+        if p.at(STYLE_CONTENT) {
+            style_block(p)?;
+        }
         if p.at(L_ANGLE) {
             p.bump();
             p.expect(SLASH)?;
@@ -167,7 +171,7 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn template_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_keyword("template")) {
+    if !(p.at_contextual_kw("template")) {
         p.error("expected to be at keyword 'template'")?;
     }
     p.expect(TAG_NAME)?;
@@ -175,7 +179,7 @@ pub fn template_tag(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn script_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_keyword("script")) {
+    if !(p.at_contextual_kw("script")) {
         p.error("expected to be at keyword 'script'")?;
     }
     p.expect(TAG_NAME)?;
@@ -183,7 +187,7 @@ pub fn script_tag(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn style_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_keyword("style")) {
+    if !(p.at_contextual_kw("style")) {
         p.error("expected to be at keyword 'style'")?;
     }
     p.expect(TAG_NAME)?;
@@ -195,7 +199,7 @@ pub fn template_content(p: &mut Parser) -> Option<Continue> {
         html_chardata(p)?;
     }
     while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
-        let mut _checkpoint = p.checkpoint(true);
+        let _checkpoint = p.checkpoint_ambiguous();
         catch!({
             if p.at(L_ANGLE) {
                 element(p)?;
@@ -222,7 +226,7 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
             html_chardata(p)?;
         }
         while p.at_ts(&tokenset![COMMENT, L_ANGLE, MUSTACHE]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 if p.at(L_ANGLE) {
                     element(p)?;
@@ -253,19 +257,19 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn attribute(p: &mut Parser) -> Option<Continue> {
-    if (p.at(COLON) || (p.at_keyword("v-bind") && p.at(TAG_NAME))) && {
+    if (p.at(COLON) || (p.at_contextual_kw("v-bind") && p.at(TAG_NAME))) && {
         // try --> ({ <predicate> }? TAG_NAME)? : attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_BINDING
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                if p.at_keyword("v-bind") && p.at(TAG_NAME) {
+                if p.at_contextual_kw("v-bind") && p.at(TAG_NAME) {
                     p.bump();
                 }
                 p.expect(COLON)?;
                 attribute_key(p)?;
                 while p.at(DOT) {
-                    let mut _checkpoint = p.checkpoint(true);
+                    let _checkpoint = p.checkpoint_ambiguous();
                     attribute_modifier(p);
                     if !p.commit(_checkpoint)?.is_ok() {
                         break;
@@ -293,20 +297,20 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at(AT) || (p.at_keyword("v-on") && p.at(TAG_NAME))) && {
+    } else if (p.at(AT) || (p.at_contextual_kw("v-on") && p.at(TAG_NAME))) && {
         // try --> ({ <predicate> }? TAG_NAME | @) attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_LISTENER
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                if p.at_keyword("v-on") && p.at(TAG_NAME) {
+                if p.at_contextual_kw("v-on") && p.at(TAG_NAME) {
                     p.bump();
                 } else if p.at(AT) {
                     p.bump();
                 }
                 attribute_key(p)?;
                 while p.at(DOT) {
-                    let mut _checkpoint = p.checkpoint(true);
+                    let _checkpoint = p.checkpoint_ambiguous();
                     attribute_modifier(p);
                     if !p.commit(_checkpoint)?.is_ok() {
                         break;
@@ -412,14 +416,14 @@ pub fn element(p: &mut Parser) -> Option<Continue> {
 
 pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
     p.expect(L_ANGLE)?;
-    if ((p.at_keyword("area") || p.at_keyword("base") || p.at_keyword("br") || p.at_keyword("col") || p.at_keyword("embed") || p.at_keyword("hr") || p.at_keyword("img") || p.at_keyword("input") || p.at_keyword("link") || p.at_keyword("meta") || p.at_keyword("param") || p.at_keyword("source") || p.at_keyword("track") || p.at_keyword("wbr")) && p.at(TAG_NAME)) && {
+    if ((p.at_contextual_kw("area") || p.at_contextual_kw("base") || p.at_contextual_kw("br") || p.at_contextual_kw("col") || p.at_contextual_kw("embed") || p.at_contextual_kw("hr") || p.at_contextual_kw("img") || p.at_contextual_kw("input") || p.at_contextual_kw("link") || p.at_contextual_kw("meta") || p.at_contextual_kw("param") || p.at_contextual_kw("source") || p.at_contextual_kw("track") || p.at_contextual_kw("wbr")) && p.at(TAG_NAME)) && {
         // try --> empty_element_tag_name (WS)? (attribute (WS)?)* (> | />)
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             empty_element_tag_name(p)?;
             p.eat(WS);
             while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-                let mut _checkpoint = p.checkpoint(true);
+                let _checkpoint = p.checkpoint_ambiguous();
                 catch!({
                     attribute(p)?;
                     p.eat(WS);
@@ -439,7 +443,7 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
         p.bump();
         p.eat(WS);
         while p.at_ts(&tokenset![AT, COLON, TAG_NAME]) {
-            let mut _checkpoint = p.checkpoint(true);
+            let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 attribute(p)?;
                 p.eat(WS);
@@ -477,33 +481,33 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
-    if p.at_keyword("area") && p.at(TAG_NAME) {
+    if p.at_contextual_kw("area") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("base") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("base") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("br") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("br") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("col") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("col") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("embed") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("embed") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("hr") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("hr") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("img") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("img") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("input") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("input") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("link") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("link") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("meta") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("meta") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("param") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("param") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("source") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("source") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("track") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("track") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_keyword("wbr") && p.at(TAG_NAME) {
+    } else if p.at_contextual_kw("wbr") && p.at(TAG_NAME) {
         p.bump();
     } else {
         // otherwise, emit an error

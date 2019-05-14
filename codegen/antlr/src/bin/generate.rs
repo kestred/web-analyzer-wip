@@ -205,6 +205,9 @@ fn emit_pattern<'a>(
             match repeat {
                 Repeat::ZeroOrOne => {
                     let ts = db.next_predicates_of(pat);
+                    if ts.is_empty() {
+                        return PatternType::Unit;
+                    }
                     if pat.is_term() {
                         emit_depth(out, dep);
                         out.push_str("p.eat(");
@@ -244,6 +247,9 @@ fn emit_pattern<'a>(
                 }
                 Repeat::ZeroOrMore => {
                     let ts = db.next_predicates_of(pat);
+                    if ts.is_empty() {
+                        return PatternType::Unit;
+                    }
                     if pat.is_term() {
                         let term = ts.into_iter().next().unwrap();
                         emit_depth(out, dep);
@@ -265,7 +271,8 @@ fn emit_pattern<'a>(
                             }
                         }
                         if !ts.is_disjoint(&followed_by_ts) || !db.does_parser_advance_unconditionally(pat) {
-                            emit_let_checkpoint(out, true, dep + 1);
+                            emit_depth(out, dep + 1);
+                            out.push_str("let _checkpoint = p.checkpoint_ambiguous();\n");
                             emit_catch(out, db, rule, pat, dep + 1, Precond::one_of(ts), None);
                             emit_depth(out, dep + 1);
                             out.push_str("if !p.commit(_checkpoint)?.is_ok() {\n");
@@ -315,12 +322,10 @@ fn emit_pattern<'a>(
             out.push_str(");\n");
         }
         Pattern::Node(kind, pat) => {
-            let marker_name = emit_let_marker(out, dep);
+            emit_let_marker(out, dep);
             let must_catch = emit_catch(out, db, rule, pat, dep, precond, Some("_ok"));
             emit_depth(out, dep);
-            out.push_str("p.complete(");
-            out.push_str(&marker_name);
-            out.push_str(", ");
+            out.push_str("p.complete(_marker, ");
             out.push_str(kind);
             out.push_str(");\n");
             if must_catch {
@@ -676,42 +681,7 @@ fn emit_choice_lr_precedence_climbing(out: &mut String, db: &Database, rule: &st
     let _ = (out, dep, head_ident);
     false
 
-    // TODO: Update implementation to be correct if I ever want to perform this transform
-    /*
-    emit_depth(out, dep);
-    out.push_str("fn ");
-    out.push_str(&head_ident);
-    out.push_str("(p: &mut Parser) -> Option<Continue> {\n");
-    emit_choice(out, db, rule, &head_pat, dep + 1, Precond::empty());
-    emit_depth(out, dep + 1);
-    out.push_str("Some(Continue)\n");
-    emit_depth(out, dep);
-    out.push_str("}\n\n");
-
-    // Emit prec parser
-    emit_depth(out, dep);
-    out.push_str("fn ");
-    out.push_str(&prec_ident);
-    out.push_str("(p: &mut Parser, prec: u32) {\n");
-    emit_pattern(out, db, rule, &Pattern::Ident(head_ident.clone()), dep + 1, Precond::empty(), &[]);
-    for (pat, prec) in prec_patterns.into_iter().rev() {
-        let (_, tail) = transform::unshift(pat).unwrap();
-        let suffix = transform::convert_next_nonterm(&tail, rule, &prec_ident, 0).0;
-        emit_depth(out, dep + 1);
-        let ts = db.next_predicates_of(&suffix);
-        out.push_str("while ");
-        emit_lookahead(out, ts);
-        out.push_str(" && prec <= ");
-        out.push_str(&prec.to_string());
-        out.push_str(" {\n");
-        emit_pattern(out, db, rule, &suffix, dep + 2, Precond::one_of(ts), &[]);
-        emit_depth(out, dep + 1);
-        out.push_str("}\n");
-    }
-    println!("info: performed lr_precedence_climbing for '{}'", rule);
-
-    true
-    */
+    // TODO: Implement precdence climbing parser
 }
 
 fn emit_choice_ll1(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u8, precond: Precond) {
@@ -880,26 +850,18 @@ fn emit_predicate_description(out: &mut String, expr: &PredicateExpression) {
     }
 }
 
-fn emit_let_marker(out: &mut String, dep: u8) -> String {
-    let marker_ident = format!("_marker");
+fn emit_let_marker(out: &mut String, dep: u8) {
     emit_depth(out, dep);
-    out.push_str("let ");
-    out.push_str(&marker_ident);
-    out.push_str(" = p.start();\n");
-    marker_ident
+    out.push_str("let _marker = p.start();\n");
 }
 
-fn emit_let_checkpoint(out: &mut String, rollback: bool, dep: u8) -> String {
-    let checkpoint_ident = format!("_checkpoint");
+fn emit_let_checkpoint(out: &mut String, rollback: bool, dep: u8) {
     emit_depth(out, dep);
-    out.push_str("let mut ");
-    out.push_str(&checkpoint_ident);
     if rollback {
-        out.push_str(" = p.checkpoint(true);\n");
+        out.push_str("let mut _checkpoint = p.checkpoint(true);\n");
     } else {
-        out.push_str(" = p.checkpoint(false);\n");
+        out.push_str("let mut _checkpoint = p.checkpoint(false);\n");
     }
-    checkpoint_ident
 }
 
 fn emit_tokenset_list<'a, Iter>(out: &mut String, iter: Iter)
