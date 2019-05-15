@@ -69,6 +69,35 @@ impl Expression {
     }
 }
 
+impl Pattern {
+    fn new(root: &SyntaxNode) -> TreeArc<Pattern> {
+        // N.B. an `Pattern` can be one of many different syntax kinds
+        Pattern::cast(root).unwrap().to_owned()
+    }
+
+    pub fn parse(text: &str) -> (TreeArc<Pattern>, &str) {
+        let tokens = JavascriptLexer::new().tokenize(text);
+        let parser = Parser::new((text, &tokens).into(), ParseConfig {
+            debug_repr: syntax_kind::as_debug_repr,
+            max_rollback_size: 4,
+            preserve_comments: false,
+            preserve_whitespace: false,
+        });
+        let (root, remainder) = parser.parse(grammar::pattern);
+        (Pattern::new(&root), remainder.text)
+    }
+
+    pub fn errors(&self) -> Vec<SyntaxError> {
+        self.syntax
+            .root_data().unwrap()
+            .downcast_ref::<Vec<(String, Location)>>().unwrap()
+            .into_iter()
+            .cloned()
+            .map(|(msg, loc)| SyntaxError::new(msg, loc))
+            .collect()
+    }
+}
+
 impl ClassDeclaration {
     pub fn id(&self) -> &Identifier {
         self.syntax.first_child().and_then(Identifier::cast).unwrap()

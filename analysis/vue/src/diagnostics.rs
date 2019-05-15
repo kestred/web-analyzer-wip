@@ -60,11 +60,12 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         None => return results,
     };
     let root = db.typescript_ast(source_id);
+    let script_block = component.script().unwrap().script().unwrap();
+    let script_pos = script_block.syntax.range().start();
     {
         let errors = root.errors();
         if !errors.is_empty() {
-            let script_block = component.script().unwrap().script().unwrap();
-            syntax_errors(&mut results, db, src_id, path.as_str(), script_block.syntax.range().start(), errors);
+            syntax_errors(&mut results, db, src_id, path.as_str(), script_pos, errors);
             return results
         }
     }
@@ -111,6 +112,14 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         },
         None => (),
     };
+    let vue_mixins = get_object_property(vue_options, "mixins")
+        .map(AstNode::syntax)
+        .and_then(ts::Expression::cast)
+        .map(infer_expression_type);
+    if vue_mixins.is_some() {
+        // TODO: Lookup mixin.... and mix it in!
+        return results;
+    }
     let vue_data_property = get_object_property(vue_options, "data");
     let vue_data = vue_data_property
         .and_then(|expr| {
@@ -120,7 +129,8 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
                     .and_then(|f| f.body())
                     .and_then(|f| f.body().last())
                     .and_then(|f| ts::ReturnStatement::cast(&f.syntax).or_else(|| {
-                        results.push("warn(internal): could not find `return ...` in component's `data` method".into());
+                        let pos = error_at(db, src_id, path.as_str(), script_pos + f.syntax.range().start());
+                        results.push(format!("warn(internal): [{}] could not find `return ...` in component's `data` method", pos));
                         None
                     }))
                     .and_then(|f| f.argument()),
@@ -139,8 +149,10 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
 
     if let Some(partial) = vue_data.as_ref().and_then(Ty::as_interface) {
         vm.merge(partial);
-    }  else if vue_data_property.is_some() {
-        results.push("warn(internal): could not infer type of component's `data`".into());
+    }  else if let Some(data) = vue_data_property {
+        let pos = error_at(db, src_id, path.as_str(), script_pos + data.syntax.range().start());
+        results.push(format!("warn(internal): [{}] could not infer type of component's `data`", pos));
+        return results;
     }
     let vue_computed = get_object_property(vue_options, "computed")
         .map(AstNode::syntax)
@@ -172,6 +184,21 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
         })
         .unwrap_or_else(|| InterfaceTy::default().into());
 
+    // TODO: Move `vue_store` into some sort of `extensions` or `contrib` module
+    let vue_apollo = get_object_property(vue_options, "store")
+        .map(AstNode::syntax)
+        .and_then(ts::Expression::cast)
+        .map(infer_expression_type);
+    if let Some(partial) = vue_apollo.as_ref().and_then(Ty::as_interface) {
+        let mut tmp = partial.clone();
+        tmp.properties = tmp.properties.into_iter().map(|prop| {
+            // N.B. Since we don't infer function return types yet,
+            //      convert computed properties to the _any_ type.
+            PropertyDef { ident: prop.ident, type_: Ty::Any.into() }
+        }).collect();
+        vm.merge(&tmp);
+    }
+
     // TODO: Move `vue_apollo` into some sort of `extensions` or `contrib` module
     let vue_apollo = get_object_property(vue_options, "apollo")
         .map(AstNode::syntax)
@@ -197,26 +224,19 @@ pub(crate) fn check(db: &impl VueDatabase, file_id: FileId) -> Vec<String> {
     let is_decl_in_template = |name: &str, range: TextRange| -> bool {
         template_declarations.iter().any(|(decl, scope, _item)| decl == name && range.is_subrange(scope))
     };
-    // eprintln!("{:?}", global);
-    // for component in &global.components {
-    //     eprintln!("Vue.component(\"{}\", ...)", component);
-    // }
-    // for filter in &global.filters {
-    //     eprintln!("Vue.filter(\"{}\", ...)", filter);
-    // }
     for (expr, range) in template_expressions {
         for (ident, node) in find_captured_environment(&expr) {
             if !vm.properties.iter().any(|p| p.ident == ident) &&
                 !ident.starts_with('$') &&
                 !is_global(ident) &&
-                !is_decl_in_template(ident, range) &&
+                !is_decl_in_template(ident, node.syntax.range() + range.start()) &&
                 // TODO: Only perform these check if the expression is in a filter
                 !vue_filters.properties.iter().any(|p| p.ident == ident) &&
                 !config.global.filters.iter().any(|f| f == ident) &&
                 !global.filters.contains(ident)
             {
                 let pos = error_at(db, src_id, path.as_str(), range.start() + node.syntax.range().start());
-                results.push(format!("error(vue): [{}] property `{}` is not defined on the component", pos, ident))
+                results.push(format!("error(vue): [{}] property `{}` is not defined on the component", pos, ident));
             }
         }
     }
@@ -573,26 +593,36 @@ fn collect_template_scope(template: &vue::Template) -> (Vec<(TextRange)>, Vec<(T
                             .next();
                         if let Some(SyntaxElement::Token(token)) = value {
                             if token.kind() != QUOTED {
-                                continue; // N.B. not a valid `v-for` expression
+                                continue; // N.B. not a valid `sloc-scope` value
                             }
 
-                            // TODO: This probably needs to be parsed as a pattern
+                            // Parse the scope as a pattern
                             let text = token.text().as_str();
-                            let offset = 1 + text[1..]
-                                .chars()
-                                .take_while(|&c| c.is_whitespace())
-                                .count();
-                            let len = text[offset .. text.len() - 1]
-                                .chars()
-                                .take_while(|&c| !c.is_whitespace())
-                                .count();
                             let range = token.range();
-                            let start = TextUnit::from_usize(range.start().to_usize() + offset);
-                            let end = TextUnit::from_usize(start.to_usize() + len);
-                            declarations.push((
-                                node.parent().unwrap().range(),
-                                TextRange::from_to(start, end)
-                            ));
+                            let trimmed = text[1 .. text.len() - 1].trim();
+                            let trim_offset = text[1..].chars().take_while(|&c| c.is_whitespace()).count();
+                            let (pattern, _) = js::Pattern::parse(trimmed);
+                            if !pattern.errors().is_empty() {
+                                continue;
+                            }
+
+
+                            let mut pat_decls = Vec::new();
+                            let mut pat_captures = Vec::new();
+                            collect_pattern_decls_and_captures(&pattern, &mut pat_decls, &mut pat_captures, true);
+
+                            // TODO: Maybe also save _captures_ to expressions
+                            // captures: &mut Vec<(&'a str, &'a ts::Expression)>
+                            for decl in pat_decls {
+                                if let Some((decl_offset, _)) = text.match_indices(decl).next() {
+                                    let start = TextUnit::from_usize(range.start().to_usize() + trim_offset + decl_offset);
+                                    let end = TextUnit::from_usize(start.to_usize() + decl.len());
+                                    declarations.push((
+                                        node.parent().unwrap().range(),
+                                        TextRange::from_to(start, end)
+                                    ));
+                                }
+                            }
                         }
                     }
                     "v-if" | "v-else-if" | "v-model" => {
@@ -620,7 +650,7 @@ fn collect_template_scope(template: &vue::Template) -> (Vec<(TextRange)>, Vec<(T
                             .next();
                         if let Some(SyntaxElement::Token(token)) = value {
                             if token.kind() != QUOTED {
-                                continue; // N.B. not a valid `v-for` expression
+                                continue; // N.B. not a valid `v-for` value
                             }
 
                             // Define simple scanner
@@ -635,10 +665,11 @@ fn collect_template_scope(template: &vue::Template) -> (Vec<(TextRange)>, Vec<(T
 
                             // Collect declarations
                             eat_whitespace(&mut pos);
-                            if text.starts_with("(") {
+                            if text.chars().nth(pos) == Some('(') {
                                 while text.len() > pos {
                                     eat_whitespace(&mut pos);
                                     if text.chars().nth(pos) == Some(')') {
+                                        pos += 1; // eat R_PAREN
                                         break;
                                     }
                                     pos += 1; // eat L_PAREN or COMMA
