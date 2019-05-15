@@ -171,7 +171,7 @@ pub fn component_style(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn template_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_contextual_kw("template")) {
+    if !(p.at_keyword("template")) {
         p.error("expected to be at keyword 'template'")?;
     }
     p.expect(TAG_NAME)?;
@@ -179,7 +179,7 @@ pub fn template_tag(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn script_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_contextual_kw("script")) {
+    if !(p.at_keyword("script")) {
         p.error("expected to be at keyword 'script'")?;
     }
     p.expect(TAG_NAME)?;
@@ -187,7 +187,7 @@ pub fn script_tag(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn style_tag(p: &mut Parser) -> Option<Continue> {
-    if !(p.at_contextual_kw("style")) {
+    if !(p.at_keyword("style")) {
         p.error("expected to be at keyword 'style'")?;
     }
     p.expect(TAG_NAME)?;
@@ -257,13 +257,13 @@ pub fn html_content(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn attribute(p: &mut Parser) -> Option<Continue> {
-    if (p.at(COLON) || (p.at_contextual_kw("v-bind") && p.at(TAG_NAME))) && {
-        // try --> ({ <predicate> }? TAG_NAME)? : attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_BINDING
+    if (p.at(COLON) || (p.at_keyword("v-bind") && p.at(TAG_NAME))) && {
+        // try --> ({ <predicate> }? TAG_NAME)? ':' attribute_key (attribute_modifier)* ((WS)? '=' (WS)? attribute_value)? #ATTRIBUTE_BINDING
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                if p.at_contextual_kw("v-bind") && p.at(TAG_NAME) {
+                if p.at_keyword("v-bind") && p.at(TAG_NAME) {
                     p.bump();
                 }
                 p.expect(COLON)?;
@@ -297,13 +297,13 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at(AT) || (p.at_contextual_kw("v-on") && p.at(TAG_NAME))) && {
-        // try --> ({ <predicate> }? TAG_NAME | @) attribute_key (attribute_modifier)* ((WS)? = (WS)? attribute_value)? #ATTRIBUTE_LISTENER
+    } else if (p.at(AT) || (p.at_keyword("v-on") && p.at(TAG_NAME))) && {
+        // try --> ({ <predicate> }? TAG_NAME | '@') attribute_key (attribute_modifier)* ((WS)? '=' (WS)? attribute_value)? #ATTRIBUTE_LISTENER
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                if p.at_contextual_kw("v-on") && p.at(TAG_NAME) {
+                if p.at_keyword("v-on") && p.at(TAG_NAME) {
                     p.bump();
                 } else if p.at(AT) {
                     p.bump();
@@ -339,7 +339,7 @@ pub fn attribute(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at(TAG_NAME) && {
-        // try --> TAG_NAME (WS)? = (WS)? attribute_value #ATTRIBUTE
+        // try --> TAG_NAME (WS)? '=' (WS)? attribute_value #ATTRIBUTE
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
@@ -416,8 +416,8 @@ pub fn element(p: &mut Parser) -> Option<Continue> {
 
 pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
     p.expect(L_ANGLE)?;
-    if ((p.at_contextual_kw("area") || p.at_contextual_kw("base") || p.at_contextual_kw("br") || p.at_contextual_kw("col") || p.at_contextual_kw("embed") || p.at_contextual_kw("hr") || p.at_contextual_kw("img") || p.at_contextual_kw("input") || p.at_contextual_kw("link") || p.at_contextual_kw("meta") || p.at_contextual_kw("param") || p.at_contextual_kw("source") || p.at_contextual_kw("track") || p.at_contextual_kw("wbr")) && p.at(TAG_NAME)) && {
-        // try --> empty_element_tag_name (WS)? (attribute (WS)?)* (> | />)
+    if ((p.at_keyword("area") || p.at_keyword("base") || p.at_keyword("br") || p.at_keyword("col") || p.at_keyword("embed") || p.at_keyword("hr") || p.at_keyword("img") || p.at_keyword("input") || p.at_keyword("link") || p.at_keyword("meta") || p.at_keyword("param") || p.at_keyword("source") || p.at_keyword("track") || p.at_keyword("wbr")) && p.at(TAG_NAME)) && {
+        // try --> empty_element_tag_name (WS)? (attribute (WS)?)* ('>' | '/>')
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             empty_element_tag_name(p)?;
@@ -481,33 +481,33 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
-    if p.at_contextual_kw("area") && p.at(TAG_NAME) {
+    if p.at_keyword("area") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("base") && p.at(TAG_NAME) {
+    } else if p.at_keyword("base") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("br") && p.at(TAG_NAME) {
+    } else if p.at_keyword("br") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("col") && p.at(TAG_NAME) {
+    } else if p.at_keyword("col") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("embed") && p.at(TAG_NAME) {
+    } else if p.at_keyword("embed") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("hr") && p.at(TAG_NAME) {
+    } else if p.at_keyword("hr") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("img") && p.at(TAG_NAME) {
+    } else if p.at_keyword("img") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("input") && p.at(TAG_NAME) {
+    } else if p.at_keyword("input") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("link") && p.at(TAG_NAME) {
+    } else if p.at_keyword("link") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("meta") && p.at(TAG_NAME) {
+    } else if p.at_keyword("meta") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("param") && p.at(TAG_NAME) {
+    } else if p.at_keyword("param") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("source") && p.at(TAG_NAME) {
+    } else if p.at_keyword("source") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("track") && p.at(TAG_NAME) {
+    } else if p.at_keyword("track") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("wbr") && p.at(TAG_NAME) {
+    } else if p.at_keyword("wbr") && p.at(TAG_NAME) {
         p.bump();
     } else {
         // otherwise, emit an error

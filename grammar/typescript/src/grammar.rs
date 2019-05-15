@@ -33,7 +33,7 @@ pub fn module_declaration(p: &mut Parser) -> Option<Continue> {
         import_declaration(p)?;
     } else if p.at(EXPORT_KW) {
         export_declaration(p)?;
-    } else if p.at_contextual_kw("declare") && p.at(IDENTIFIER) {
+    } else if p.at_keyword("declare") && p.at(IDENTIFIER) {
         ts_declare_declaration(p)?;
     } else {
         p.expected_ts_in("module_declaration", &tokenset![EXPORT_KW, IDENTIFIER, IMPORT_KW])?;
@@ -49,12 +49,9 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.bump();
         export_specifier_list(p)?;
         p.expect(R_CURLY)?;
-        if p.at_contextual_kw("from") && p.at(IDENTIFIER) {
-            from_kw(p)?;
-            if !(p.at(STRING_LITERAL)) {
-                p.error("expected to be at STRING_LITERAL")?;
-            }
-            literal(p)?;
+        if p.at_keyword("from") && p.at(IDENTIFIER) {
+            p.expect_keyword(FROM_KW, "from")?;
+            module_path(p)?;
         }
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
@@ -65,7 +62,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     } else if p.at(CLASS_KW) {
         class_declaration(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
-    } else if (p.at(FUNCTION_KW) || (p.at_contextual_kw("async") && p.at(IDENTIFIER))) && {
+    } else if (p.at(FUNCTION_KW) || (p.at_keyword("async") && p.at(IDENTIFIER))) && {
         // try --> function_declaration #EXPORT_NAMED_DECLARATION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -79,7 +76,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     } else if p.at(INTERFACE_KW) {
         ts_interface_declaration(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
-    } else if p.at_contextual_kw("type") && p.at(IDENTIFIER) {
+    } else if p.at_keyword("type") && p.at(IDENTIFIER) {
         ts_alias_declaration(p)?;
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
@@ -93,11 +90,8 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.complete(_checkpoint.branch(&_marker), EXPORT_DEFAULT_DECLARATION);
     } else if p.at(ASTERISK) {
         p.bump();
-        from_kw(p)?;
-        if !(p.at(STRING_LITERAL)) {
-            p.error("expected to be at STRING_LITERAL")?;
-        }
-        literal(p)?;
+        p.expect_keyword(FROM_KW, "from")?;
+        module_path(p)?;
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
     } else {
@@ -151,7 +145,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
         eos(p)?;
-    } else if (p.at(FUNCTION_KW) || (p.at_contextual_kw("async") && p.at(IDENTIFIER))) && {
+    } else if (p.at(FUNCTION_KW) || (p.at_keyword("async") && p.at(IDENTIFIER))) && {
         // try --> function_declaration
         let mut _checkpoint = p.checkpoint(true);
         function_declaration(p);
@@ -160,7 +154,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at(INTERFACE_KW) {
         ts_interface_declaration(p)?;
-    } else if (p.at_contextual_kw("type") && p.at(IDENTIFIER)) && {
+    } else if (p.at_keyword("type") && p.at(IDENTIFIER)) && {
         // try --> ts_alias_declaration eos
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -173,7 +167,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at(ENUM_KW) {
         ts_enum_declaration(p)?;
-    } else if ((p.at_contextual_kw("async") && !p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at(IDENTIFIER)) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION))) && {
+    } else if ((p.at_keyword("async") && !p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at(IDENTIFIER)) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION))) && {
         // try --> expression_statement
         let mut _checkpoint = p.checkpoint(true);
         expression_statement(p);
@@ -295,7 +289,7 @@ pub fn ts_type_predicate(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         identifier(p)?;
-        is_kw(p)?;
+        p.expect_keyword(IS_KW, "is")?;
         ts_type_annotation(p)?;
         Some(Continue)
     });
@@ -304,15 +298,15 @@ pub fn ts_type_predicate(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn ts_declare_declaration(p: &mut Parser) -> Option<Continue> {
-    declare_kw(p)?;
-    if (p.at_contextual_kw("module") && p.at(IDENTIFIER)) && {
+    p.expect_keyword(DECLARE_KW, "declare")?;
+    if (p.at_keyword("module") && p.at(IDENTIFIER)) && {
         // try --> ts_module_declaration
         let mut _checkpoint = p.checkpoint(true);
         ts_module_declaration(p);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if p.at_contextual_kw("namespace") && p.at(IDENTIFIER) {
+    } else if p.at_keyword("namespace") && p.at(IDENTIFIER) {
         ts_namespace_declaration(p)?;
     } else {
         // otherwise, emit an error
@@ -322,7 +316,7 @@ pub fn ts_declare_declaration(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn ts_module_declaration(p: &mut Parser) -> Option<Continue> {
-    module_kw(p)?;
+    p.expect_keyword(MODULE_KW, "module")?;
     module_path(p)?;
     if p.at(L_CURLY) {
         p.bump();
@@ -343,7 +337,7 @@ pub fn ts_module_declaration(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn ts_namespace_declaration(p: &mut Parser) -> Option<Continue> {
-    namespace_kw(p)?;
+    p.expect_keyword(NAMESPACE_KW, "namespace")?;
     identifier(p)?;
     p.expect(L_CURLY)?;
     while p.at_ts(&tokenset![EXPORT_KW, IMPORT_KW, INTERFACE_KW]) {
@@ -468,7 +462,7 @@ pub fn ts_method_type(p: &mut Parser) -> Option<Continue> {
 pub fn ts_alias_declaration(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        type_kw(p)?;
+        p.expect_keyword(TYPE_KW, "type")?;
         identifier(p)?;
         p.expect(EQ)?;
         ts_type_annotation(p)?;
@@ -694,71 +688,6 @@ pub fn ts_type_argument(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
-pub fn type_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("type")) {
-            p.error("expected to be at keyword 'type'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, TYPE_KW);
-    _ok
-}
-
-pub fn declare_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("declare")) {
-            p.error("expected to be at keyword 'declare'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, DECLARE_KW);
-    _ok
-}
-
-pub fn namespace_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("namespace")) {
-            p.error("expected to be at keyword 'namespace'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, NAMESPACE_KW);
-    _ok
-}
-
-pub fn module_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("module")) {
-            p.error("expected to be at keyword 'module'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, MODULE_KW);
-    _ok
-}
-
-pub fn is_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("is")) {
-            p.error("expected to be at keyword 'is'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, IS_KW);
-    _ok
-}
-
 pub fn source_element(p: &mut Parser) -> Option<Continue> {
     if (p.at_ts(&_TS3) || (!p.at(L_CURLY) && !p.at(FUNCTION_KW) && p.at_ts(&_TS1))) && {
         // try --> statement
@@ -767,7 +696,7 @@ pub fn source_element(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if p.at_ts(&tokenset![EXPORT_KW, IMPORT_KW]) || (p.at_contextual_kw("declare") && p.at(IDENTIFIER)) {
+    } else if p.at_ts(&tokenset![EXPORT_KW, IMPORT_KW]) || (p.at_keyword("declare") && p.at(IDENTIFIER)) {
         module_declaration(p)?;
     } else {
         // otherwise, emit an error
@@ -796,8 +725,8 @@ pub fn export_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         identifier(p)?;
-        if p.at_contextual_kw("as") && p.at(IDENTIFIER) {
-            as_kw(p)?;
+        if p.at_keyword("as") && p.at(IDENTIFIER) {
+            p.expect_keyword(AS_KW, "as")?;
             identifier(p)?;
         }
         Some(Continue)
@@ -812,7 +741,7 @@ pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
     p.expect(IMPORT_KW)?;
     if p.at_ts(&tokenset![ASTERISK, IDENTIFIER, L_CURLY]) {
         import_declaration_list(p)?;
-        from_kw(p)?;
+        p.expect_keyword(FROM_KW, "from")?;
         module_path(p)?;
         eos(p)?;
         p.complete(_checkpoint.branch(&_marker), IMPORT_DECLARATION);
@@ -858,8 +787,8 @@ pub fn import_specifier_atom(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         identifier(p)?;
-        if p.at_contextual_kw("as") && p.at(IDENTIFIER) {
-            as_kw(p)?;
+        if p.at_keyword("as") && p.at(IDENTIFIER) {
+            p.expect_keyword(AS_KW, "as")?;
             identifier(p)?;
         }
         Some(Continue)
@@ -880,7 +809,7 @@ pub fn import_specifier_special(p: &mut Parser) -> Option<Continue> {
         let _marker = p.start();
         let _ok = catch!({
             p.bump();
-            as_kw(p)?;
+            p.expect_keyword(AS_KW, "as")?;
             identifier(p)?;
             Some(Continue)
         });
@@ -947,7 +876,7 @@ pub fn variable_declarator_list(p: &mut Parser) -> Option<Continue> {
 pub fn variable_declarator(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        pattern(p)?;
+        pattern_uninit(p)?;
         if p.at(EQ) {
             p.bump();
             expression(p)?;
@@ -1003,7 +932,7 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
     p.expect(FOR_KW)?;
     p.expect(L_PAREN)?;
     if p.at_ts(&_TS4) && {
-        // try --> (expression_list)? ; (expression_list)? ; (expression_list)? ) statement_list #FOR_STATEMENT
+        // try --> (expression_list)? ';' (expression_list)? ';' (expression_list)? ')' statement_list #FOR_STATEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             if p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION) {
@@ -1026,7 +955,7 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) && {
-        // try --> variable_declaration ; (expression_list)? ; (expression_list)? ) statement #FOR_STATEMENT
+        // try --> variable_declaration ';' (expression_list)? ';' (expression_list)? ')' statement #FOR_STATEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             variable_declaration(p)?;
@@ -1047,7 +976,7 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION) && {
-        // try --> expression IN_KW expression ) statement_list #FOR_IN_STATEMENT
+        // try --> expression IN_KW expression ')' statement_list #FOR_IN_STATEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             expression(p)?;
@@ -1062,7 +991,7 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) && {
-        // try --> variable_declaration IN_KW expression ) statement #FOR_IN_STATEMENT
+        // try --> variable_declaration IN_KW expression ')' statement #FOR_IN_STATEMENT
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             variable_declaration(p)?;
@@ -1078,14 +1007,14 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION) {
         expression(p)?;
-        of_kw(p)?;
+        p.expect_keyword(OF_KW, "of")?;
         expression(p)?;
         p.expect(R_PAREN)?;
         statement_list(p)?;
         p.complete(_checkpoint.branch(&_marker), FOR_OF_STATEMENT);
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
-        of_kw(p)?;
+        p.expect_keyword(OF_KW, "of")?;
         expression(p)?;
         p.expect(R_PAREN)?;
         statement(p)?;
@@ -1159,7 +1088,7 @@ pub fn return_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(RETURN_KW)?;
-        if (!p.at_line_terminator() && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION)) || (p.at_contextual_kw("async") && !p.at_line_terminator() && p.at(IDENTIFIER)) {
+        if (!p.at_line_terminator() && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION)) || (p.at_keyword("async") && !p.at_line_terminator() && p.at(IDENTIFIER)) {
             if !(!p.at_line_terminator()) {
                 p.error("expected to be not at line terminator")?;
             }
@@ -1338,8 +1267,8 @@ pub fn debugger_statement(p: &mut Parser) -> Option<Continue> {
 pub fn function_declaration(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
-            async_kw(p)?;
+        if p.at_keyword("async") && p.at(IDENTIFIER) {
+            p.expect_keyword(ASYNC_KW, "async")?;
             p.expect(FUNCTION_KW)?;
         } else if p.at(FUNCTION_KW) {
             p.bump();
@@ -1422,7 +1351,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_contextual_kw("get") && p.at(IDENTIFIER)) && {
+    } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
         // try --> getter getter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1434,7 +1363,7 @@ pub fn method_definition(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_contextual_kw("set") && p.at(IDENTIFIER)) && {
+    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
         // try --> setter setter_tail #METHOD_DEFINITION
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1470,11 +1399,11 @@ pub fn method_tail(p: &mut Parser) -> Option<Continue> {
 pub fn generator_method(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at(ASTERISK) || (p.at_contextual_kw("async") && p.at(IDENTIFIER)) {
+        if p.at(ASTERISK) || (p.at_keyword("async") && p.at(IDENTIFIER)) {
             if p.at(ASTERISK) {
                 p.bump();
-            } else if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
-                async_kw(p)?;
+            } else if p.at_keyword("async") && p.at(IDENTIFIER) {
+                p.expect_keyword(ASYNC_KW, "async")?;
             }
         }
         identifier_or_keyword(p)?;
@@ -1694,7 +1623,7 @@ pub fn pattern_uninit(p: &mut Parser) -> Option<Continue> {
 
 pub fn assignment_property(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_IDENTIFIER_OR_KEYWORD) && {
-        // try --> identifier_or_keyword : pattern #PROPERTY
+        // try --> identifier_or_keyword ':' pattern #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
@@ -1779,7 +1708,7 @@ pub fn identifier(p: &mut Parser) -> Option<Continue> {
 
 pub fn property(p: &mut Parser) -> Option<Continue> {
     if p.at_ts(&AT_PROPERTY_NAME) && {
-        // try --> property_name : expression #PROPERTY
+        // try --> property_name ':' expression #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
@@ -1812,7 +1741,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         if _ok.is_none() {
             return None;
         }
-    } else if (p.at_contextual_kw("get") && p.at(IDENTIFIER)) && {
+    } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
         // try --> getter getter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1831,7 +1760,7 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
-    } else if (p.at_contextual_kw("set") && p.at(IDENTIFIER)) && {
+    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
         // try --> setter setter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
@@ -1999,8 +1928,8 @@ pub fn function_expression(p: &mut Parser) -> Option<Continue> {
 pub fn arrow_function_expression(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
-        if p.at_contextual_kw("async") && p.at(IDENTIFIER) {
-            async_kw(p)?;
+        if p.at_keyword("async") && p.at(IDENTIFIER) {
+            p.expect_keyword(ASYNC_KW, "async")?;
         }
         arrow_function_parameters(p)?;
         p.expect(FAT_ARROW)?;
@@ -2086,93 +2015,15 @@ pub fn keyword(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn getter(p: &mut Parser) -> Option<Continue> {
-    get_kw(p)?;
+    p.expect_keyword(GET_KW, "get")?;
     property_name(p)?;
     Some(Continue)
 }
 
 pub fn setter(p: &mut Parser) -> Option<Continue> {
-    set_kw(p)?;
+    p.expect_keyword(SET_KW, "set")?;
     property_name(p)?;
     Some(Continue)
-}
-
-pub fn as_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("as")) {
-            p.error("expected to be at keyword 'as'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, AS_KW);
-    _ok
-}
-
-pub fn from_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("from")) {
-            p.error("expected to be at keyword 'from'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, FROM_KW);
-    _ok
-}
-
-pub fn get_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("get")) {
-            p.error("expected to be at keyword 'get'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, GET_KW);
-    _ok
-}
-
-pub fn set_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("set")) {
-            p.error("expected to be at keyword 'set'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, SET_KW);
-    _ok
-}
-
-pub fn of_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("of")) {
-            p.error("expected to be at keyword 'of'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, OF_KW);
-    _ok
-}
-
-pub fn async_kw(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        if !(p.at_contextual_kw("async")) {
-            p.error("expected to be at keyword 'async'")?;
-        }
-        p.expect(IDENTIFIER)?;
-        Some(Continue)
-    });
-    p.complete(_marker, ASYNC_KW);
-    _ok
 }
 
 pub fn eos(p: &mut Parser) -> Option<Continue> {

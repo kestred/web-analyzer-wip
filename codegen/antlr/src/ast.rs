@@ -34,8 +34,14 @@ pub enum Pattern {
     /// A non-terminal or terminal (e.g. `L_PAREN`)
     Ident(String),
 
-    /// A literal string (e.g. `"keyword"`)
+    /// A literal representation of a terminal (e.g. `'++'`)
     Literal(String),
+
+    /// A compound literal token that should be parsed from single character tokens (e.g. `~'<<'`)
+    Compound(Vec<char>),
+
+    /// A contextual keyword (e.g. `"keyword"`)
+    Keyword(String),
 
     /// Multiple patterns matched in a row (e.g. `L_PAREN IDENT R_PAREN`)
     Series(Vec<Pattern>),
@@ -77,6 +83,7 @@ impl Pattern {
         match self {
             Pattern::Ident(ident) if is_term(ident) => true,
             Pattern::Literal(_) => true,
+            Pattern::Compound(_) => true,
             _ => false,
         }
     }
@@ -113,7 +120,9 @@ impl fmt::Display for Pattern {
         match self {
             Pattern::Empty => Ok(()),
             Pattern::Ident(ident) => write!(f, "{}", ident),
-            Pattern::Literal(lit) => write!(f, "{}", lit),
+            Pattern::Literal(lit) => write!(f, "'{}'", lit),
+            Pattern::Compound(chars) => write!(f, "@'{}'", chars.iter().collect::<String>()),
+            Pattern::Keyword(keyword) => write!(f, "\"{}\"", keyword),
             Pattern::Series(series) => write!(f, "{}", series.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" ")),
             Pattern::Choice(choices) => write!(f, "({})", choices.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" | ")),
             Pattern::Repeat(pattern, repeat) => match repeat {

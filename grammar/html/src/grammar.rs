@@ -38,7 +38,7 @@ pub fn doctype(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(L_ANGLE_BANG)?;
-        if !(p.at_contextual_kw("DOCTYPE")) {
+        if !(p.at_keyword("DOCTYPE")) {
             p.error("expected to be at keyword 'DOCTYPE'")?;
         }
         p.expect(IDENT)?;
@@ -76,8 +76,8 @@ pub fn element(p: &mut Parser) -> Option<Continue> {
 
 pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
     p.expect(L_ANGLE)?;
-    if ((p.at_contextual_kw("area") || p.at_contextual_kw("base") || p.at_contextual_kw("br") || p.at_contextual_kw("col") || p.at_contextual_kw("embed") || p.at_contextual_kw("hr") || p.at_contextual_kw("img") || p.at_contextual_kw("input") || p.at_contextual_kw("link") || p.at_contextual_kw("meta") || p.at_contextual_kw("param") || p.at_contextual_kw("source") || p.at_contextual_kw("track") || p.at_contextual_kw("wbr")) && p.at(TAG_NAME)) && {
-        // try --> empty_element_tag_name (WS)? (attribute (WS)?)* (> | />)
+    if ((p.at_keyword("area") || p.at_keyword("base") || p.at_keyword("br") || p.at_keyword("col") || p.at_keyword("embed") || p.at_keyword("hr") || p.at_keyword("img") || p.at_keyword("input") || p.at_keyword("link") || p.at_keyword("meta") || p.at_keyword("param") || p.at_keyword("source") || p.at_keyword("track") || p.at_keyword("wbr")) && p.at(TAG_NAME)) && {
+        // try --> empty_element_tag_name (WS)? (attribute (WS)?)* ('>' | '/>')
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             empty_element_tag_name(p)?;
@@ -141,33 +141,33 @@ pub fn element_pattern(p: &mut Parser) -> Option<Continue> {
 }
 
 pub fn empty_element_tag_name(p: &mut Parser) -> Option<Continue> {
-    if p.at_contextual_kw("area") && p.at(TAG_NAME) {
+    if p.at_keyword("area") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("base") && p.at(TAG_NAME) {
+    } else if p.at_keyword("base") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("br") && p.at(TAG_NAME) {
+    } else if p.at_keyword("br") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("col") && p.at(TAG_NAME) {
+    } else if p.at_keyword("col") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("embed") && p.at(TAG_NAME) {
+    } else if p.at_keyword("embed") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("hr") && p.at(TAG_NAME) {
+    } else if p.at_keyword("hr") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("img") && p.at(TAG_NAME) {
+    } else if p.at_keyword("img") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("input") && p.at(TAG_NAME) {
+    } else if p.at_keyword("input") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("link") && p.at(TAG_NAME) {
+    } else if p.at_keyword("link") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("meta") && p.at(TAG_NAME) {
+    } else if p.at_keyword("meta") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("param") && p.at(TAG_NAME) {
+    } else if p.at_keyword("param") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("source") && p.at(TAG_NAME) {
+    } else if p.at_keyword("source") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("track") && p.at(TAG_NAME) {
+    } else if p.at_keyword("track") && p.at(TAG_NAME) {
         p.bump();
-    } else if p.at_contextual_kw("wbr") && p.at(TAG_NAME) {
+    } else if p.at_keyword("wbr") && p.at(TAG_NAME) {
         p.bump();
     } else {
         // otherwise, emit an error

@@ -35,7 +35,7 @@ document
     ;
 
 doctype
-    : '<!' {at_contextual_kw("DOCTYPE")}? IDENT WS? ((IDENT | QUOTED) WS?)+ '>'
+    : '<!' {at_keyword("DOCTYPE")}? IDENT WS? ((IDENT | QUOTED) WS?)+ '>'
     # DOCUMENT_TYPE
     ;
 
@@ -55,20 +55,20 @@ element_pattern
     ;
 
 empty_element_tag_name
-    : {at_contextual_kw("area")}? TAG_NAME
-    | {at_contextual_kw("base")}? TAG_NAME
-    | {at_contextual_kw("br")}? TAG_NAME
-    | {at_contextual_kw("col")}? TAG_NAME
-    | {at_contextual_kw("embed")}? TAG_NAME
-    | {at_contextual_kw("hr")}? TAG_NAME
-    | {at_contextual_kw("img")}? TAG_NAME
-    | {at_contextual_kw("input")}? TAG_NAME
-    | {at_contextual_kw("link")}? TAG_NAME
-    | {at_contextual_kw("meta")}? TAG_NAME
-    | {at_contextual_kw("param")}? TAG_NAME
-    | {at_contextual_kw("source")}? TAG_NAME
-    | {at_contextual_kw("track")}? TAG_NAME
-    | {at_contextual_kw("wbr")}? TAG_NAME
+    : {at_keyword("area")}? TAG_NAME
+    | {at_keyword("base")}? TAG_NAME
+    | {at_keyword("br")}? TAG_NAME
+    | {at_keyword("col")}? TAG_NAME
+    | {at_keyword("embed")}? TAG_NAME
+    | {at_keyword("hr")}? TAG_NAME
+    | {at_keyword("img")}? TAG_NAME
+    | {at_keyword("input")}? TAG_NAME
+    | {at_keyword("link")}? TAG_NAME
+    | {at_keyword("meta")}? TAG_NAME
+    | {at_keyword("param")}? TAG_NAME
+    | {at_keyword("source")}? TAG_NAME
+    | {at_keyword("track")}? TAG_NAME
+    | {at_keyword("wbr")}? TAG_NAME
     ;
 
 attribute

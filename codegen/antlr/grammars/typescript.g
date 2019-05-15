@@ -14,7 +14,7 @@ module_declaration
     ;
 
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (from_kw {at(STRING_LITERAL)}? literal)? eos
+    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? eos
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW variable_declaration eos
     # EXPORT_NAMED_DECLARATION
@@ -30,7 +30,7 @@ export_declaration
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW DEFAULT_KW expression eos
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK from_kw {at(STRING_LITERAL)}? literal eos
+    | EXPORT_KW ASTERISK @"from" module_path eos
     # EXPORT_ALL_DECLARATION
     ;
 
@@ -89,11 +89,11 @@ expression
     /* Binary Operators */
     | expression ('*' | '/' | '%') expression              # BINARY_EXPRESSION
     | expression ('+' | '-') expression                    # BINARY_EXPRESSION
-    | expression ('<<' | '>>' | '>>>') expression          # BINARY_EXPRESSION
-    | expression ('<' | '>' | '<=' | '>=') expression      # BINARY_EXPRESSION
+    | expression (@'<<' | @'>>' | @'>>>') expression       # BINARY_EXPRESSION
+    | expression ('<' | '>' | @'<=' | @'>=') expression    # BINARY_EXPRESSION
     | expression INSTANCEOF_KW expression                  # BINARY_EXPRESSION
     | expression IN_KW expression                          # BINARY_EXPRESSION
-    | expression as_kw ts_type_annotation                           # TS_AS_EXPRESSION
+    | expression @"as" ts_type_annotation                           # TS_AS_EXPRESSION
     | expression ('==' | '!=' | '===' | '!==') expression  # BINARY_EXPRESSION
     | expression '&' expression                            # BINARY_EXPRESSION
     | expression '^' expression                            # BINARY_EXPRESSION
@@ -147,22 +147,22 @@ function_return_type
     ;
 
 ts_type_predicate
-    : identifier is_kw ts_type_annotation
+    : identifier @"is" ts_type_annotation
     # TYPE_PREDICATE
     ;
 
 ts_declare_declaration
-    : declare_kw ts_module_declaration
-    | declare_kw ts_namespace_declaration
+    : @"declare" ts_module_declaration
+    | @"declare" ts_namespace_declaration
     ;
 
 ts_module_declaration
-    : module_kw module_path '{' ts_d_source_element* '}'
-    | module_kw module_path ';'
+    : @"module" module_path '{' ts_d_source_element* '}'
+    | @"module" module_path ';'
     ;
 
 ts_namespace_declaration
-    : namespace_kw identifier '{' ts_d_source_element* '}'
+    : @"namespace" identifier '{' ts_d_source_element* '}'
     ;
 
 ts_d_source_element
@@ -191,7 +191,7 @@ ts_method_type
     ;
 
 ts_alias_declaration
-    : type_kw identifier '=' ts_type_annotation
+    : @"type" identifier '=' ts_type_annotation
     # ALIAS_DECLARATION
     ;
 
@@ -271,40 +271,10 @@ ts_tuple_type
     ;
 
 ts_type_arguments
-    : '<' ts_type_argument (',' ts_type_argument)* {split(SHR, &[R_ANGLE, R_ANGLE])}? '>'
+    : '<' ts_type_argument (',' ts_type_argument)* '>'
     ;
 
 ts_type_argument
     : ts_type_annotation
     # TYPE_PARAMETER_INSTANTIATION
-    ;
-
-type_kw
-    : {at_contextual_kw("type")}? IDENTIFIER
-    # TYPE_KW
-    ;
-
-declare_kw
-    : {at_contextual_kw("declare")}? IDENTIFIER
-    # DECLARE_KW
-    ;
-
-namespace_kw
-    : {at_contextual_kw("namespace")}? IDENTIFIER
-    # NAMESPACE_KW
-    ;
-
-module_kw
-    : {at_contextual_kw("module")}? IDENTIFIER
-    # MODULE_KW
-    ;
-
-keyof_kw
-    : {at_contextual_kw("keyof")}? IDENTIFIER
-    # KEYOF_KW
-    ;
-
-is_kw
-    : {at_contextual_kw("is")}? IDENTIFIER
-    # IS_KW
     ;

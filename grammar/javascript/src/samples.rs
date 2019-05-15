@@ -209,14 +209,12 @@ PROGRAM@[0; 621)
     IDENTIFIER@[254; 265)
       IDENTIFIER@[254; 265)  "createTable"
     L_PAREN@[265; 266)  "("
-    ASSIGNMENT_PATTERN@[266; 270)
-      IDENTIFIER@[266; 270)
-        IDENTIFIER@[266; 270)  "rows"
+    IDENTIFIER@[266; 270)
+      IDENTIFIER@[266; 270)  "rows"
     COMMA@[270; 271)  ","
     WHITESPACE@[271; 272)
-    ASSIGNMENT_PATTERN@[272; 276)
-      IDENTIFIER@[272; 276)
-        IDENTIFIER@[272; 276)  "cols"
+    IDENTIFIER@[272; 276)
+      IDENTIFIER@[272; 276)  "cols"
     R_PAREN@[276; 277)  ")"
     WHITESPACE@[277; 278)
     BLOCK_STATEMENT@[278; 621)
@@ -437,8 +435,7 @@ PROGRAM@[0; 942)
       IDENTIFIER@[8; 11)
         IDENTIFIER@[8; 11)  "Vue"
     WHITESPACE@[11; 12)
-    FROM_KW@[12; 16)
-      IDENTIFIER@[12; 16)  "from"
+    FROM_KW@[12; 16)  "from"
     WHITESPACE@[16; 17)
     LITERAL@[17; 22)
       STRING_LITERAL@[17; 22)  "\"vue\""
@@ -599,8 +596,7 @@ PROGRAM@[0; 942)
             WHITESPACE@[246; 251)
             PROPERTY@[251; 934)
               FUNCTION_EXPRESSION@[251; 934)
-                ASYNC_KW@[251; 256)
-                  IDENTIFIER@[251; 256)  "async"
+                ASYNC_KW@[251; 256)  "async"
                 WHITESPACE@[256; 257)
                 IDENTIFIER@[257; 261)
                   IDENTIFIER@[257; 261)  "load"
@@ -652,7 +648,8 @@ PROGRAM@[0; 942)
                           WHITESPACE@[340; 341)
                           EQ@[341; 342)  "="
                           WHITESPACE@[342; 343)
-                          TEMPLATE_LITERAL@[343; 590)
+                          TEMPLATE_EXPRESSION@[343; 590)
+                            TEMPLATE_LITERAL@[343; 590)
                       SEMICOLON@[590; 591)  ";"
                       WHITESPACE@[591; 600)
                       VARIABLE_DECLARATION@[600; 668)

@@ -108,6 +108,7 @@ parser!(fn atom_recursive(input: &mut Input) -> Pattern {
         token_literal().map(Pattern::Literal),
         group(),
         predicate(),
+        contextual(),
     ))
     .parse_stream(input)
 });
@@ -117,6 +118,21 @@ parser!(fn group() -> Pattern {
     , pattern().skip(ws())
     , token(')').skip(ws())
     ).map(|(_, pattern, _)| pattern.flatten_once())
+});
+
+parser!(fn contextual() -> Pattern {
+    ( token('@')
+    , choice((
+        token_literal().map(|lit| {
+            let chars = lit.chars().collect();
+            Pattern::Compound(chars)
+        }),
+        string_literal().map(|lit| {
+            let keyword = lit[1 .. lit.len()-1].to_string();
+            Pattern::Keyword(keyword)
+        }),
+    ))
+    ).map(|(_, pat)| pat)
 });
 
 parser!(fn repeat() -> Repeat {

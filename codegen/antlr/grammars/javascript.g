@@ -52,7 +52,7 @@ module_path
     ;
 
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (from_kw module_path)? eos
+    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? eos
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW variable_declaration eos
     # EXPORT_NAMED_DECLARATION
@@ -62,7 +62,7 @@ export_declaration
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW DEFAULT_KW expression eos
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK from_kw module_path eos
+    | EXPORT_KW ASTERISK @"from" module_path eos
     # EXPORT_ALL_DECLARATION
     ;
 
@@ -71,12 +71,12 @@ export_specifier_list
     ;
 
 export_specifier_atom
-    : identifier (as_kw identifier)?
+    : identifier (@"as" identifier)?
     # EXPORT_SPECIFIER
     ;
 
 import_declaration
-    : IMPORT_KW import_declaration_list from_kw module_path eos
+    : IMPORT_KW import_declaration_list @"from" module_path eos
     # IMPORT_DECLARATION
     | IMPORT_KW module_path eos
     # IMPORT_DECLARATION
@@ -92,14 +92,14 @@ import_specifier_list
     ;
 
 import_specifier_atom
-    : identifier (as_kw identifier)?
+    : identifier (@"as" identifier)?
     # IMPORT_SPECIFIER
     ;
 
 import_specifier_special
     : identifier
     # IMPORT_DEFAULT_SPECIFIER
-    | ASTERISK as_kw identifier
+    | ASTERISK @"as" identifier
     # IMPORT_NAMESPACE_SPECIFIER
     ;
 
@@ -150,7 +150,7 @@ variable_declarator_list
     ;
 
 variable_declarator
-    : pattern ('=' expression)?  // ES6: Array & Object Matching
+    : pattern_uninit ('=' expression)?  // ES6: Array & Object Matching
     # VARIABLE_DECLARATOR
     ;
 
@@ -182,10 +182,10 @@ for_statement
     | FOR_KW '(' variable_declaration IN_KW expression ')' statement
     # FOR_IN_STATEMENT
 
-    | FOR_KW '(' expression of_kw expression ')' statement_list
+    | FOR_KW '(' expression @"of" expression ')' statement_list
     # FOR_OF_STATEMENT
 
-    | FOR_KW '(' variable_declaration of_kw expression ')' statement
+    | FOR_KW '(' variable_declaration @"of" expression ')' statement
     # FOR_OF_STATEMENT
     ;
 
@@ -272,7 +272,7 @@ debugger_statement
     ;
 
 function_declaration
-    : (async_kw FUNCTION_KW | FUNCTION_KW '*'?) identifier function_parameters function_body
+    : (@"async" FUNCTION_KW | FUNCTION_KW '*'?) identifier function_parameters function_body
     # FUNCTION_DECLARATION
     ;
 
@@ -312,7 +312,7 @@ method_tail
     ;
 
 generator_method
-    : ('*' | async_kw)? identifier_or_keyword function_parameters function_body
+    : ('*' | @"async")? identifier_or_keyword function_parameters function_body
     # FUNCTION_EXPRESSION
     ;
 
@@ -511,8 +511,8 @@ expression
     /* Binary Operators */
     | expression ('*' | '/' | '%') expression              # BINARY_EXPRESSION
     | expression ('+' | '-') expression                    # BINARY_EXPRESSION
-    | expression ('<<' | '>>' | '>>>') expression          # BINARY_EXPRESSION
-    | expression ('<' | '>' | '<=' | '>=') expression      # BINARY_EXPRESSION
+    | expression (@'<<' | @'>>' | @'>>>') expression       # BINARY_EXPRESSION
+    | expression ('<' | '>' | @'<=' | @'>=') expression    # BINARY_EXPRESSION
     | expression INSTANCEOF_KW expression                  # BINARY_EXPRESSION
     | expression IN_KW expression                          # BINARY_EXPRESSION
     | expression ('==' | '!=' | '===' | '!==') expression  # BINARY_EXPRESSION
@@ -549,7 +549,7 @@ function_expression
     ;
 
 arrow_function_expression
-    : async_kw? arrow_function_parameters '=>' arrow_function_body
+    : @"async"? arrow_function_parameters '=>' arrow_function_body
     # ARROW_FUNCTION_EXPRESSION
     ;
 
@@ -665,41 +665,11 @@ keyword
     ;
 
 getter
-    : get_kw property_name
+    : @"get" property_name
     ;
 
 setter
-    : set_kw property_name
-    ;
-
-as_kw
-    : {at_contextual_kw("as")}? IDENTIFIER
-    # AS_KW
-    ;
-
-from_kw
-    : {at_contextual_kw("from")}? IDENTIFIER
-    # FROM_KW
-    ;
-
-get_kw
-    : {at_contextual_kw("get")}? IDENTIFIER
-    # GET_KW
-    ;
-
-set_kw
-    : {at_contextual_kw("set")}? IDENTIFIER
-    # SET_KW
-    ;
-
-of_kw
-    : {at_contextual_kw("of")}? IDENTIFIER
-    # OF_KW
-    ;
-
-async_kw
-    : {at_contextual_kw("async")}? IDENTIFIER
-    # ASYNC_KW
+    : @"set" property_name
     ;
 
 eos

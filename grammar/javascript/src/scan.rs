@@ -288,6 +288,8 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
         }
         '<' => {
             match (s.current(), s.nth(1)) {
+                // Don't scan compound symbols; instead these will be combined in parser
+                /*
                 (Some('<'), Some('=')) => {
                     s.bump();
                     SHL_EQ
@@ -300,11 +302,14 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
                     s.bump();
                     LT_EQ
                 }
+                */
                 _ => L_ANGLE,
             }
         }
         '>' => {
             match (s.current(), s.nth(1), s.nth(2)) {
+                // Don't scan compound symbols; instead these will be combined in parser
+                /*
                 (Some('>'), Some('>'), Some('=')) => {
                     s.bump();
                     SHU_EQ
@@ -325,6 +330,7 @@ pub fn scan_multibyte_symbol(c: char, s: &mut Scanner) -> Option<SyntaxKind> {
                     s.bump();
                     GT_EQ
                 }
+                */
                 _ => R_ANGLE,
             }
         }

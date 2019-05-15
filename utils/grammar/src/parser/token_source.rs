@@ -28,7 +28,7 @@ pub trait TokenSource {
     /// Is the current token on the same line as the next one (`> >` vs `>>`).
     fn is_token_inline_to_next(&self, pos: usize) -> bool;
     /// Is the current token a specified keyword?
-    fn is_keyword(&self, pos: usize, kw: &str) -> bool;
+    fn at_keyword(&self, pos: usize, kw: &str) -> bool;
 }
 
 pub struct TextTokenSource<'t> {
@@ -73,7 +73,7 @@ impl<'t> TokenSource for TextTokenSource<'t> {
         let range = TextRange::from_to(left, right);
         self.text[range].chars().all(|c| c != '\n' || c != '\r')
     }
-    fn is_keyword(&self, pos: usize, kw: &str) -> bool {
+    fn at_keyword(&self, pos: usize, kw: &str) -> bool {
         if !(pos < self.tokens.len()) {
             return false;
         }

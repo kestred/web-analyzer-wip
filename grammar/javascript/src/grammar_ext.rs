@@ -65,7 +65,7 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         } else if p.at(IDENTIFIER) {
             if p.nth(1) == FAT_ARROW {
                 arrow_function_expression(p)?;
-            } else if !p.at_contextual_kw("async") {
+            } else if !p.at_keyword("async") {
                 identifier(p)?;
             } else {
                 let checkpoint = p.checkpoint(true);
@@ -191,70 +191,70 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
                 }
             }
         }
-        if prec > 14 {
-            return Some(Continue);
-        }
 
         // binary_expression[p ≤ 14]
         //     : expression ('*' | '/' | '%') expression
         //     # BINARY_EXPRESSION
         //     ;
-        let ts = tokenset![STAR, SLASH, PERCENT];
-        while prec <= 14 && p.at_ts(&ts) {
+        if prec > 14 { return Some(Continue); }
+        while prec <= 14 && p.at_ts(&tokenset![STAR, SLASH, PERCENT]) {
             p.bump();
             _expression_prec(p, 14)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 13 {
-            return Some(Continue);
         }
 
         // binary_expression[p ≤ 13]
         //     : expression ('+' | '-') expression
         //     # BINARY_EXPRESSION
         //     ;
-        let ts = tokenset![PLUS, MINUS];
-        while prec <= 13 && p.at_ts(&ts) {
+        if prec > 13 { return Some(Continue); }
+        while prec <= 13 && p.at_ts(&tokenset![PLUS, MINUS]) {
             p.bump();
             _expression_prec(p, 13)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 12 {
-            return Some(Continue);
         }
 
         // binary_expression[p ≤ 12]
         //     : expression ('<<' | '>>' | '>>>') expression
         //     # BINARY_EXPRESSION
         //     ;
-        let ts = tokenset![SHL, SHR, SHU];
-        while prec <= 12 && p.at_ts(&ts) {
-            p.bump();
+        if prec > 12 { return Some(Continue); }
+        while prec <= 12 && p.at_ts(&tokenset![L_ANGLE, R_ANGLE]) {
+            if p.current3() == Some((R_ANGLE, R_ANGLE, R_ANGLE)) {
+                p.bump_compound(SHU, 3);
+            } else if p.current2() == Some((R_ANGLE, R_ANGLE)) {
+                p.bump_compound(SHR, 2);
+            } else if p.current2() == Some((L_ANGLE, L_ANGLE)) {
+                p.bump_compound(SHL, 2);
+            } else {
+                break;
+            }
             _expression_prec(p, 12)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 11 {
-            return Some(Continue);
         }
 
         // binary_expression[p ≤ 11]
         //     : expression ('<' | '>' | '<=' | '>=') expression
         //     # BINARY_EXPRESSION
         //     ;
-        let ts = tokenset![LT, GT, LT_EQ, GT_EQ];
-        while prec <= 11 && p.at_ts(&ts) {
-            p.bump();
+        if prec > 11 { return Some(Continue); }
+        while prec <= 11 && p.at_ts(&tokenset![LT, GT]) {
+            if p.current2() == Some((L_ANGLE, EQ)) {
+                p.bump_compound(LT_EQ, 2);
+            } else if p.current2() == Some((R_ANGLE, EQ)) {
+                p.bump_compound(GT_EQ, 2);
+            } else {
+                p.bump();
+            }
             _expression_prec(p, 11)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 10 {
-            return Some(Continue);
         }
 
         // binary_expression[p ≤ 10]
         //     : expression INSTANCEOF_KW expression
         //     # BINARY_EXPRESSION
         //     ;
+        if prec > 10 { return Some(Continue); }
         while prec <= 10 && p.at(INSTANCEOF_KW) {
             p.bump();
             _expression_prec(p, 10)?;

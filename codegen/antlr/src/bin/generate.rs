@@ -171,6 +171,35 @@ fn emit_pattern<'a>(
             let ident = Pattern::Ident(String::from(to_token_of_literal(lit)));
             emit_pattern(out, db, rule, &ident, dep, precond, &[]);
         }
+        Pattern::Compound(chars) => {
+            let term = to_token_of_literal(&chars.iter().collect::<String>());
+            let parts = chars.iter()
+                .map(|c| c.to_string())
+                .map(|s| to_token_of_literal(&s));
+            emit_depth(out, dep);
+            match parts.len() {
+                2 => out.push_str("p.expect2("),
+                3 => out.push_str("p.expect3("),
+                _ => panic!("a compound must be 2 or 3 chars but got: @'{}'", chars.iter().collect::<String>()),
+            }
+            out.push_str(term);
+            out.push_str(", (");
+            for (i, part) in parts.into_iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(part);
+            }
+            out.push_str("))?;\n");
+        }
+        Pattern::Keyword(keyword) => {
+            emit_depth(out, dep);
+            out.push_str("p.expect_keyword(");
+            out.push_str(&keyword.to_uppercase());
+            out.push_str("_KW, \"");
+            out.push_str(keyword);
+            out.push_str("\")?;\n");
+        }
         Pattern::Ident(ident) => {
             emit_depth(out, dep);
             if is_term(ident) {

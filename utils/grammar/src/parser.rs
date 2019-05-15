@@ -152,8 +152,8 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// Checks if the current token is a specified keyword.
     ///
     /// Does not consider the SyntaxKind (e.g. to detect contextual keywords)
-    pub fn at_contextual_kw(&self, kw: &str) -> bool {
-        self.source.is_keyword(self.source_pos, kw)
+    pub fn at_keyword(&self, kw: &str) -> bool {
+        self.source.at_keyword(self.source_pos, kw)
     }
 
     /// Checks if the next token is separated by ignored tokens (e.g. whitespace or comments).
@@ -195,11 +195,10 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// by trivia.
     ///
     /// Useful for parsing things like `>>`.
-    pub(crate) fn current2(&self) -> Option<(SyntaxKind, SyntaxKind)> {
+    pub fn current2(&self) -> Option<(SyntaxKind, SyntaxKind)> {
         let c1 = self.nth(0);
         let c2 = self.nth(1);
-
-        if self.token_source.is_token_joint_to_next(self.token_pos) {
+        if self.source.is_token_joint_to_next(self.source_pos) {
             Some((c1, c2))
         } else {
             None
@@ -210,12 +209,12 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// by trivia.
     ///
     /// Useful for parsing things like `=>>`.
-    pub(crate) fn current3(&self) -> Option<(SyntaxKind, SyntaxKind, SyntaxKind)> {
+    pub fn current3(&self) -> Option<(SyntaxKind, SyntaxKind, SyntaxKind)> {
         let c1 = self.nth(0);
         let c2 = self.nth(1);
         let c3 = self.nth(2);
-        if self.token_source.is_token_joint_to_next(self.token_pos)
-            && self.token_source.is_token_joint_to_next(self.token_pos + 1)
+        if self.source.is_token_joint_to_next(self.source_pos)
+            && self.source.is_token_joint_to_next(self.source_pos + 1)
         {
             Some((c1, c2, c3))
         } else {
@@ -344,9 +343,38 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     }
 
     /// Consume the next token if it is `kind` or emit an error otherwise.
-    #[must_use]
     pub fn expect(&mut self, kind: SyntaxKind) -> Option<Continue> {
         if self.eat(kind) {
+            Some(Continue)
+        } else {
+            self.expected(kind)
+        }
+    }
+
+    /// Consumes the next 2 matching tokens converting them into a single token (or emit an error otherwise).
+    pub fn expect2(&mut self, kind: SyntaxKind, compound: (SyntaxKind, SyntaxKind)) -> Option<Continue> {
+        if self.current2() == Some(compound) {
+            self.bump_compound(kind, 2);
+            Some(Continue)
+        } else {
+            self.expected(kind)
+        }
+    }
+
+    /// Consumes the next few matching tokens converting them into a single token (or emit an error otherwise).
+    pub fn expect3(&mut self, kind: SyntaxKind, compound: (SyntaxKind, SyntaxKind, SyntaxKind)) -> Option<Continue> {
+        if self.current3() == Some(compound) {
+            self.bump_compound(kind, 3);
+            Some(Continue)
+        } else {
+            self.expected(kind)
+        }
+    }
+
+    /// Consumes the next tokens converting it into a different token if it matches the contextual keyword (or emit an error otherwise).
+    pub fn expect_keyword(&mut self, kind: SyntaxKind, keyword: &str) -> Option<Continue> {
+        if self.at_keyword(keyword) {
+            self.bump_remap(kind);
             Some(Continue)
         } else {
             self.expected(kind)
@@ -424,7 +452,7 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
     /// Advances the parser by `n` tokens, remapping its kind.
     /// This is useful to create compound tokens from parts. For
     /// example, an `<<` token is two consecutive remapped `<` tokens
-    pub fn bump_compound(&mut self, kind: SyntaxKind, n: u8) {
+    pub fn bump_compound(&mut self, kind: SyntaxKind, n: usize) {
         self.advance(kind, n);
     }
 

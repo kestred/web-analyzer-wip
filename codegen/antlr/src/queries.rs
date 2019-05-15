@@ -159,6 +159,8 @@ impl Database {
         match pat {
             Pattern::Empty => true,
             Pattern::Literal(_) => false,
+            Pattern::Compound(_) => false,
+            Pattern::Keyword(_) => false,
             Pattern::Ident(ident) => {
                 if is_term(ident) {
                     false
@@ -198,6 +200,8 @@ impl Database {
         match pat {
             Pattern::Empty => false,
             Pattern::Literal(_) => false,
+            Pattern::Compound(_) => false,
+            Pattern::Keyword(_) => false,
             Pattern::Ident(ident) => {
                 if is_term(ident) {
                     false
@@ -291,6 +295,17 @@ impl Database {
                 set.insert(to_token_of_literal(lit));
                 set
             }
+            Pattern::Compound(chars) => {
+                let lit = chars.iter().next().unwrap().to_string();
+                let mut set = Set::new();
+                set.insert(to_token_of_literal(&lit));
+                set
+            }
+            Pattern::Keyword(_) => {
+                let mut set = Set::new();
+                set.insert("IDENTIFIER");
+                set
+            }
             Pattern::Ident(ident) => {
                 let mut set = Set::new();
                 set.insert(ident.as_str());
@@ -336,6 +351,23 @@ impl Database {
             Pattern::Literal(lit) => {
                 let mut set = Set::new();
                 set.insert(QualifiedTerm::new(to_token_of_literal(lit)));
+                set
+            }
+            Pattern::Compound(chars) => {
+                let lit = chars.iter().next().unwrap().to_string();
+                let mut set = Set::new();
+                set.insert(QualifiedTerm::new(to_token_of_literal(&lit)));
+                set
+            }
+            Pattern::Keyword(keyword) => {
+                let mut set = Set::new();
+                set.insert(
+                    QualifiedTerm::new("IDENTIFIER")
+                        .qualified_by(PredicateExpression::Call {
+                        method: "at_keyword".into(),
+                        args: vec![format!("\"{}\"", keyword)],
+                    })
+                );
                 set
             }
             Pattern::Ident(ident) => {
