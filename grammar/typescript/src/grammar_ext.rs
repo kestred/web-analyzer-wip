@@ -230,20 +230,18 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             // N.B. Do some custom lookahead logic here to avoid
             // TODO: Implement auto-genned 2-4 token lookahead for ambiguous cases
             let peek = p.nth(1);
-            let lookahead = tokenset![IDENTIFIER, L_SQUARE, L_CURLY, R_PAREN];
-            if !lookahead.contains(&peek) {
+            if peek == DOTDOTDOT || peek == R_PAREN {
+                arrow_function_expression(p)?;
+            } else if !tokenset![IDENTIFIER, L_SQUARE, L_CURLY].contains(&peek) {
                 p.bump();
                 expression_list(p)?;
                 p.expect(R_PAREN)?;
             } else {
                 // Try `arrow_function_expression`
-                let checkpoint = if peek == L_SQUARE || peek == L_CURLY {
-                    // N.B. Allow lots of roll-back to disambiguate
-                    //      between a pattern and an expression.
-                    p.checkpoint_upto(16)
-                } else {
-                    p.checkpoint(true)
-                };
+                //
+                // N.B. Allow lots of rollback to disambiguate
+                //      between a pattern and an expression.
+                let checkpoint = p.checkpoint_upto(32);
                 arrow_function_expression(p);
 
                 // Otherwise, expect `expression_list`
@@ -284,15 +282,15 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             //     # CALL_EXPRESSION
             //     ;
             // update_expression[p ≤ 16]
-            //     : expression {!at_line_terminator()}? '++'
+            //     : expression {!at_beginning_of_line()}? '++'
             //     # UPDATE_EXPRESSION
             //     ;
             // update_expression[p ≤ 15]
-            //     : expression {!at_line_terminator()}? '--'
+            //     : expression {!at_beginning_of_line()}? '--'
             //     # UPDATE_EXPRESSION
             //     ;
             // not_null_expression[p ≤ 15]
-            //     : expression {!at_line_terminator()}? '!'
+            //     : expression {!at_beginning_of_line()}? '!'
             //     # TS_NON_NULL_EXPRESSION
             //     ;
             while prec <= 19 && p.at_ts(&tokenset![L_SQUARE, DOT, L_PAREN, INCREMENT, DECREMENT, BANG]) {
@@ -385,26 +383,22 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
         //     : expression INSTANCEOF_KW expression
         //     # BINARY_EXPRESSION
         //     ;
+        if prec > 10 { return Some(Continue); }
         while prec <= 10 && p.at(INSTANCEOF_KW) {
             p.bump();
             _expression_prec(p, 10)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 9 {
-            return Some(Continue);
         }
 
         // binary_expression[p ≤ 9]
         //     : expression IN_KW expression
         //     # BINARY_EXPRESSION
         //     ;
+        if prec > 9 { return Some(Continue); }
         while prec <= 9 && p.at(IN_KW) {
             p.bump();
             _expression_prec(p, 9)?;
             p.complete_and_wrap(&marker, BINARY_EXPRESSION);
-        }
-        if prec > 8 {
-            return Some(Continue);
         }
 
         // FIXME: Need to introduce a new precedence level here
@@ -413,20 +407,19 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             //     : expression 'as' ts_type_annotation
             //     # TS_AS_EXPRESSION
             //     ;
+            if prec > 8 { return Some(Continue); }
             while prec <= 8 && p.at_keyword("as") && p.at(IDENTIFIER) {
                 p.expect_keyword(AS_KW, "as")?;
                 ts_type_annotation(p)?;
                 p.complete_and_wrap(&marker, TS_AS_EXPRESSION);
             }
-            // if prec > 8 {
-            //     return Some(Continue);
-            // }
             }
 
         // binary_expression[p ≤ 8]
         //     : expression ('==' | '!=' | '===' | '!==') expression
         //     # BINARY_EXPRESSION
         //     ;
+        if prec > 8 { return Some(Continue); }
         let ts = tokenset![EQEQ, BANG_EQ, EQEQEQ, BANG_EQEQ];
         while prec <= 8 && p.at_ts(&ts) {
             p.bump();

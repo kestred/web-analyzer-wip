@@ -66,7 +66,22 @@ pub fn scan_regexp_literal(s: &mut Scanner, prev_tokens: [Option<SyntaxKind>; 3]
         return false;
     }
 
-    scan_string('/', s);
+    loop {
+        s.bump_while(|c| c != '[' && c != '/' && c != '\\');
+        if let Some(c) = s.current() {
+            if c == '[' {
+                scan_string(']', s);
+            } else if c == '\\' {
+                s.bump(); // eat '\'
+                s.bump(); // eat escape char
+            } else {
+                s.bump(); // eat '/'
+                break;
+            }
+        } else {
+            break;
+        }
+    }
     s.bump_while(is_regexp_flag);
     true
 }

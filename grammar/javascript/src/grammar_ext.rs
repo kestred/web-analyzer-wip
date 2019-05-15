@@ -105,20 +105,18 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             // N.B. Do some custom lookahead logic here to avoid
             // TODO: Implement auto-genned 2-4 token lookahead for ambiguous cases
             let peek = p.nth(1);
-            let lookahead = tokenset![IDENTIFIER, L_SQUARE, L_CURLY, R_PAREN];
-            if !lookahead.contains(&peek) {
+            if peek == DOTDOTDOT || peek == R_PAREN {
+                arrow_function_expression(p)?;
+            } else if !tokenset![IDENTIFIER, L_SQUARE, L_CURLY].contains(&peek) {
                 p.bump();
                 expression_list(p)?;
                 p.expect(R_PAREN)?;
             } else {
                 // Try `arrow_function_expression`
-                let checkpoint = if peek == L_SQUARE || peek == L_CURLY {
-                    // N.B. Allow lots of roll-back to disambiguate
-                    //      between a pattern and an expression.
-                    p.checkpoint_upto(16)
-                } else {
-                    p.checkpoint(true)
-                };
+                //
+                // N.B. Allow lots of rollback to disambiguate
+                //      between a pattern and an expression.
+                let checkpoint = p.checkpoint_upto(32);
                 arrow_function_expression(p);
 
                 // Otherwise, expect `expression_list`
@@ -160,11 +158,11 @@ pub fn expression(p: &mut Parser) -> Option<Continue> {
             //     # CALL_EXPRESSION
             //     ;
             // update_expression[p ≤ 16]
-            //     : expression {!at_line_terminator()}? '++'
+            //     : expression {!at_beginning_of_line()}? '++'
             //     # UPDATE_EXPRESSION
             //     ;
             // update_expression[p ≤ 15]
-            //     : expression {!at_line_terminator()}? '--'
+            //     : expression {!at_beginning_of_line()}? '--'
             //     # UPDATE_EXPRESSION
             //     ;
             while prec <= 19 && p.at_ts(&tokenset![L_SQUARE, DOT, L_PAREN, INCREMENT, DECREMENT]) {

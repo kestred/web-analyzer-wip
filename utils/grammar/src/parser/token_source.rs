@@ -71,7 +71,7 @@ impl<'t> TokenSource for TextTokenSource<'t> {
         let left = self.start_offsets[pos] + self.tokens[pos].len;
         let right = self.start_offsets[pos + 1];
         let range = TextRange::from_to(left, right);
-        self.text[range].chars().all(|c| c != '\n' || c != '\r')
+        self.text[range].chars().all(|c| c != '\n' && c != '\r')
     }
     fn at_keyword(&self, pos: usize, kw: &str) -> bool {
         if !(pos < self.tokens.len()) {

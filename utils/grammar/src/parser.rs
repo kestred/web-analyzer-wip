@@ -161,8 +161,13 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
         !self.source.is_token_joint_to_next(self.source_pos)
     }
 
-    /// Checks if the next token on the same line as the current token.
-    pub fn at_line_terminator(&self) -> bool {
+    /// Checks if the prev token was on the same line as the current token.
+    pub fn at_beginning_of_line(&self) -> bool {
+        self.source_pos == 0 || !self.source.is_token_inline_to_next(self.source_pos - 1)
+    }
+
+    /// Checks if the next token is on the same line as the current token.
+    pub fn at_end_of_line(&self) -> bool {
         !self.source.is_token_inline_to_next(self.source_pos)
     }
 
@@ -305,9 +310,10 @@ impl<'a, 'b, E: ParseError> Parser<'a, 'b, E> {
                 Some(Err(error))
             } else {
                 // eprintln!(
-                //     "wouldn't rollback in commit of size {} at {}",
+                //     "wouldn't rollback in commit of size {} at {} (limit: {})",
                 //     distance,
                 //     (self.config.debug_repr)(self.current()).unwrap().name,
+                //     checkpoint.rollback_limit,
                 // );
                 None
             }

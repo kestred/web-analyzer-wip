@@ -52,22 +52,22 @@ module_path
     ;
 
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? eos
+    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? end_of_statement
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW variable_declaration eos
+    | EXPORT_KW variable_declaration end_of_statement
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW class_declaration
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW function_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW DEFAULT_KW expression eos
+    | EXPORT_KW DEFAULT_KW expression end_of_statement
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK @"from" module_path eos
+    | EXPORT_KW ASTERISK @"from" module_path end_of_statement
     # EXPORT_ALL_DECLARATION
     ;
 
 export_specifier_list
-    : export_specifier_atom (',' export_specifier_atom)*
+    : export_specifier_atom (',' export_specifier_atom)* ','?
     ;
 
 export_specifier_atom
@@ -76,9 +76,9 @@ export_specifier_atom
     ;
 
 import_declaration
-    : IMPORT_KW import_declaration_list @"from" module_path eos
+    : IMPORT_KW import_declaration_list @"from" module_path end_of_statement
     # IMPORT_DECLARATION
-    | IMPORT_KW module_path eos
+    | IMPORT_KW module_path end_of_statement
     # IMPORT_DECLARATION
     ;
 
@@ -88,7 +88,7 @@ import_declaration_list
     ;
 
 import_specifier_list
-    : import_specifier_atom (',' import_specifier_atom)*
+    : import_specifier_atom (',' import_specifier_atom)* ','?
     ;
 
 import_specifier_atom
@@ -119,7 +119,7 @@ statement
     | try_statement
     | debugger_statement
     | class_declaration
-    | variable_declaration eos
+    | variable_declaration end_of_statement
     | function_declaration
     | expression_statement
     | labeled_statement
@@ -160,7 +160,7 @@ empty_statement
     ;
 
 expression_statement
-    : {!at(L_CURLY) && !at(FUNCTION_KW)}? expression_list eos
+    : {!at(L_CURLY) && !at(FUNCTION_KW)}? expression_list end_of_statement
     # EXPRESSION_STATEMENT
     ;
 
@@ -195,22 +195,22 @@ while_statement
     ;
 
 do_while_statement
-    : DO_KW statement WHILE_KW '(' expression_list ')' eos
+    : DO_KW statement WHILE_KW '(' expression_list ')' end_of_statement
     # DO_WHILE_STATEMENT
     ;
 
 continue_statement
-    : CONTINUE_KW ({!at_line_terminator()}? identifier)? eos
+    : CONTINUE_KW ({!at_beginning_of_line()}? identifier)? end_of_statement
     # CONTINUE_STATEMENT
     ;
 
 break_statement
-    : BREAK_KW ({!at_line_terminator()}? identifier)? eos
+    : BREAK_KW ({!at_beginning_of_line()}? identifier)? end_of_statement
     # BREAK_STATEMENT
     ;
 
 return_statement
-    : RETURN_KW ({!at_line_terminator()}? expression_list)? eos
+    : RETURN_KW ({!at_beginning_of_line()}? expression_list)? end_of_statement
     # RETURN_STATEMENT
     ;
 
@@ -248,7 +248,7 @@ labeled_statement
     ;
 
 throw_statement
-    : THROW_KW {!at_line_terminator()}? expression_list eos
+    : THROW_KW {!at_beginning_of_line()}? expression_list end_of_statement
     # THROW_STATEMENT
     ;
 
@@ -267,7 +267,7 @@ finally_clause
     ;
 
 debugger_statement
-    : DEBUGGER_KW eos
+    : DEBUGGER_KW end_of_statement
     # DEBUGGER_STATEMENT
     ;
 
@@ -296,11 +296,11 @@ class_element
     ;
 
 method_definition
-    : STATIC_KW? property_name method_tail
+    : STATIC_KW? getter_head getter_tail
     # METHOD_DEFINITION
-    | STATIC_KW? getter getter_tail
+    | STATIC_KW? setter_head setter_tail
     # METHOD_DEFINITION
-    | STATIC_KW? setter setter_tail
+    | STATIC_KW? property_name method_tail
     # METHOD_DEFINITION
     | STATIC_KW? generator_method
     # METHOD_DEFINITION
@@ -317,8 +317,8 @@ generator_method
     ;
 
 formal_parameter_list
-    : formal_parameter (',' formal_parameter)* (',' formal_parameter_rest)?
-    | formal_parameter_rest
+    : formal_parameter (',' formal_parameter)* (',' formal_parameter_rest)? ','?
+    | formal_parameter_rest ','?
     ;
 
 formal_parameter
@@ -366,12 +366,12 @@ element_or_spread
     ;
 
 object_expression
-    : '{' property_list? ','? '}'
+    : '{' property_list? '}'
     # OBJECT_EXPRESSION
     ;
 
 property_list
-    : property_or_spread (',' property_or_spread)*
+    : property_or_spread (',' property_or_spread)* ','?
     ;
 
 property_or_spread
@@ -451,9 +451,9 @@ property
     # PROPERTY
     | '[' expression ']' ':' expression
     # PROPERTY
-    | getter getter_tail
+    | getter_head getter_tail
     # PROPERTY
-    | setter setter_tail
+    | setter_head setter_tail
     # PROPERTY
     | generator_method
     # PROPERTY
@@ -496,8 +496,8 @@ expression
     | NEW_KW expression arguments?                         # NEW_EXPRESSION
 
     /* Unary Operators */
-    | expression {!at_line_terminator()}? '++'             # UPDATE_EXPRESSION
-    | expression {!at_line_terminator()}? '--'             # UPDATE_EXPRESSION
+    | expression {!at_beginning_of_line()}? '++'           # UPDATE_EXPRESSION
+    | expression {!at_beginning_of_line()}? '--'           # UPDATE_EXPRESSION
     | DELETE_KW expression                                 # UNARY_EXPRESSION
     | VOID_KW expression                                   # UNARY_EXPRESSION
     | TYPEOF_KW expression                                 # UNARY_EXPRESSION
@@ -664,17 +664,18 @@ keyword
     | DOUBLE_KW
     ;
 
-getter
+getter_head
     : @"get" property_name
     ;
 
-setter
+setter_head
     : @"set" property_name
     ;
 
-eos
+end_of_statement
     : ';'
     | EOF
-    | {at_line_terminator()}?
+    | {at_beginning_of_line()}?
     | {at(R_CURLY)}?
+    | {at(R_PAREN)}?
     ;

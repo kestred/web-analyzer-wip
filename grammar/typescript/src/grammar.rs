@@ -53,11 +53,11 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
             p.expect_keyword(FROM_KW, "from")?;
             module_path(p)?;
         }
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
     } else if p.at(CLASS_KW) {
         class_declaration(p)?;
@@ -65,11 +65,8 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     } else if (p.at(FUNCTION_KW) || (p.at_keyword("async") && p.at(IDENTIFIER))) && {
         // try --> function_declaration #EXPORT_NAMED_DECLARATION
         let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            function_declaration(p)?;
-            p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
-            Some(Continue)
-        });
+        function_declaration(p);
+        p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
@@ -78,7 +75,7 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
     } else if p.at_keyword("type") && p.at(IDENTIFIER) {
         ts_alias_declaration(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_NAMED_DECLARATION);
     } else if p.at(ENUM_KW) {
         ts_enum_declaration(p)?;
@@ -86,13 +83,13 @@ pub fn export_declaration(p: &mut Parser) -> Option<Continue> {
     } else if p.at(DEFAULT_KW) {
         p.bump();
         expression(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_DEFAULT_DECLARATION);
     } else if p.at(ASTERISK) {
         p.bump();
         p.expect_keyword(FROM_KW, "from")?;
         module_path(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), EXPORT_ALL_DECLARATION);
     } else {
         // otherwise, emit an error
@@ -144,7 +141,7 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
         // ok
     } else if p.at_ts(&tokenset![CONST_KW, LET_KW, VAR_KW]) {
         variable_declaration(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
     } else if (p.at(FUNCTION_KW) || (p.at_keyword("async") && p.at(IDENTIFIER))) && {
         // try --> function_declaration
         let mut _checkpoint = p.checkpoint(true);
@@ -155,11 +152,11 @@ pub fn statement(p: &mut Parser) -> Option<Continue> {
     } else if p.at(INTERFACE_KW) {
         ts_interface_declaration(p)?;
     } else if (p.at_keyword("type") && p.at(IDENTIFIER)) && {
-        // try --> ts_alias_declaration eos
+        // try --> ts_alias_declaration end_of_statement
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             ts_alias_declaration(p)?;
-            eos(p)?;
+            end_of_statement(p)?;
             Some(Continue)
         });
         p.commit(_checkpoint)?.is_ok()
@@ -263,12 +260,12 @@ pub fn function_parameters(p: &mut Parser) -> Option<Continue> {
     p.expect(R_PAREN)?;
     if p.at(COLON) {
         p.bump();
-        function_return_type(p)?;
+        ts_return_type(p)?;
     }
     Some(Continue)
 }
 
-pub fn function_return_type(p: &mut Parser) -> Option<Continue> {
+pub fn ts_return_type(p: &mut Parser) -> Option<Continue> {
     if p.at(IDENTIFIER) && {
         // try --> ts_type_predicate
         let mut _checkpoint = p.checkpoint(true);
@@ -280,9 +277,144 @@ pub fn function_return_type(p: &mut Parser) -> Option<Continue> {
         ts_type_annotation(p)?;
     } else {
         // otherwise, emit an error
-        p.expected_ts_in("function_return_type", &AT_TS_TYPE_ANNOTATION)?;
+        p.expected_ts_in("ts_return_type", &AT_TS_TYPE_ANNOTATION)?;
     }
     Some(Continue)
+}
+
+pub fn class_element(p: &mut Parser) -> Option<Continue> {
+    if p.at_ts(&tokenset![IDENTIFIER, PRIVATE_KW, PROTECTED_KW, PUBLIC_KW]) && {
+        // try --> ts_class_property end_of_statement
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            ts_class_property(p)?;
+            end_of_statement(p)?;
+            Some(Continue)
+        });
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at_ts(&AT_METHOD_DEFINITION) {
+        method_definition(p)?;
+    } else if p.at(SEMICOLON) {
+        empty_statement(p)?;
+    } else {
+        // otherwise, emit an error
+        p.expected_ts_in("class_element", &AT_CLASS_ELEMENT)?;
+    }
+    Some(Continue)
+}
+
+pub fn ts_class_property(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        if p.at_ts(&tokenset![PRIVATE_KW, PROTECTED_KW, PUBLIC_KW]) {
+            ts_vis(p)?;
+        }
+        identifier(p)?;
+        p.eat(QUESTION);
+        if p.at(COLON) {
+            p.bump();
+            ts_type_annotation(p)?;
+        }
+        if p.at(EQ) {
+            p.bump();
+            expression(p)?;
+        }
+        Some(Continue)
+    });
+    p.complete(_marker, PROPERTY);
+    _ok
+}
+
+pub fn method_definition(p: &mut Parser) -> Option<Continue> {
+    let mut _checkpoint = p.checkpoint(false);
+    let _marker = p.start();
+    if p.at_ts(&tokenset![PRIVATE_KW, PROTECTED_KW, PUBLIC_KW]) {
+        ts_vis(p)?;
+    }
+    p.eat(STATIC_KW);
+    if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
+        // try --> getter_head getter_tail #METHOD_DEFINITION
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            getter_head(p)?;
+            getter_tail(p)?;
+            Some(Continue)
+        });
+        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
+        // try --> setter_head setter_tail #METHOD_DEFINITION
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            setter_head(p)?;
+            setter_tail(p)?;
+            Some(Continue)
+        });
+        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at_ts(&AT_PROPERTY_NAME) && {
+        // try --> property_name method_tail #METHOD_DEFINITION
+        let mut _checkpoint = p.checkpoint(true);
+        catch!({
+            property_name(p)?;
+            method_tail(p)?;
+            Some(Continue)
+        });
+        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
+        p.commit(_checkpoint)?.is_ok()
+    } {
+        // ok
+    } else if p.at_ts(&AT_GENERATOR_METHOD) {
+        generator_method(p)?;
+        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
+    } else {
+        // otherwise, emit an error
+        p.expected_ts_in("method_definition", &AT_METHOD_DEFINITION)?;
+    }
+    Some(Continue)
+}
+
+pub fn getter_tail(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_PAREN)?;
+        p.expect(R_PAREN)?;
+        if p.at(COLON) {
+            p.bump();
+            ts_return_type(p)?;
+        }
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
+}
+
+pub fn setter_tail(p: &mut Parser) -> Option<Continue> {
+    let _marker = p.start();
+    let _ok = catch!({
+        p.expect(L_PAREN)?;
+        identifier_pattern(p)?;
+        p.expect(R_PAREN)?;
+        if p.at(COLON) {
+            p.bump();
+            ts_return_type(p)?;
+        }
+        function_body(p)?;
+        Some(Continue)
+    });
+    p.complete(_marker, FUNCTION_EXPRESSION);
+    _ok
+}
+
+pub fn ts_vis(p: &mut Parser) -> Option<Continue> {
+    p.expect_ts(&tokenset![PRIVATE_KW, PROTECTED_KW, PUBLIC_KW])
 }
 
 pub fn ts_type_predicate(p: &mut Parser) -> Option<Continue> {
@@ -381,7 +513,7 @@ pub fn ts_interface_declaration(p: &mut Parser) -> Option<Continue> {
             let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 ts_interface_property(p)?;
-                eos(p)?;
+                end_of_statement(p)?;
                 Some(Continue)
             });
             if !p.commit(_checkpoint)?.is_ok() {
@@ -478,22 +610,31 @@ pub fn ts_enum_declaration(p: &mut Parser) -> Option<Continue> {
         p.expect(ENUM_KW)?;
         identifier(p)?;
         p.expect(L_CURLY)?;
-        while p.at(IDENTIFIER) {
-            let _checkpoint = p.checkpoint_ambiguous();
-            catch!({
-                ts_enum_variant(p)?;
-                p.expect(COMMA)?;
-                Some(Continue)
-            });
-            if !p.commit(_checkpoint)?.is_ok() {
-                break;
-            }
+        if p.at(IDENTIFIER) {
+            ts_enum_variant_list(p)?;
         }
         p.expect(R_CURLY)?;
         Some(Continue)
     });
     p.complete(_marker, ENUM_DECLARATION);
     _ok
+}
+
+pub fn ts_enum_variant_list(p: &mut Parser) -> Option<Continue> {
+    ts_enum_variant(p)?;
+    while p.at(COMMA) {
+        let _checkpoint = p.checkpoint_ambiguous();
+        catch!({
+            p.bump();
+            ts_enum_variant(p)?;
+            Some(Continue)
+        });
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
+    }
+    p.eat(COMMA);
+    Some(Continue)
 }
 
 pub fn ts_enum_variant(p: &mut Parser) -> Option<Continue> {
@@ -560,7 +701,7 @@ pub(crate) fn _ts_type_annotation_interface(p: &mut Parser) -> Option<Continue> 
             let _checkpoint = p.checkpoint_ambiguous();
             catch!({
                 ts_interface_property(p)?;
-                eos(p)?;
+                end_of_statement(p)?;
                 Some(Continue)
             });
             if !p.commit(_checkpoint)?.is_ok() {
@@ -610,11 +751,18 @@ pub fn ts_function_parameter_list(p: &mut Parser) -> Option<Continue> {
             }
         }
         if p.at(COMMA) {
-            p.bump();
-            ts_function_parameter_rest(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                p.bump();
+                ts_function_parameter_rest(p)?;
+                Some(Continue)
+            });
+            p.commit(_checkpoint)?.ok();
         }
+        p.eat(COMMA);
     } else if p.at(DOTDOTDOT) {
         ts_function_parameter_rest(p)?;
+        p.eat(COMMA);
     } else {
         p.expected_ts_in("ts_function_parameter_list", &tokenset![DOTDOTDOT, IDENTIFIER])?;
     }
@@ -715,9 +863,17 @@ pub fn module_path(p: &mut Parser) -> Option<Continue> {
 pub fn export_specifier_list(p: &mut Parser) -> Option<Continue> {
     export_specifier_atom(p)?;
     while p.at(COMMA) {
-        p.bump();
-        export_specifier_atom(p)?;
+        let _checkpoint = p.checkpoint_ambiguous();
+        catch!({
+            p.bump();
+            export_specifier_atom(p)?;
+            Some(Continue)
+        });
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
+    p.eat(COMMA);
     Some(Continue)
 }
 
@@ -743,11 +899,11 @@ pub fn import_declaration(p: &mut Parser) -> Option<Continue> {
         import_declaration_list(p)?;
         p.expect_keyword(FROM_KW, "from")?;
         module_path(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), IMPORT_DECLARATION);
     } else if p.at(STRING_LITERAL) {
         module_path(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         p.complete(_checkpoint.branch(&_marker), IMPORT_DECLARATION);
     } else {
         p.expected_ts_in("import_declaration", &tokenset![ASTERISK, IDENTIFIER, L_CURLY, STRING_LITERAL])?;
@@ -777,9 +933,17 @@ pub fn import_declaration_list(p: &mut Parser) -> Option<Continue> {
 pub fn import_specifier_list(p: &mut Parser) -> Option<Continue> {
     import_specifier_atom(p)?;
     while p.at(COMMA) {
-        p.bump();
-        import_specifier_atom(p)?;
+        let _checkpoint = p.checkpoint_ambiguous();
+        catch!({
+            p.bump();
+            import_specifier_atom(p)?;
+            Some(Continue)
+        });
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
+    p.eat(COMMA);
     Some(Continue)
 }
 
@@ -901,7 +1065,7 @@ pub fn expression_statement(p: &mut Parser) -> Option<Continue> {
             p.error("expected to be not at L_CURLY and not at FUNCTION_KW")?;
         }
         expression_list(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, EXPRESSION_STATEMENT);
@@ -948,9 +1112,9 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
             }
             p.expect(R_PAREN)?;
             statement_list(p)?;
-            p.complete(_checkpoint.branch(&_marker), FOR_STATEMENT);
             Some(Continue)
         });
+        p.complete(_checkpoint.branch(&_marker), FOR_STATEMENT);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
@@ -969,9 +1133,9 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
             }
             p.expect(R_PAREN)?;
             statement(p)?;
-            p.complete(_checkpoint.branch(&_marker), FOR_STATEMENT);
             Some(Continue)
         });
+        p.complete(_checkpoint.branch(&_marker), FOR_STATEMENT);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
@@ -984,9 +1148,9 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
             expression(p)?;
             p.expect(R_PAREN)?;
             statement_list(p)?;
-            p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
             Some(Continue)
         });
+        p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
@@ -999,9 +1163,9 @@ pub fn for_statement(p: &mut Parser) -> Option<Continue> {
             expression(p)?;
             p.expect(R_PAREN)?;
             statement(p)?;
-            p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
             Some(Continue)
         });
+        p.complete(_checkpoint.branch(&_marker), FOR_IN_STATEMENT);
         p.commit(_checkpoint)?.is_ok()
     } {
         // ok
@@ -1049,7 +1213,7 @@ pub fn do_while_statement(p: &mut Parser) -> Option<Continue> {
         p.expect(L_PAREN)?;
         expression_list(p)?;
         p.expect(R_PAREN)?;
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, DO_WHILE_STATEMENT);
@@ -1060,10 +1224,10 @@ pub fn continue_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(CONTINUE_KW)?;
-        if !p.at_line_terminator() && p.at(IDENTIFIER) {
+        if !p.at_beginning_of_line() && p.at(IDENTIFIER) {
             identifier(p)?;
         }
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, CONTINUE_STATEMENT);
@@ -1074,10 +1238,10 @@ pub fn break_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(BREAK_KW)?;
-        if !p.at_line_terminator() && p.at(IDENTIFIER) {
+        if !p.at_beginning_of_line() && p.at(IDENTIFIER) {
             identifier(p)?;
         }
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, BREAK_STATEMENT);
@@ -1088,13 +1252,13 @@ pub fn return_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(RETURN_KW)?;
-        if (!p.at_line_terminator() && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION)) || (p.at_keyword("async") && !p.at_line_terminator() && p.at(IDENTIFIER)) {
-            if !(!p.at_line_terminator()) {
-                p.error("expected to be not at line terminator")?;
+        if (!p.at_beginning_of_line() && p.at_ts(&AT_EXPRESSION_LIST_OR_EXPRESSION)) || (p.at_keyword("async") && !p.at_beginning_of_line() && p.at(IDENTIFIER)) {
+            if !(!p.at_beginning_of_line()) {
+                p.error("expected to be not at beginning of line")?;
             }
             expression_list(p)?;
         }
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, RETURN_STATEMENT);
@@ -1201,11 +1365,11 @@ pub fn throw_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(THROW_KW)?;
-        if !(!p.at_line_terminator()) {
-            p.error("expected to be not at line terminator")?;
+        if !(!p.at_beginning_of_line()) {
+            p.error("expected to be not at beginning of line")?;
         }
         expression_list(p)?;
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, THROW_STATEMENT);
@@ -1257,7 +1421,7 @@ pub fn debugger_statement(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
         p.expect(DEBUGGER_KW)?;
-        eos(p)?;
+        end_of_statement(p)?;
         Some(Continue)
     });
     p.complete(_marker, DEBUGGER_STATEMENT);
@@ -1324,67 +1488,6 @@ pub fn class_body(p: &mut Parser) -> Option<Continue> {
     _ok
 }
 
-pub fn class_element(p: &mut Parser) -> Option<Continue> {
-    if p.at_ts(&AT_METHOD_DEFINITION) {
-        method_definition(p)?;
-    } else if p.at(SEMICOLON) {
-        empty_statement(p)?;
-    } else {
-        p.expected_ts_in("class_element", &AT_CLASS_ELEMENT)?;
-    }
-    Some(Continue)
-}
-
-pub fn method_definition(p: &mut Parser) -> Option<Continue> {
-    let mut _checkpoint = p.checkpoint(false);
-    let _marker = p.start();
-    p.eat(STATIC_KW);
-    if p.at_ts(&AT_PROPERTY_NAME) && {
-        // try --> property_name method_tail #METHOD_DEFINITION
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            property_name(p)?;
-            method_tail(p)?;
-            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
-        // try --> getter getter_tail #METHOD_DEFINITION
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            getter(p)?;
-            getter_tail(p)?;
-            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
-        // try --> setter setter_tail #METHOD_DEFINITION
-        let mut _checkpoint = p.checkpoint(true);
-        catch!({
-            setter(p)?;
-            setter_tail(p)?;
-            p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
-            Some(Continue)
-        });
-        p.commit(_checkpoint)?.is_ok()
-    } {
-        // ok
-    } else if p.at_ts(&AT_GENERATOR_METHOD) {
-        generator_method(p)?;
-        p.complete(_checkpoint.branch(&_marker), METHOD_DEFINITION);
-    } else {
-        // otherwise, emit an error
-        p.expected_ts_in("method_definition", &AT_METHOD_DEFINITION)?;
-    }
-    Some(Continue)
-}
-
 pub fn method_tail(p: &mut Parser) -> Option<Continue> {
     let _marker = p.start();
     let _ok = catch!({
@@ -1430,11 +1533,18 @@ pub fn formal_parameter_list(p: &mut Parser) -> Option<Continue> {
             }
         }
         if p.at(COMMA) {
-            p.bump();
-            formal_parameter_rest(p)?;
+            let mut _checkpoint = p.checkpoint(true);
+            catch!({
+                p.bump();
+                formal_parameter_rest(p)?;
+                Some(Continue)
+            });
+            p.commit(_checkpoint)?.ok();
         }
+        p.eat(COMMA);
     } else if p.at(DOTDOTDOT) {
         formal_parameter_rest(p)?;
+        p.eat(COMMA);
     } else {
         p.expected_ts_in("formal_parameter_list", &tokenset![DOTDOTDOT, IDENTIFIER, L_CURLY, L_SQUARE])?;
     }
@@ -1551,7 +1661,6 @@ pub fn object_expression(p: &mut Parser) -> Option<Continue> {
         if p.at_ts(&AT_PROPERTY_OR_SPREAD) {
             property_list(p)?;
         }
-        p.eat(COMMA);
         p.expect(R_CURLY)?;
         Some(Continue)
     });
@@ -1562,9 +1671,17 @@ pub fn object_expression(p: &mut Parser) -> Option<Continue> {
 pub fn property_list(p: &mut Parser) -> Option<Continue> {
     property_or_spread(p)?;
     while p.at(COMMA) {
-        p.bump();
-        property_or_spread(p)?;
+        let _checkpoint = p.checkpoint_ambiguous();
+        catch!({
+            p.bump();
+            property_or_spread(p)?;
+            Some(Continue)
+        });
+        if !p.commit(_checkpoint)?.is_ok() {
+            break;
+        }
     }
+    p.eat(COMMA);
     Some(Continue)
 }
 
@@ -1742,12 +1859,12 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
             return None;
         }
     } else if (p.at_keyword("get") && p.at(IDENTIFIER)) && {
-        // try --> getter getter_tail #PROPERTY
+        // try --> getter_head getter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                getter(p)?;
+                getter_head(p)?;
                 getter_tail(p)?;
                 Some(Continue)
             });
@@ -1761,12 +1878,12 @@ pub fn property(p: &mut Parser) -> Option<Continue> {
     } {
         // ok
     } else if (p.at_keyword("set") && p.at(IDENTIFIER)) && {
-        // try --> setter setter_tail #PROPERTY
+        // try --> setter_head setter_tail #PROPERTY
         let mut _checkpoint = p.checkpoint(true);
         catch!({
             let _marker = p.start();
             let _ok = catch!({
-                setter(p)?;
+                setter_head(p)?;
                 setter_tail(p)?;
                 Some(Continue)
             });
@@ -1823,31 +1940,6 @@ pub fn property_name(p: &mut Parser) -> Option<Continue> {
         p.expected_ts_in("property_name", &AT_PROPERTY_NAME)?;
     }
     Some(Continue)
-}
-
-pub fn getter_tail(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        p.expect(L_PAREN)?;
-        p.expect(R_PAREN)?;
-        function_body(p)?;
-        Some(Continue)
-    });
-    p.complete(_marker, FUNCTION_EXPRESSION);
-    _ok
-}
-
-pub fn setter_tail(p: &mut Parser) -> Option<Continue> {
-    let _marker = p.start();
-    let _ok = catch!({
-        p.expect(L_PAREN)?;
-        identifier_pattern(p)?;
-        p.expect(R_PAREN)?;
-        function_body(p)?;
-        Some(Continue)
-    });
-    p.complete(_marker, FUNCTION_EXPRESSION);
-    _ok
 }
 
 pub fn arguments(p: &mut Parser) -> Option<Continue> {
@@ -2014,27 +2106,28 @@ pub fn keyword(p: &mut Parser) -> Option<Continue> {
     p.expect_ts(&AT_KEYWORD)
 }
 
-pub fn getter(p: &mut Parser) -> Option<Continue> {
+pub fn getter_head(p: &mut Parser) -> Option<Continue> {
     p.expect_keyword(GET_KW, "get")?;
     property_name(p)?;
     Some(Continue)
 }
 
-pub fn setter(p: &mut Parser) -> Option<Continue> {
+pub fn setter_head(p: &mut Parser) -> Option<Continue> {
     p.expect_keyword(SET_KW, "set")?;
     property_name(p)?;
     Some(Continue)
 }
 
-pub fn eos(p: &mut Parser) -> Option<Continue> {
+pub fn end_of_statement(p: &mut Parser) -> Option<Continue> {
     if p.at(SEMICOLON) {
         p.bump();
     } else if p.at(EOF) {
         p.bump();
-    } else if p.at_line_terminator() {
+    } else if p.at_beginning_of_line() {
     } else if p.at(R_CURLY) {
+    } else if p.at(R_PAREN) {
     } else {
-        p.expected_ts_in("eos", &tokenset![EOF, SEMICOLON])?;
+        p.expected_ts_in("end_of_statement", &tokenset![EOF, SEMICOLON])?;
     }
     Some(Continue)
 }

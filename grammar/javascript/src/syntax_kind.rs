@@ -174,6 +174,7 @@ pub fn is_javascript_punct(k: SyntaxKind) -> bool {
         _ if k == AND => true,
         _ if k == OR => true,
         _ if k == TILDE => true,
+        _ if k == FAT_ARROW => true,
         _ => false,
     }
 }

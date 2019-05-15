@@ -14,9 +14,9 @@ module_declaration
     ;
 
 export_declaration
-    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? eos
+    : EXPORT_KW '{' export_specifier_list '}' (@"from" module_path)? end_of_statement
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW variable_declaration eos
+    | EXPORT_KW variable_declaration end_of_statement
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW class_declaration
     # EXPORT_NAMED_DECLARATION
@@ -24,13 +24,13 @@ export_declaration
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW ts_interface_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW ts_alias_declaration eos
+    | EXPORT_KW ts_alias_declaration end_of_statement
     # EXPORT_NAMED_DECLARATION
     | EXPORT_KW ts_enum_declaration
     # EXPORT_NAMED_DECLARATION
-    | EXPORT_KW DEFAULT_KW expression eos
+    | EXPORT_KW DEFAULT_KW expression end_of_statement
     # EXPORT_DEFAULT_DECLARATION
-    | EXPORT_KW ASTERISK @"from" module_path eos
+    | EXPORT_KW ASTERISK @"from" module_path end_of_statement
     # EXPORT_ALL_DECLARATION
     ;
 
@@ -50,12 +50,12 @@ statement
     | try_statement
     | debugger_statement
     | class_declaration
-    | variable_declaration eos
+    | variable_declaration end_of_statement
     | function_declaration
 
     // typescript declarations
     | ts_interface_declaration
-    | ts_alias_declaration eos
+    | ts_alias_declaration end_of_statement
     | ts_enum_declaration
 
     // must occur after everything else to handle precedence
@@ -73,9 +73,9 @@ expression
     | NEW_KW expression arguments?                         # NEW_EXPRESSION
 
     /* Unary Operators */
-    | expression {!at_line_terminator()}? '++'             # UPDATE_EXPRESSION
-    | expression {!at_line_terminator()}? '--'             # UPDATE_EXPRESSION
-    | expression {!at_line_terminator()}? '!'              # TS_NON_NULL_EXPRESSION
+    | expression {!at_beginning_of_line()}? '++'           # UPDATE_EXPRESSION
+    | expression {!at_beginning_of_line()}? '--'           # UPDATE_EXPRESSION
+    | expression {!at_beginning_of_line()}? '!'            # TS_NON_NULL_EXPRESSION
     | DELETE_KW expression                                 # UNARY_EXPRESSION
     | VOID_KW expression                                   # UNARY_EXPRESSION
     | TYPEOF_KW expression                                 # UNARY_EXPRESSION
@@ -93,7 +93,7 @@ expression
     | expression ('<' | '>' | @'<=' | @'>=') expression    # BINARY_EXPRESSION
     | expression INSTANCEOF_KW expression                  # BINARY_EXPRESSION
     | expression IN_KW expression                          # BINARY_EXPRESSION
-    | expression @"as" ts_type_annotation                           # TS_AS_EXPRESSION
+    | expression @"as" ts_type_annotation                  # TS_AS_EXPRESSION
     | expression ('==' | '!=' | '===' | '!==') expression  # BINARY_EXPRESSION
     | expression '&' expression                            # BINARY_EXPRESSION
     | expression '^' expression                            # BINARY_EXPRESSION
@@ -138,12 +138,50 @@ identifier_or_primitive
     ;
 
 function_parameters
-    : ts_type_parameters? '(' formal_parameter_list? ')' (':' function_return_type)?
+    : ts_type_parameters? '(' formal_parameter_list? ')' (':' ts_return_type)?
     ;
 
-function_return_type
+ts_return_type
     : ts_type_predicate
     | ts_type_annotation
+    ;
+
+class_element
+    : ts_class_property end_of_statement
+    | method_definition
+    | empty_statement
+    ;
+
+ts_class_property
+    : ts_vis? identifier '?'? (':' ts_type_annotation)? ('=' expression)?
+    # PROPERTY
+    ;
+
+method_definition
+    : ts_vis? STATIC_KW? getter_head getter_tail
+    # METHOD_DEFINITION
+    | ts_vis? STATIC_KW? setter_head setter_tail
+    # METHOD_DEFINITION
+    | ts_vis? STATIC_KW? property_name method_tail
+    # METHOD_DEFINITION
+    | ts_vis? STATIC_KW? generator_method
+    # METHOD_DEFINITION
+    ;
+
+getter_tail
+    : '(' ')' (':' ts_return_type)? function_body
+    # FUNCTION_EXPRESSION
+    ;
+
+setter_tail
+    : '(' identifier_pattern ')' (':' ts_return_type)? function_body
+    # FUNCTION_EXPRESSION
+    ;
+
+ts_vis
+    : PUBLIC_KW
+    | PROTECTED_KW
+    | PRIVATE_KW
     ;
 
 ts_type_predicate
@@ -172,7 +210,7 @@ ts_d_source_element
     ;
 
 ts_interface_declaration
-    : INTERFACE_KW identifier ts_type_parameters? (EXTENDS_KW ts_type_annotation)? '{' (ts_interface_property eos)* '}'
+    : INTERFACE_KW identifier ts_type_parameters? (EXTENDS_KW ts_type_annotation)? '{' (ts_interface_property end_of_statement)* '}'
     # INTERFACE_DECLARATION
     ;
 
@@ -196,8 +234,12 @@ ts_alias_declaration
     ;
 
 ts_enum_declaration
-    : ENUM_KW identifier '{' (ts_enum_variant ',')* '}'
+    : ENUM_KW identifier '{' ts_enum_variant_list? '}'
     # ENUM_DECLARATION
+    ;
+
+ts_enum_variant_list
+    : ts_enum_variant (',' ts_enum_variant)* ','?
     ;
 
 ts_enum_variant
@@ -237,7 +279,7 @@ _ts_type_annotation_typeof
     ;
 
 _ts_type_annotation_interface
-    : '{' (ts_interface_property eos)* '}'
+    : '{' (ts_interface_property end_of_statement)* '}'
     # INTERFACE_TYPE_EXPR
     ;
 
@@ -251,8 +293,8 @@ ts_function_parameters
     ;
 
 ts_function_parameter_list
-    : ts_function_parameter (',' ts_function_parameter)* (',' ts_function_parameter_rest)?
-    | ts_function_parameter_rest
+    : ts_function_parameter (',' ts_function_parameter)* (',' ts_function_parameter_rest)? ','?
+    | ts_function_parameter_rest ','?
     ;
 
 ts_function_parameter

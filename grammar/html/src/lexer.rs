@@ -43,6 +43,36 @@ impl HtmlLexer {
     fn template_opener(&self) -> &'static str {
         self.template_pattern.map(|(x, _)| x).unwrap_or("\0")
     }
+
+    fn set_next_mode(&mut self, s: &Scanner, tag: Option<SmolStr>) {
+        self.mode = match tag {
+            Some(ref tag) if tag == "script" => {
+                if s.at('<') {
+                    HtmlLexerMode::Tag
+                } else {
+                    HtmlLexerMode::Script
+                }
+            }
+            Some(ref tag) if tag == "style" => {
+                if s.at('<') {
+                    HtmlLexerMode::Tag
+                } else {
+                    HtmlLexerMode::Style
+                }
+            }
+            _ => {
+                let open = self.template_opener();
+                let open_like = open.chars().next().unwrap();
+                if s.at(open_like) && s.at_str(open) {
+                    HtmlLexerMode::Template
+                } else if s.at('<') {
+                    HtmlLexerMode::Tag
+                } else {
+                    HtmlLexerMode::Text
+                }
+            }
+        };
+    }
 }
 
 impl Lexer for HtmlLexer {
@@ -168,6 +198,7 @@ impl Lexer for HtmlLexer {
                 match c {
                     '<' => {
                         if scan_html_comment(s, false) {
+                            self.set_next_mode(s, None);
                             return COMMENT;
                         }
                     }
@@ -204,54 +235,16 @@ impl Lexer for HtmlLexer {
                         }
                     }
                     '>' => {
-                        self.mode = match self.current_tag.take() {
-                            Some(ref tag) if tag == "script" => {
-                                if s.at('<') {
-                                    HtmlLexerMode::Tag
-                                } else {
-                                    HtmlLexerMode::Script
-                                }
-                            }
-                            Some(ref tag) if tag == "style" => {
-                                if s.at('<') {
-                                    HtmlLexerMode::Tag
-                                } else {
-                                    HtmlLexerMode::Style
-                                }
-                            }
-                            _ => {
-                                let open = self.template_opener();
-                                let open_like = open.chars().next().unwrap();
-                                if s.at(open_like) && s.at_str(open) {
-                                    HtmlLexerMode::Template
-                                } else if s.at('<') {
-                                    HtmlLexerMode::Tag
-                                } else {
-                                    HtmlLexerMode::Text
-                                }
-                            }
-                        };
+                        let tag = self.current_tag.take();
+                        self.set_next_mode(s, tag);
                         R_ANGLE
                     }
                     '/' => {
                         match s.current() {
                             Some('>') => {
                                 s.bump();
-                                self.mode = match self.current_tag.take() {
-                                    Some(ref tag) if tag == "script" => HtmlLexerMode::Script,
-                                    Some(ref tag) if tag == "style" => HtmlLexerMode::Style,
-                                    _ => {
-                                        let open = self.template_opener();
-                                        let open_like = open.chars().next().unwrap();
-                                        if s.at(open_like) && s.at_str(open) {
-                                            HtmlLexerMode::Template
-                                        } else if s.at('<') {
-                                            HtmlLexerMode::Tag
-                                        } else {
-                                            HtmlLexerMode::Text
-                                        }
-                                    }
-                                };
+                                let tag = self.current_tag.take();
+                                self.set_next_mode(s, tag);
                                 SLASH_R_ANGLE
                             }
                             _ => SLASH,

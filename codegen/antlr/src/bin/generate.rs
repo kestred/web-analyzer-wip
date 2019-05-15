@@ -461,6 +461,34 @@ fn emit_catch(out: &mut String, db: &Database, rule: &str, pat: &Pattern, dep: u
         return true;
     }
 
+    // Handle tail that's been split off a node (e.g. `NodeComplete`)
+    if let Pattern::NodeComplete(kind, pat) = pat {
+        emit_catch(out, db, rule, pat, dep, precond, label);
+        emit_depth(out, dep);
+        out.push_str("p.complete(_checkpoint.branch(&_marker), ");
+        out.push_str(kind);
+        out.push_str(");\n");
+        return true;
+    }
+    /*
+    else if let Pattern::Series(series) = pat {
+        if let Some(Pattern::NodeComplete(kind, right)) = series.iter().last() {
+            let inner = series.iter()
+                .take(series.len() - 1)
+                .chain(std::iter::once(right.as_ref()))
+                .cloned()
+                .collect();
+            let pat = Pattern::Series(inner);
+            emit_catch(out, db, rule, &pat, dep, precond, label);
+            emit_depth(out, dep);
+            out.push_str("p.complete(_checkpoint.branch(&_marker), ");
+            out.push_str(kind);
+            out.push_str(");\n");
+            return true;
+        }
+    }
+    */
+
     // Handle the general case
     emit_depth(out, dep);
     if let Some(label) = label {
